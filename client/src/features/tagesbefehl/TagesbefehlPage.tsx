@@ -24,7 +24,7 @@ export function TagesbefehlPage({ detail }: { detail: WkDetail }) {
   const [date, setDate] = useState(() => (days.includes(today()) ? today() : (days.find((d) => d >= wk.startDate) ?? days[0])));
   const [printDays, setPrintDays] = useState<string[]>([]);
   const q = useQuery({ queryKey: ['tagesbefehle', wk.id], queryFn: () => api.tagesbefehle(wk.id) });
-  const data = useSources(detail);
+  const data = useTagesbefehlSources(detail);
   const editable = canEditTagesbefehl(me, wk);
   const kpName = useQuery({ queryKey: ['org'], queryFn: api.org }).data?.kompanien.find((k) => k.id === wk.kpId)?.name ?? '';
   usePrintPage(['Tagesbefehl', kpName, wk.title].filter(Boolean).join(' · '));
@@ -39,7 +39,7 @@ export function TagesbefehlPage({ detail }: { detail: WkDetail }) {
     return () => clearTimeout(t);
   }, [printDays]);
 
-  const of = (d: string): Tagesbefehl => q.data?.find((t) => t.date === d) ?? { ...emptyTagesbefehl(), wkId: wk.id, date: d };
+  const of = (d: string) => tagesbefehlOf(q.data, wk.id, d);
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -56,7 +56,7 @@ export function TagesbefehlPage({ detail }: { detail: WkDetail }) {
           </select>
           <span className="flex-1" />
           <Button onClick={() => setPrintDays([date])}>Diesen Tag drucken</Button>
-          <Button variant="primary" onClick={() => setPrintDays(days.filter((d) => !wk.avorDays.includes(d) || d === date))}>
+          <Button variant="primary" onClick={() => setPrintDays(tagesbefehlDays(wk, date))}>
             Alle Tage drucken
           </Button>
         </div>
@@ -134,7 +134,7 @@ function ManualFields({ detail, day, editable }: { detail: WkDetail; day: Tagesb
 }
 
 /** Everything the Tagesbefehl is built from. */
-function useSources(detail: WkDetail) {
+export function useTagesbefehlSources(detail: WkDetail) {
   const me = useUser();
   const { wk } = detail;
   const personnel = canViewPersonnel(me, wk);
@@ -147,6 +147,7 @@ function useSources(detail: WkDetail) {
   const uebungen = useQuery({ queryKey: ['uebungen', wk.id], queryFn: () => api.uebungen(wk.id) });
   const org = useQuery({ queryKey: ['org'], queryFn: api.org });
   return {
+    ready: [requests, resources, strength, rapporte, pendenzen, uebungen, org].every((x) => x.isSuccess) && (!personnel || checkins.isSuccess),
     requests: requests.data ?? [],
     resources: resources.data ?? [],
     strength: strength.data ?? [],
@@ -159,7 +160,14 @@ function useSources(detail: WkDetail) {
   };
 }
 
-function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefehl; data: ReturnType<typeof useSources> }) {
+/** Days printed with «Alle Tage drucken» and in the Dossier: all WK days, AVOR days only if asked for. */
+export const tagesbefehlDays = (wk: WkDetail['wk'], extra?: string) => wkDays(wk).filter((d) => !wk.avorDays.includes(d) || d === extra);
+
+export const tagesbefehlOf = (list: Tagesbefehl[] | undefined, wkId: number, d: string): Tagesbefehl =>
+  list?.find((t) => t.date === d) ?? { ...emptyTagesbefehl(), wkId, date: d };
+
+/** One Tagesbefehl as an A4 page. */
+export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefehl; data: ReturnType<typeof useTagesbefehlSources> }) {
   const { wk, zuege, blocks, locations } = detail;
   const d = day.date;
   const nr = wkDays(wk).indexOf(d) + 1;

@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Ausbildungsvorbereitung, Block, Resource, ResourceRequest, Zug } from '@shared/types';
 import { BLOCK_TYPE_INFO, KDO_ID, REQUEST_STATUS_LABEL, RESOURCE_KIND_LABEL, STATUS_LABEL } from '@shared/types';
-import { canManagePersonnel, canViewAuftrag, canViewBefehl, canViewZug } from '@shared/permissions';
+import { canManagePersonnel, canViewAuftrag, canViewBefehl, canViewTagesbefehl, canViewZug } from '@shared/permissions';
 import { fmtDate, fmtTime, weekday, wkDays, zieleFor } from '@shared/util';
 import { api, type WkDetail } from '../../api';
 import { Briefkopf, marginBoxes, usePrintPage } from '../../components/Briefkopf';
@@ -13,6 +13,7 @@ import { withKdo } from '../arbeitsprogramm/columns';
 import { requestLabel } from '../ressourcen/conflicts';
 import { QrSheetContent } from '../personal/QrCodes';
 import { chunk, daysPerPage, LANDSCAPE, MM, PrintGrid } from './PrintGrid';
+import { Sheet as TagesbefehlSheet, tagesbefehlDays, tagesbefehlOf, useTagesbefehlSources } from '../tagesbefehl/TagesbefehlPage';
 
 type Variant = 'kp' | 'zug';
 const KP_SECTIONS = { deckblatt: 'Deckblatt', auftrag: 'Auftrag aus dem Ausbildungsbefehl', konzept: 'WK-Konzept / Befehl Kp Kdo', ap: 'Arbeitsprogramm (Blockübersicht)', ressourcen: 'Fahrzeuge, Räume und Standorte' } as const;
@@ -30,9 +31,19 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
   const [zugId, setZugId] = useState<number | null>(viewZuege.find((z) => z.id === me.zugId)?.id ?? viewZuege[0]?.id ?? null);
   // Kp Kdt: the QR codes of the check-in, one notice per WK day.
   const manage = canManagePersonnel(me, wk);
-  const sectionsDef = variant === 'kp' ? (manage ? { ...KP_SECTIONS, qr: 'QR-Codes Check-in (Aushang pro Tag)' } : KP_SECTIONS) : ZUG_SECTIONS;
-  // The QR notices are printed on demand, not with every Dossier.
-  const [off, setOff] = useState<string[]>(['qr']);
+  // Kp Kdt and Bat Kommando: the Tagesbefehle, one page per WK day.
+  const tagesbefehl = canViewTagesbefehl(me, wk);
+  const sectionsDef =
+    variant === 'kp'
+      ? {
+          ...KP_SECTIONS,
+          ...(tagesbefehl ? { tagesbefehl: 'Tagesbefehle (ein Blatt pro Tag)' } : {}),
+          ...(manage ? { qr: 'QR-Codes Check-in (Aushang pro Tag)' } : {}),
+        }
+      : ZUG_SECTIONS;
+  // Tagesbefehle and QR notices are printed on demand, not with every Dossier.
+  const [off, setOff] = useState<string[]>(['tagesbefehl', 'qr']);
+  const [tbReady, setTbReady] = useState(false);
   const on = (k: string) => !off.includes(k);
   const zug = zuege.find((z) => z.id === zugId) ?? null;
 
@@ -55,6 +66,7 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
   usePrintPage(footer, { stand, margin: '12mm 14mm 16mm 14mm' });
 
   const included = (Object.keys(sectionsDef) as string[]).filter(on);
+  const tbPending = variant === 'kp' && tagesbefehl && on('tagesbefehl') && !tbReady;
   const ready = org.isSuccess && konzept.isSuccess && requests.isSuccess && resources.isSuccess && avs.isSuccess && (variant === 'kp' || zfhr.isSuccess || !zugId) && (!manage || variant !== 'kp' || !on('qr') || checkinDays.isSuccess);
 
   return (
@@ -86,7 +98,7 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
           </label>
         ))}
         <span className="flex-1" />
-        <Button variant="primary" disabled={!ready} onClick={() => window.print()}>
+        <Button variant="primary" disabled={!ready || tbPending} onClick={() => window.print()}>
           Drucken / PDF
         </Button>
       </div>
@@ -183,6 +195,7 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
               canAuftrag={canViewAuftrag(me, wk.kpId)}
             />
           ) : null}
+          {variant === 'kp' && tagesbefehl && on('tagesbefehl') && <TagesbefehlSections detail={detail} footer={footer} stand={stand} onReady={setTbReady} />}
           {variant === 'kp' &&
             manage &&
             on('qr') &&
@@ -314,6 +327,28 @@ function KpSections(p: {
           </table>
         </Sheet>
       )}
+    </>
+  );
+}
+
+/** The Tagesbefehle of all WK days (as «Alle Tage drucken» on the Tagesbefehl page). */
+function TagesbefehlSections({ detail, footer, stand, onReady }: { detail: WkDetail; footer: string; stand: string; onReady: (ready: boolean) => void }) {
+  const { wk } = detail;
+  const q = useQuery({ queryKey: ['tagesbefehle', wk.id], queryFn: () => api.tagesbefehle(wk.id) });
+  const data = useTagesbefehlSources(detail);
+  const ready = q.isSuccess && data.ready;
+  useEffect(() => {
+    onReady(ready);
+    return () => onReady(false);
+  }, [ready, onReady]);
+  if (!ready) return <p className="no-print p-8 text-center text-slate-500">Tagesbefehle werden zusammengestellt …</p>;
+  return (
+    <>
+      {tagesbefehlDays(wk).map((d) => (
+        <Sheet key={`tb${d}`} footer={footer} stand={stand}>
+          <TagesbefehlSheet detail={detail} day={tagesbefehlOf(q.data, wk.id, d)} data={data} />
+        </Sheet>
+      ))}
     </>
   );
 }
