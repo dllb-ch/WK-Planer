@@ -1,5 +1,6 @@
 // Pure layout and analysis helpers for the Arbeitsprogramm grid.
-import type { Block, Location, Zug } from '@shared/types';
+import type { Block, Location, Zug, Duty } from '@shared/types';
+import { currentT } from '../../lib/lang';
 
 export interface Layout {
   days: string[];
@@ -10,7 +11,7 @@ export interface Layout {
   /** Does the column's Zug serve on that day? (Default: yes.) */
   serves?: (date: string, zugId: number) => boolean;
   /** Duty of the column's Zug (shown where it differs from the type of the day, e.g. KVK on a WK day). */
-  duty?: (date: string, zugId: number) => string;
+  duty?: (date: string, zugId: number) => Duty;
   dayStart: number;
   dayEnd: number;
   snap: number;
@@ -90,7 +91,7 @@ export function analyse(blocks: Block[], zuege: Zug[], locations: Location[]): {
             kind: 'overlap',
             blockIds: [list[i].id, list[j].id],
             date,
-            text: `${zug.name}: «${list[i].title}» überschneidet sich mit «${list[j].title}»`,
+            text: currentT('ap.hint.overlap', { zug: zug.name, a: list[i].title, b: list[j].title }),
           });
         }
         const next = list[i + 1];
@@ -108,7 +109,7 @@ export function analyse(blocks: Block[], zuege: Zug[], locations: Location[]): {
             kind: 'verschiebung',
             blockIds: [cur.id, next.id],
             date,
-            text: `${zug.name}: keine Verschiebung von ${locName(cur.locationId)} nach ${locName(next.locationId)} eingeplant`,
+            text: currentT('ap.hint.noMove', { zug: zug.name, from: locName(cur.locationId), to: locName(next.locationId) }),
           });
         }
       }

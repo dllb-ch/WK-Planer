@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { BlockInput, Location, Zug } from '@shared/types';
-import { BLOCK_TYPE_INFO, BLOCK_TYPES } from '@shared/types';
-import { fmtDate, fmtTime, parseTime, weekday } from '@shared/util';
+import { BLOCK_TYPES } from '@shared/types';
+import { fmtDate, fmtTime, parseTime } from '@shared/util';
+import { useT } from '../../i18n';
 import { Button, Field, Modal, TextArea } from '../../components/ui';
 import { PersonSelect } from '../../components/PersonSelect';
 
@@ -30,6 +31,7 @@ export function BlockDialog(p: Props) {
   const [b, setB] = useState<BlockInput>(p.initial);
   const set = <K extends keyof BlockInput>(k: K, v: BlockInput[K]) => setB((x) => ({ ...x, [k]: v }));
   const ro = p.readOnly;
+  const { t, weekdayShort } = useT();
 
   const toggleZug = (id: number) => {
     const has = b.zugIds.includes(id);
@@ -51,51 +53,51 @@ export function BlockDialog(p: Props) {
         <>
           {p.onDelete && !ro && (
             <Button variant="danger" className="mr-auto" onClick={p.onDelete}>
-              Löschen
+              {t('common.delete')}
             </Button>
           )}
-          {p.onDuplicate && !ro && <Button onClick={p.onDuplicate}>Duplizieren</Button>}
-          <Button onClick={p.onClose}>{ro ? 'Schliessen' : 'Abbrechen'}</Button>
+          {p.onDuplicate && !ro && <Button onClick={p.onDuplicate}>{t('bd.duplicate')}</Button>}
+          <Button onClick={p.onClose}>{ro ? t('common.close') : t('common.cancel')}</Button>
           {!ro && (
             <Button variant="primary" disabled={!valid} onClick={save}>
-              Speichern
+              {t('common.save')}
             </Button>
           )}
         </>
       }
     >
-      {p.lockedByBat && <p className="rounded bg-pink-50 px-3 py-2 text-sm text-pink-800">Vorgabe des Bat Kommandos – nur durch das Bat änderbar.</p>}
-      <Field label="Titel / Thema">
+      {p.lockedByBat && <p className="rounded bg-pink-50 px-3 py-2 text-sm text-pink-800">{t('bd.batPreset')}</p>}
+      <Field label={t('bd.titleTopic')}>
         <input className="input" autoFocus={!ro} disabled={ro} value={b.title} onChange={(e) => set('title', e.target.value)} />
       </Field>
-      <Field label="Art">
+      <Field label={t('bd.type')}>
         <select className="input" disabled={ro} value={b.type} onChange={(e) => set('type', e.target.value as BlockInput['type'])}>
-          {BLOCK_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {BLOCK_TYPE_INFO[t].label}
+          {BLOCK_TYPES.map((x) => (
+            <option key={x} value={x}>
+              {t(`block.${x}`)}
             </option>
           ))}
         </select>
       </Field>
       <div className="grid grid-cols-3 gap-3">
-        <Field label="Tag">
+        <Field label={t('ap.day')}>
           <select className="input" disabled={ro} value={b.date} onChange={(e) => set('date', e.target.value)}>
             {p.days.map((d) => (
               <option key={d} value={d}>
-                {weekday(d).slice(0, 2)} {fmtDate(d)}
+                {weekdayShort(d)} {fmtDate(d)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Von">
+        <Field label={t('bd.from')}>
           <input type="time" step={300} className="input" disabled={ro} value={fmtTime(b.startMin)} onChange={(e) => e.target.value && set('startMin', parseTime(e.target.value))} />
         </Field>
-        <Field label="Bis">
+        <Field label={t('bd.to')}>
           <input type="time" step={300} className="input" disabled={ro} value={fmtTime(b.endMin)} onChange={(e) => e.target.value && set('endMin', parseTime(e.target.value))} />
         </Field>
       </div>
       <div>
-        <span className="label">Züge</span>
+        <span className="label">{t('bd.zuege')}</span>
         <div className="flex flex-wrap gap-2">
           {p.zuege.map((z) => (
             <label key={z.id} className={`flex items-center gap-1.5 rounded border px-2 py-1 text-sm ${b.zugIds.includes(z.id) ? 'border-zs-blue bg-blue-50' : 'border-slate-200'}`}>
@@ -104,9 +106,9 @@ export function BlockDialog(p: Props) {
             </label>
           ))}
         </div>
-        {!contiguous && !ro && <p className="mt-1 text-xs text-red-600">Die gewählten Züge müssen nebeneinander liegen.</p>}
+        {!contiguous && !ro && <p className="mt-1 text-xs text-red-600">{t('bd.adjacent')}</p>}
       </div>
-      <Field label="Verantwortlich">
+      <Field label={t('bd.responsible')}>
         {ro ? (
           <input className="input" disabled value={b.verantwortlich} />
         ) : (
@@ -114,8 +116,8 @@ export function BlockDialog(p: Props) {
         )}
       </Field>
       <section className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2">
-        <h3 className="label !mb-0">Standort & Ressourcen</h3>
-        <Field label="Standort">
+        <h3 className="label !mb-0">{t('bd.locationResources')}</h3>
+        <Field label={t('bd.location')}>
           <select
             className="input"
             disabled={ro}
@@ -132,7 +134,7 @@ export function BlockDialog(p: Props) {
             }}
           >
             <option value="">–</option>
-            <optgroup label="Standorte (Legende)">
+            <optgroup label={t('bd.locationsLegend')}>
               {p.locations.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.nr} = {l.name}
@@ -143,7 +145,7 @@ export function BlockDialog(p: Props) {
             {(['RAUM', 'GELAENDE'] as const).map((kind) => {
               const list = (p.catalogue ?? []).filter((c) => c.kind === kind && !linked.has(c.id));
               return list.length > 0 && p.onAddLocation ? (
-                <optgroup key={kind} label={kind === 'RAUM' ? 'Räume (Katalog)' : 'Gelände (Katalog)'}>
+                <optgroup key={kind} label={kind === 'RAUM' ? t('bd.roomsCatalogue') : t('bd.sitesCatalogue')}>
                   {list.map((c) => (
                     <option key={c.id} value={`cat:${c.id}`}>
                       {c.name}
@@ -156,16 +158,16 @@ export function BlockDialog(p: Props) {
         </Field>
         {p.resources?.(b)}
       </section>
-      <Field label="Bemerkungen">
-        <TextArea disabled={ro} value={b.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Teilnehmende, Material, Hinweise …" />
+      <Field label={t('common.notes')}>
+        <TextArea disabled={ro} value={b.notes} onChange={(e) => set('notes', e.target.value)} placeholder={t('bd.notesPh')} />
       </Field>
       {p.canLock && !ro && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={b.locked} onChange={(e) => set('locked', e.target.checked)} />
-          Sperren (Zugführer können den Block nicht verschieben)
+          {t('bd.lock')}
         </label>
       )}
-      {b.endMin <= b.startMin && <p className="text-xs text-red-600">Ende muss nach Beginn liegen.</p>}
+      {b.endMin <= b.startMin && <p className="text-xs text-red-600">{t('bd.endAfterStart')}</p>}
     </Modal>
   );
 }

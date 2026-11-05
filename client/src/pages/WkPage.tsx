@@ -23,6 +23,7 @@ import { TagesbefehlPage } from '../features/tagesbefehl/TagesbefehlPage';
 import { RapportPage } from '../features/rapporte/RapportPage';
 import { DossierPage } from '../features/dossier/DossierPage';
 import { LektionenPage } from '../features/av/LektionenPage';
+import { useT } from '../i18n';
 
 export function WkPage() {
   const id = Number(useParams().id);
@@ -30,6 +31,7 @@ export function WkPage() {
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
+  const { t, tn } = useT();
   const [review, setReview] = useState<'approve' | 'reject' | null>(null);
   const [note, setNote] = useState('');
 
@@ -54,9 +56,9 @@ export function WkPage() {
 
   if (q.error) {
     const status = q.error instanceof ApiError ? q.error.status : 0;
-    return <div className="p-8 text-slate-600">{status === 403 ? 'Kein Zugriff auf diesen WK.' : errMsg(q.error)}</div>;
+    return <div className="p-8 text-slate-600">{status === 403 ? t('wk.noAccess') : errMsg(q.error)}</div>;
   }
-  if (!q.data) return <div className="p-8 text-slate-500">Laden …</div>;
+  if (!q.data) return <div className="p-8 text-slate-500">{t('common.loading')}</div>;
   const { wk } = q.data;
   const zugFirst = me.role === 'ZFHR' || me.role === 'KADER';
 
@@ -65,53 +67,57 @@ export function WkPage() {
     `shrink-0 rounded-[7px] px-3 py-1 text-[13px] transition ${isActive ? 'bg-white font-semibold text-slate-900 shadow-[0_1px_3px_rgb(0_0_0/0.12),0_0_0_0.5px_rgb(0_0_0/0.04)]' : 'font-medium text-slate-600 hover:text-slate-900'}`;
 
   // Sections of the WK with their pages; the first visible page opens the section.
-  const all: { label: string; subs: { to: string; label: string; show?: boolean; also?: string[] }[] }[] = [
-    { label: 'Zugansicht', subs: [{ to: 'zug', label: 'Zugansicht' }] },
+  const all: { id: string; label: string; subs: { to: string; label: string; show?: boolean; also?: string[] }[] }[] = [
+    { id: 'zug', label: t('wk.tab.zug'), subs: [{ to: 'zug', label: t('wk.tab.zug') }] },
     {
-      label: 'Auftrag Kp Kdt',
+      id: 'auftrag',
+      label: t('wk.tab.auftrag'),
       subs: [
-        { to: '', label: 'Arbeitsprogramm' },
-        { to: 'konzept', label: 'WK-Konzept' },
+        { to: '', label: t('ap.title') },
+        { to: 'konzept', label: t('wk.tab.konzept') },
       ],
     },
-    { label: 'Zugführer-AP', subs: [{ to: 'zfhr', label: 'Zugführer-AP' }] },
+    { id: 'zfhr', label: t('wk.tab.zfhr'), subs: [{ to: 'zfhr', label: t('wk.tab.zfhr') }] },
     {
-      label: 'Ausbildung',
+      id: 'ausbildung',
+      label: t('wk.tab.ausbildung'),
       subs: [
-        { to: 'lektionen', label: 'Lektionen', also: ['av'] },
-        { to: 'uebungen', label: 'Übungen' },
-        { to: 'erkundungen', label: 'Erkundungen' },
+        { to: 'lektionen', label: t('wk.tab.lektionen'), also: ['av'] },
+        { to: 'uebungen', label: t('wk.tab.uebungen') },
+        { to: 'erkundungen', label: t('wk.tab.erkundungen') },
       ],
     },
     {
-      label: 'Ressourcen',
+      id: 'ressourcen',
+      label: t('wk.tab.ressourcen'),
       subs: [
-        { to: 'ressourcen', label: 'Fahrzeuge, Räume, Gelände' },
-        { to: 'personal', label: 'Personal', show: canViewPersonnel(me, wk) },
+        { to: 'ressourcen', label: t('wk.tab.material') },
+        { to: 'personal', label: t('wk.tab.personal'), show: canViewPersonnel(me, wk) },
       ],
     },
-    { label: 'Rapporte', subs: [{ to: 'rapporte', label: 'Rapporte' }] },
-    { label: 'Pendenzen', subs: [{ to: 'pendenzen', label: 'Pendenzen', also: ['meilensteine'] }] },
-    { label: 'Dateien', subs: [{ to: 'dateien', label: 'Dateien' }] },
+    { id: 'rapporte', label: t('wk.tab.rapporte'), subs: [{ to: 'rapporte', label: t('wk.tab.rapporte') }] },
+    { id: 'pendenzen', label: t('wk.tab.pendenzen'), subs: [{ to: 'pendenzen', label: t('wk.tab.pendenzen'), also: ['meilensteine'] }] },
+    { id: 'dateien', label: t('wk.tab.dateien'), subs: [{ to: 'dateien', label: t('wk.tab.dateien') }] },
     {
-      label: 'Dossier',
+      id: 'dossier',
+      label: t('wk.tab.dossier'),
       subs: [
-        { to: 'dossier', label: 'Dossier' },
-        { to: 'tagesbefehl', label: 'Tagesbefehl', show: canViewTagesbefehl(me, wk) },
+        { to: 'dossier', label: t('wk.tab.dossier') },
+        { to: 'tagesbefehl', label: t('wk.tab.tagesbefehl'), show: canViewTagesbefehl(me, wk) },
       ],
     },
   ];
   const ordered = zugFirst ? all : [all[1], all[0], ...all.slice(2)];
   const sections = ordered.map((sec) => ({ ...sec, subs: sec.subs.filter((x) => x.show !== false) })).filter((sec) => sec.subs.length);
   const segment = location.pathname.split('/')[3] ?? '';
-  const active = sections.find((sec) => sec.subs.some((x) => x.to === segment || x.also?.includes(segment))) ?? sections.find((sec) => sec.label === 'Auftrag Kp Kdt');
+  const active = sections.find((sec) => sec.subs.some((x) => x.to === segment || x.also?.includes(segment))) ?? sections.find((sec) => sec.id === 'auftrag');
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="no-print hairline-b px-3 pb-2 pt-2 sm:px-4 sm:pt-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <Link to="/" className="-ml-1 rounded-full px-1.5 py-0.5 text-[15px] text-zs-blue hover:bg-slate-200/60" aria-label="Zur Übersicht">
-            ‹<span className="hidden sm:inline"> Übersicht</span>
+          <Link to="/" className="-ml-1 rounded-full px-1.5 py-0.5 text-[15px] text-zs-blue hover:bg-slate-200/60" aria-label={t('wk.toOverview')}>
+            ‹<span className="hidden sm:inline"> {t('nav.overview')}</span>
           </Link>
           <h1 className="text-lg font-bold tracking-tight sm:text-[22px]">{wk.title}</h1>
           <StatusBadge status={wk.status} />
@@ -121,28 +127,28 @@ export function WkPage() {
           <span className="flex-1" />
           {!wk.archived && canSubmit(me, wk) && (
             <Button variant="primary" disabled={action.isPending} onClick={() => action.mutate('submit')}>
-              Zur Freigabe einreichen
+              {t('wk.submit')}
             </Button>
           )}
           {!wk.archived && canReview(me, wk) && (
             <>
               <Button variant="danger" onClick={() => setReview('reject')}>
-                Zurückweisen
+                {t('wk.reject')}
               </Button>
               <Button variant="primary" onClick={() => setReview('approve')}>
-                Freigeben
+                {t('wk.approve')}
               </Button>
             </>
           )}
           {!wk.archived && canReopen(me, wk) && (
             <Button disabled={action.isPending} onClick={() => action.mutate('reopen')}>
-              {wk.status === 'EINGEREICHT' ? 'Einreichung zurückziehen' : 'Wieder öffnen'}
+              {wk.status === 'EINGEREICHT' ? t('wk.withdraw') : t('wk.reopen')}
             </Button>
           )}
         </div>
         {wk.archived && (
           <p className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-slate-200/70 px-3 py-1.5 text-sm text-slate-700">
-            <b>Archiviert</b> – nur lesen.
+            {tn('wk.archived', { b: <b>{t('wk.archivedBold')}</b> })}
             {canArchiveWk(me, wk) && (
               <Button
                 className="!py-0.5 text-xs"
@@ -156,20 +162,20 @@ export function WkPage() {
                   }
                 }}
               >
-                Wiederherstellen
+                {t('dash.restore')}
               </Button>
             )}
           </p>
         )}
         {wk.reviewNote && (wk.status === 'ZURUECKGEWIESEN' || wk.status === 'FREIGEGEBEN') && (
           <p className={`mt-2 rounded-lg px-3 py-1.5 text-sm ${wk.status === 'ZURUECKGEWIESEN' ? 'bg-red-50 text-red-800' : 'bg-emerald-50 text-emerald-800'}`}>
-            <b>Bat Kommando:</b> {wk.reviewNote}
+            <b>{t('wk.batNote')}</b> {wk.reviewNote}
           </p>
         )}
         <div className="-mx-3 mt-2 overflow-x-auto px-3 sm:mx-0 sm:px-0">
           <nav className="inline-flex gap-0.5 whitespace-nowrap rounded-[9px] bg-slate-200/80 p-0.5">
             {sections.map((sec) => (
-              <Link key={sec.label} to={sec.subs[0].to} className={tab(sec === active)}>
+              <Link key={sec.id} to={sec.subs[0].to} className={tab(sec === active)}>
                 {sec.label}
               </Link>
             ))}
@@ -218,30 +224,30 @@ export function WkPage() {
 
       {review && (
         <Modal
-          title={review === 'approve' ? 'Arbeitsprogramm freigeben' : 'Arbeitsprogramm zurückweisen'}
+          title={review === 'approve' ? t('wk.approveTitle') : t('wk.rejectTitle')}
           onClose={() => setReview(null)}
           footer={
             <>
-              <Button onClick={() => setReview(null)}>Abbrechen</Button>
+              <Button onClick={() => setReview(null)}>{t('common.cancel')}</Button>
               <Button
                 variant={review === 'approve' ? 'primary' : 'danger'}
                 disabled={action.isPending || (review === 'reject' && !note.trim())}
                 onClick={() => action.mutate(review)}
               >
-                {review === 'approve' ? 'Freigeben' : 'Zurückweisen'}
+                {review === 'approve' ? t('wk.approve') : t('wk.reject')}
               </Button>
             </>
           }
         >
           <p className="text-sm text-slate-600">
             {review === 'approve'
-              ? 'Nach der Freigabe ist das Arbeitsprogramm eingefroren. Der Kp Kdt kann es bei Bedarf wieder öffnen.'
-              : 'Der Kp Kdt erhält das Arbeitsprogramm zur Überarbeitung zurück.'}
+              ? t('wk.approveHint')
+              : t('wk.rejectHint')}
           </p>
           <TextArea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={review === 'approve' ? 'Bemerkung (optional)' : 'Begründung / Auflagen (erforderlich)'}
+            placeholder={review === 'approve' ? t('wk.noteOptional') : t('wk.noteRequired')}
             autoFocus
           />
         </Modal>

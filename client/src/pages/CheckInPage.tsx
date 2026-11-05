@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CheckInInput, Diet, HealthPoint, HealthStatus, PublicCheckIn } from '@shared/types';
 import { DIETS, HEALTH_POINT_KEYS } from '@shared/types';
-import { LANGS, LANG_NAME } from '@shared/i18n';
+import { LangSwitch } from '../components/LangSwitch';
 import { fmtDate } from '@shared/util';
 import { useT } from '../i18n';
 import { api, ApiError } from '../api';
@@ -162,7 +162,7 @@ export function CheckInPage({ token }: { token: string }) {
               </p>
             )}
           </div>
-          <LangSwitch />
+          <LangSwitch className="ml-auto" />
         </header>
 
         {!info ? (
@@ -394,21 +394,3 @@ function HealthStep({
   );
 }
 
-/** Language of the page (people check in without an account; the choice stays on the phone). */
-function LangSwitch() {
-  const { lang, setLang } = useT();
-  return (
-    <select
-      className="ml-auto rounded-lg bg-transparent py-1 text-[15px] text-zs-blue"
-      aria-label="Sprache · Langue · Lingua · Language"
-      value={lang}
-      onChange={(e) => setLang(e.target.value as (typeof LANGS)[number])}
-    >
-      {LANGS.map((l) => (
-        <option key={l} value={l}>
-          {LANG_NAME[l]}
-        </option>
-      ))}
-    </select>
-  );
-}

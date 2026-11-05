@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import type { WkStatus } from '@shared/types';
-import { STATUS_LABEL } from '@shared/types';
+import { useT } from '../i18n';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 // As in SwiftUI: prominent (filled tint), bordered (tinted fill), destructive and plain.
@@ -51,11 +51,13 @@ const STATUS_STYLE: Record<WkStatus, string> = {
   FREIGEGEBEN: 'bg-emerald-100 text-emerald-800',
   ZURUECKGEWIESEN: 'bg-red-100 text-red-800',
 };
-export const StatusBadge = ({ status }: { status: WkStatus }) => (
-  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[status]}`}>{STATUS_LABEL[status]}</span>
-);
+export function StatusBadge({ status }: { status: WkStatus }) {
+  const { t } = useT();
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[status]}`}>{t(`status.${status}`)}</span>;
+}
 
 export function Modal({ title, onClose, children, footer, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+  const { t } = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -79,7 +81,7 @@ export function Modal({ title, onClose, children, footer, wide }: { title: strin
           <button
             className="grid h-7 w-7 place-items-center rounded-full bg-slate-200/80 text-[13px] font-bold text-slate-500 hover:bg-slate-300/80"
             onClick={onClose}
-            aria-label="Schliessen"
+            aria-label={t('ui.close')}
           >
             ✕
           </button>

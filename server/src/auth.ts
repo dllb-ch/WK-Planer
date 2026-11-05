@@ -36,7 +36,7 @@ export function sessionMiddleware(db: DB) {
 }
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction) {
-  if (!req.user) return next(new HttpError(401, 'Nicht angemeldet'));
+  if (!req.user) return next(new HttpError(401, 'err.auth.required'));
   next();
 }
 
@@ -63,7 +63,7 @@ export function authRouter(db: DB) {
     const { email, password } = parse(z.object({ email: z.string(), password: z.string() }), req.body);
     const row = (await db.prepare('SELECT * FROM app_user WHERE lower(email) = lower(?)').get(email.trim())) as any;
     if (!row || !bcrypt.compareSync(password, row.pw_hash)) {
-      throw new HttpError(401, 'E-Mail oder Passwort falsch');
+      throw new HttpError(401, 'err.auth.wrong');
     }
     await startSession(res, row);
   });
@@ -84,7 +84,7 @@ export function authRouter(db: DB) {
     const { email } = parse(z.object({ email: z.string() }), req.body);
     const row = (await db.prepare('SELECT * FROM app_user WHERE lower(email) = lower(?)').get(email.trim())) as any;
     if (!isDemo(u.email) || !row || !isDemo(row.email) || !bcrypt.compareSync(DEMO_PASSWORD, row.pw_hash)) {
-      throw new HttpError(403, 'Nur zwischen Demo-Konten');
+      throw new HttpError(403, 'err.auth.demoOnly');
     }
     const token = req.cookies?.[COOKIE];
     if (token) await db.prepare('DELETE FROM session WHERE token = ?').run(token);
@@ -109,8 +109,8 @@ export function authRouter(db: DB) {
       req.body,
     );
     const row = (await db.prepare('SELECT pw_hash FROM app_user WHERE id = ?').get(u.id)) as any;
-    if (!bcrypt.compareSync(oldPassword, row.pw_hash)) throw new HttpError(400, 'Aktuelles Passwort falsch');
-    if (oldPassword === newPassword) throw new HttpError(400, 'Das neue Passwort muss sich vom bisherigen unterscheiden');
+    if (!bcrypt.compareSync(oldPassword, row.pw_hash)) throw new HttpError(400, 'err.auth.wrongPassword');
+    if (oldPassword === newPassword) throw new HttpError(400, 'err.auth.samePassword');
     await db.prepare('UPDATE app_user SET pw_hash = ? WHERE id = ?').run(hashPassword(newPassword), u.id);
     // Other devices have to sign in again with the new password.
     await db.prepare('DELETE FROM session WHERE user_id = ? AND token != ?').run(u.id, req.cookies?.[COOKIE] ?? '');
@@ -131,9 +131,9 @@ export function authRouter(db: DB) {
     const u = user(req);
     const { password, email } = parse(z.object({ password: z.string(), email: z.string().trim().toLowerCase().email('Ungültige E-Mail-Adresse').max(200) }), req.body);
     const row = (await db.prepare('SELECT * FROM app_user WHERE id = ?').get(u.id)) as any;
-    if (!bcrypt.compareSync(password, row.pw_hash)) throw new HttpError(400, 'Aktuelles Passwort falsch');
+    if (!bcrypt.compareSync(password, row.pw_hash)) throw new HttpError(400, 'err.auth.wrongPassword');
     if (await db.prepare('SELECT 1 FROM app_user WHERE lower(email) = lower(?) AND id != ?').get(email, u.id)) {
-      throw new HttpError(409, 'Diese E-Mail-Adresse wird bereits verwendet');
+      throw new HttpError(409, 'err.auth.emailTaken');
     }
     await db.prepare('UPDATE app_user SET email = ? WHERE id = ?').run(email, u.id);
     await audit(db, u.id, 'user', u.id, 'email', { from: row.email, to: email });

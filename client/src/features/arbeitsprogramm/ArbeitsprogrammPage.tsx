@@ -11,7 +11,8 @@ import {
   canLockBlocks,
   canSpanZuege,
 } from '@shared/permissions';
-import { defaultDuty, dutyOf, fmtDate, fmtTime, isAvorDay, isKvkDay, parseTime, servesOnDay, weekday, wkDays } from '@shared/util';
+import { defaultDuty, dutyOf, fmtDate, fmtTime, isAvorDay, isKvkDay, parseTime, servesOnDay, wkDays } from '@shared/util';
+import { useT } from '../../i18n';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Button, errMsg, Field, Modal, useToast } from '../../components/ui';
@@ -53,6 +54,7 @@ type DialogState =
 
 export function ArbeitsprogrammPage({ detail }: { detail: WkDetail }) {
   const me = useUser();
+  const { t, lang } = useT();
   const toast = useToast();
   const qc = useQueryClient();
   const { wk, zuege, locations, blocks } = detail;
@@ -77,7 +79,8 @@ export function ArbeitsprogrammPage({ detail }: { detail: WkDetail }) {
 
   const daySel = useDaySelection(wk, 'ap');
   const days = daySel.days;
-  const columns = useMemo(() => withKdo(wk.kpId, zuege), [wk.kpId, zuege]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the «Kdo» column is named in the language
+  const columns = useMemo(() => withKdo(wk.kpId, zuege), [wk.kpId, zuege, lang]);
   const cols = Math.max(1, days.length * columns.length);
   const layout: Layout = {
     days,
@@ -95,7 +98,8 @@ export function ArbeitsprogrammPage({ detail }: { detail: WkDetail }) {
     ppm: printing ? (PRINT_H - HEADER_H) / (wk.dayEnd - wk.dayStart) : zoom.ppm,
   };
 
-  const { hints, conflictIds } = useMemo(() => analyse(blocks, columns, locations), [blocks, columns, locations]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- hints are texts in the language
+  const { hints, conflictIds } = useMemo(() => analyse(blocks, columns, locations), [blocks, columns, locations, lang]);
   const selected = blocks.find((b) => b.id === selectedId) ?? null;
   const canEdit = useCallback((b: Block) => canEditBlock(me, wk, b), [me, wk]);
   const source = me.role === 'BAT' ? 'BAT' : 'KP';
@@ -173,7 +177,7 @@ export function ArbeitsprogrammPage({ detail }: { detail: WkDetail }) {
       newBlock({ date: at.date, zugIds: [at.zugId], startMin: start, endMin: Math.min(start + 60, wk.dayEnd) });
     },
     canCreateAt: (zugId) => canCreateIn(columns.findIndex((c) => c.id === zugId)),
-    extraEmptyItems: () => (showStandard ? [{ label: 'Standardblöcke einfügen …', icon: '▦', onClick: () => setDialog({ kind: 'standardtag' }) }] : []),
+    extraEmptyItems: () => (showStandard ? [{ label: t('ap.insertStandard'), icon: '▦', onClick: () => setDialog({ kind: 'standardtag' }) }] : []),
   });
 
   const nudge = (b: Block, dMin: number, dDay: number, resize: boolean) => {
@@ -242,71 +246,71 @@ export function ArbeitsprogrammPage({ detail }: { detail: WkDetail }) {
                 className={`rounded px-2.5 py-1 text-xs font-medium ${view === v ? 'bg-zs-blue text-white' : 'text-slate-600 hover:bg-slate-100'}`}
                 onClick={() => setView(v)}
               >
-                {v === 'grid' ? 'Raster' : 'Liste'}
+                {v === 'grid' ? t('ap.grid') : t('ap.list')}
               </button>
             ))}
           </div>
           <DaySelector wk={wk} all={daySel.all} days={days} onChange={daySel.set} />
           {canCreateAny && view === 'grid' && (
             <Button variant="primary" onClick={newBlockDefault}>
-              + Block
+              {t('ap.newBlockButton')}
             </Button>
           )}
           {view === 'grid' && (
             <>
-              <Button variant="ghost" disabled={!ops.canUndo} onClick={ops.undo} title="Rückgängig (Ctrl/Cmd+Z)">
+              <Button variant="ghost" disabled={!ops.canUndo} onClick={ops.undo} title={t('ap.undo')}>
                 ↶
               </Button>
-              <Button variant="ghost" disabled={!ops.canRedo} onClick={ops.redo} title="Wiederholen (Ctrl/Cmd+Shift+Z)">
+              <Button variant="ghost" disabled={!ops.canRedo} onClick={ops.redo} title={t('ap.redo')}>
                 ↷
               </Button>
             </>
           )}
           {(canEditApStructure(me, wk) || (ownZugId !== null && canCreateBlock(me, wk, { zugIds: [ownZugId], locked: false, source: 'KP' }))) && (
             <Button className="max-md:hidden" onClick={() => setDialog({ kind: 'standardtag' })}>
-              Standardblöcke
+              {t('ap.standardBlocks')}
             </Button>
           )}
           {canEditApStructure(me, wk) && (
             <Button className="max-md:hidden" onClick={() => setDialog({ kind: 'copy' })}>
-              Aus WK kopieren
+              {t('ap.copyFromWk')}
             </Button>
           )}
           {(canEditApStructure(me, wk) || (me.role === 'BAT' && wk.status !== 'FREIGEGEBEN')) && (
-            <Button onClick={() => setDialog({ kind: 'settings' })}>Einstellungen</Button>
+            <Button onClick={() => setDialog({ kind: 'settings' })}>{t('ap.settings')}</Button>
           )}
           <span className="flex-1" />
           <label className="flex items-center gap-1.5 text-xs text-slate-600">
-            <input type="checkbox" checked={showResources} onChange={(e) => setShowResources(e.target.checked)} /> Ressourcen
+            <input type="checkbox" checked={showResources} onChange={(e) => setShowResources(e.target.checked)} /> {t('ap.resources')}
           </label>
           {ownZugId && zuege.some((z) => z.id === ownZugId) && (
             <label className="flex items-center gap-1.5 text-xs text-slate-600">
-              <input type="checkbox" checked={dimOthers} onChange={(e) => setDimOthers(e.target.checked)} /> Nur mein Zug
+              <input type="checkbox" checked={dimOthers} onChange={(e) => setDimOthers(e.target.checked)} /> {t('ap.onlyMyZug')}
             </label>
           )}
           {view === 'grid' && (
             <div className="flex items-center gap-1 text-xs text-slate-500 max-md:hidden">
-              <span>Breite</span>
-              <input type="range" min={50} max={200} value={zoom.colW} onChange={(e) => setZoom({ ...zoom, colW: Number(e.target.value) })} className="w-20" aria-label="Spaltenbreite" />
-              <span>Höhe</span>
-              <input type="range" min={6} max={25} value={zoom.ppm * 10} onChange={(e) => setZoom({ ...zoom, ppm: Number(e.target.value) / 10 })} className="w-20" aria-label="Zeilenhöhe" />
+              <span>{t('ap.width')}</span>
+              <input type="range" min={50} max={200} value={zoom.colW} onChange={(e) => setZoom({ ...zoom, colW: Number(e.target.value) })} className="w-20" aria-label={t('ap.columnWidth')} />
+              <span>{t('ap.height')}</span>
+              <input type="range" min={6} max={25} value={zoom.ppm * 10} onChange={(e) => setZoom({ ...zoom, ppm: Number(e.target.value) / 10 })} className="w-20" aria-label={t('ap.rowHeight')} />
             </div>
           )}
           <Button className="max-md:hidden" onClick={print}>
-            Drucken
+            {t('common.print')}
           </Button>
         </div>
 
         {!editable && me.role !== 'KADER' && (
           <div className="no-print border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
             {wk.status === 'FREIGEGEBEN'
-              ? 'Das Arbeitsprogramm ist freigegeben und eingefroren. Änderungen erst nach «Wieder öffnen» durch den Kp Kdt.'
-              : 'Das Arbeitsprogramm ist eingereicht und wartet auf die Freigabe durch das Bat Kommando.'}
+              ? t('ap.frozen')
+              : t('ap.submitted')}
           </div>
         )}
 
         {/* Print header */}
-        <Briefkopf printOnly compact className="!mb-2" title={`Arbeitsprogramm ${wk.title}`} subtitle={`${fmtDate(wk.startDate)} – ${fmtDate(wk.endDate)}`} />
+        <Briefkopf printOnly compact className="!mb-2" title={t('ap.printTitle', { title: wk.title })} subtitle={`${fmtDate(wk.startDate)} – ${fmtDate(wk.endDate)}`} />
 
         {view === 'grid' ? (
           <div className={`min-h-0 flex-1 ${printing ? '' : 'overflow-auto'} bg-slate-50 p-2`}>
@@ -336,7 +340,7 @@ export function ArbeitsprogrammPage({ detail }: { detail: WkDetail }) {
 
         {/* Print legend */}
         <div className="print-only mt-2 text-[10px]">
-          <b>Legende:</b> {locations.map((l) => `${l.nr} = ${l.name}`).join(' · ')} · Vs = Verschiebung · 🔒 = gesperrt
+          <b>{t('ap.legend')}</b> {locations.map((l) => `${l.nr} = ${l.name}`).join(' · ')} · {t('ap.legendMoveLocked')}
         </div>
       </div>
 
@@ -360,7 +364,7 @@ export function ArbeitsprogrammPage({ detail }: { detail: WkDetail }) {
       {dialog?.kind === 'block' && dialogBlock && (
         <BlockDialog
           key={dialogBlock.id + ':' + dialogBlock.version}
-          title={canEdit(dialogBlock) ? 'Block bearbeiten' : 'Block'}
+          title={canEdit(dialogBlock) ? t('ap.editBlock') : t('ap.block')}
           initial={toInput(dialogBlock)}
           days={daySel.all}
           zuege={columns}
@@ -386,7 +390,7 @@ export function ArbeitsprogrammPage({ detail }: { detail: WkDetail }) {
       )}
       {dialog?.kind === 'new' && (
         <BlockDialog
-          title="Neuer Block"
+          title={t('ap.newBlock')}
           initial={dialog.initial}
           days={daySel.all}
           zuege={columns}
@@ -447,11 +451,12 @@ function ListView({
   resourcesOf?: (b: Block) => ResourceChip[];
 }) {
   const { wk, zuege, locations, blocks } = detail;
+  const { t, weekday } = useT();
   const zugName = (ids: number[]) =>
-    zuege.length > 1 && zuege.every((z) => ids.includes(z.id)) ? 'alle' : ids.map((id) => columnName(zuege, id)).join(', ');
+    zuege.length > 1 && zuege.every((z) => ids.includes(z.id)) ? t('ap.allZuege') : ids.map((id) => columnName(zuege, id)).join(', ');
   return (
     <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-4">
-      {zugId && <p className="no-print mb-3 text-sm text-slate-600">Programm für {zuege.find((z) => z.id === zugId)?.name}</p>}
+      {zugId && <p className="no-print mb-3 text-sm text-slate-600">{t('ap.programFor', { name: zuege.find((z) => z.id === zugId)?.name ?? '' })}</p>}
       <div className="space-y-4">
         {days.map((d) => {
           const list = blocks
@@ -461,10 +466,10 @@ function ListView({
             <section key={d} className="break-inside-avoid rounded-lg border border-slate-200 bg-white">
               <h3 className={`border-b px-4 py-2 text-sm font-semibold ${isAvorDay(wk, d) ? 'bg-amber-50' : ''}`}>
                 {weekday(d)}, {fmtDate(d)}
-                {isAvorDay(wk, d) && <span className="ml-2 rounded bg-amber-500 px-1.5 text-[10px] text-white">AVOR</span>}
+                {isAvorDay(wk, d) && <span className="ml-2 rounded bg-amber-500 px-1.5 text-[10px] text-white">{t('duty.AVOR')}</span>}
               </h3>
               {list.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-slate-400">Keine Einträge.</p>
+                <p className="px-4 py-3 text-sm text-slate-400">{t('ap.noEntries')}</p>
               ) : (
                 <table className="w-full text-sm">
                   <tbody>
@@ -506,6 +511,7 @@ function ListView({
 function CopyDialog({ detail, onClose }: { detail: WkDetail; onClose: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const { t } = useT();
   const wks = useQuery({ queryKey: ['wks'], queryFn: api.wks });
   const others = (wks.data ?? []).filter((w) => w.kpId === detail.wk.kpId && w.id !== detail.wk.id);
   const [src, setSrc] = useState<number | null>(null);
@@ -513,7 +519,7 @@ function CopyDialog({ detail, onClose }: { detail: WkDetail; onClose: () => void
     try {
       const r = await api.copyFrom(detail.wk.id, src!);
       await qc.invalidateQueries({ queryKey: ['wk', detail.wk.id] });
-      toast(`${r.created} Blöcke kopiert`);
+      toast(t('ap.copied', { n: r.created }));
       onClose();
     } catch (e) {
       toast(errMsg(e), 'error');
@@ -521,29 +527,29 @@ function CopyDialog({ detail, onClose }: { detail: WkDetail; onClose: () => void
   };
   return (
     <Modal
-      title="Aus anderem WK kopieren"
+      title={t('ap.copyTitle')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!src} onClick={run}>
-            Kopieren
+            {t('ap.copy')}
           </Button>
         </>
       }
     >
       <p className="text-sm text-slate-600">
-        Übernimmt alle Blöcke der Kompanie (ohne Bat-Vorgaben) Tag für Tag ab Beginn dieses WK. Standorte werden über die Nummer zugeordnet.
+        {t('ap.copyHint')}
       </p>
       {others.length === 0 ? (
-        <p className="text-sm text-slate-500">Keine anderen WKs dieser Kompanie vorhanden.</p>
+        <p className="text-sm text-slate-500">{t('ap.noOtherWks')}</p>
       ) : (
-        <Field label="Quelle">
+        <Field label={t('ap.source')}>
           <select className="input" value={src ?? ''} onChange={(e) => setSrc(Number(e.target.value) || null)}>
-            <option value="">– wählen –</option>
+            <option value="">{t('common.choose')}</option>
             {others.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.title} ({fmtDate(w.startDate)}, {w.blockCount} Blöcke)
+                {t('ap.sourceOption', { title: w.title, date: fmtDate(w.startDate), n: w.blockCount })}
               </option>
             ))}
           </select>
@@ -564,6 +570,7 @@ const DUTY_CLASS: Record<Duty, string> = {
 
 function SettingsDialog({ detail, onClose, onError }: { detail: WkDetail; onClose: () => void; onError: (e: unknown) => void }) {
   const qc = useQueryClient();
+  const { t, tn, weekdayShort } = useT();
   const { wk, zuege } = detail;
   const [f, setF] = useState({
     title: wk.title,
@@ -610,43 +617,43 @@ function SettingsDialog({ detail, onClose, onError }: { detail: WkDetail; onClos
   };
   const chip = (d: string, kind: 'AVOR' | 'KVK') => (
     <span key={d} className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-sm ${kind === 'AVOR' ? 'bg-amber-100 text-amber-900' : 'bg-sky-100 text-sky-900'}`}>
-      <b className="text-[10px]">{kind}</b> {weekday(d).slice(0, 2)} {fmtDate(d)}
-      <button className="opacity-70 hover:text-red-600" onClick={() => removeDay(d)} aria-label={`${kind}-Tag entfernen`}>
+      <b className="text-[10px]">{t(`duty.${kind}`)}</b> {weekdayShort(d)} {fmtDate(d)}
+      <button className="opacity-70 hover:text-red-600" onClick={() => removeDay(d)} aria-label={t('ap.removeDay', { kind: t(`duty.${kind}`) })}>
         ✕
       </button>
     </span>
   );
   return (
     <Modal
-      title="WK-Einstellungen"
+      title={t('ap.settingsTitle')}
       onClose={onClose}
       wide
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" onClick={save}>
-            Speichern
+            {t('common.save')}
           </Button>
         </>
       }
     >
-      <Field label="Bezeichnung">
+      <Field label={t('dash.designation')}>
         <input className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
       </Field>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Field label="Erster WK-Tag">
+        <Field label={t('ap.firstWkDay')}>
           <input type="date" className="input" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} />
         </Field>
-        <Field label="Letzter WK-Tag">
+        <Field label={t('ap.lastWkDay')}>
           <input type="date" className="input" value={f.endDate} onChange={(e) => setF({ ...f, endDate: e.target.value })} />
         </Field>
-        <Field label="Tagesbeginn">
+        <Field label={t('dash.dayStart')}>
           <input type="time" className="input" value={f.dayStart} onChange={(e) => setF({ ...f, dayStart: e.target.value })} />
         </Field>
-        <Field label="Tagesende">
+        <Field label={t('dash.dayEnd')}>
           <input type="time" className="input" value={f.dayEnd} onChange={(e) => setF({ ...f, dayEnd: e.target.value })} />
         </Field>
-        <Field label="Raster (Minuten)">
+        <Field label={t('ap.snap')}>
           <select className="input" value={f.snapMin} onChange={(e) => setF({ ...f, snapMin: Number(e.target.value) })}>
             {[5, 10, 15, 30, 60].map((n) => (
               <option key={n}>{n}</option>
@@ -655,35 +662,35 @@ function SettingsDialog({ detail, onClose, onError }: { detail: WkDetail; onClos
         </Field>
       </div>
       <div>
-        <span className="label">Zusätzliche Tage</span>
+        <span className="label">{t('ap.extraDays')}</span>
         <p className="mb-1 text-xs text-slate-500">
-          <b>AVOR</b>: nur Kp Kdo (einzelne Züge unten zuschalten). <b>KVK</b>: Kadervorkurs mit allen Zügen.
+          {tn('ap.extraDaysHint', { avor: <b>{t('duty.AVOR')}</b>, kvk: <b>{t('duty.KVK')}</b> })}
         </p>
         <div className="flex flex-wrap gap-2">
           {[...f.avorDays.map((d) => chip(d, 'AVOR')), ...f.kvkDays.map((d) => chip(d, 'KVK'))]}
-          {f.avorDays.length + f.kvkDays.length === 0 && <span className="text-sm text-slate-400">Keine</span>}
+          {f.avorDays.length + f.kvkDays.length === 0 && <span className="text-sm text-slate-400">{t('ap.noneDays')}</span>}
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <input type="date" className="input !w-44" value={newDay} onChange={(e) => setNewDay(e.target.value)} aria-label="Tag" />
+          <input type="date" className="input !w-44" value={newDay} onChange={(e) => setNewDay(e.target.value)} aria-label={t('ap.day')} />
           <Button disabled={!newDay} onClick={() => addDay('avor')}>
-            + AVOR-Tag
+            {t('ap.addAvorDay')}
           </Button>
           <Button disabled={!newDay} onClick={() => addDay('kvk')}>
-            + KVK-Tag
+            {t('ap.addKvkDay')}
           </Button>
         </div>
       </div>
       {zuege.length > 0 && days.length > 0 && (
         <div>
-          <span className="label">Diensttage pro Zug</span>
+          <span className="label">{t('ap.dutyPerZug')}</span>
           <div className="overflow-x-auto">
             <table className="text-sm">
               <thead>
                 <tr className="text-xs text-slate-500">
-                  <th className="pr-3 text-left font-medium">Zug</th>
+                  <th className="pr-3 text-left font-medium">{t('common.zug')}</th>
                   {days.map((d) => (
                     <th key={d} className={`px-1 text-center font-medium ${isAvorDay(f, d) ? 'text-amber-700' : isKvkDay(f, d) ? 'text-sky-700' : ''}`}>
-                      {isAvorDay(f, d) ? 'AVOR' : isKvkDay(f, d) ? 'KVK' : weekday(d).slice(0, 2)}
+                      {isAvorDay(f, d) ? t('duty.AVOR') : isKvkDay(f, d) ? t('duty.KVK') : weekdayShort(d)}
                       <div className="font-normal tabular-nums">{fmtDate(d).slice(0, 6)}</div>
                     </th>
                   ))}
@@ -691,7 +698,7 @@ function SettingsDialog({ detail, onClose, onError }: { detail: WkDetail; onClos
               </thead>
               <tbody>
                 <tr className="border-t border-slate-100 text-slate-500">
-                  <td className="py-1 pr-3">Kdo</td>
+                  <td className="py-1 pr-3">{t('kdo')}</td>
                   {days.map((d) => (
                     <td key={d} className="text-center">
                       ✓
@@ -714,7 +721,7 @@ function SettingsDialog({ detail, onClose, onError }: { detail: WkDetail; onClos
                           >
                             {(['WK', 'KVK', 'AVOR', 'NONE'] as Duty[]).map((x) => (
                               <option key={x} value={x}>
-                                {x === 'NONE' ? '–' : x}
+                                {x === 'NONE' ? '–' : t(`duty.${x}`)}
                               </option>
                             ))}
                           </select>
@@ -727,8 +734,7 @@ function SettingsDialog({ detail, onClose, onError }: { detail: WkDetail; onClos
             </table>
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Pro Zug und Tag: WK, KVK, AVOR oder – (kein Dienst; die Spalte ist dann schraffiert und nicht beplanbar). So kann am selben Tag ein Zug im KVK
-            sein und ein anderer im WK. Blau umrandet: abweichend vom Tagestyp.
+            {t('ap.dutyHint', { wk: t('duty.WK'), kvk: t('duty.KVK'), avor: t('duty.AVOR') })}
           </p>
         </div>
       )}

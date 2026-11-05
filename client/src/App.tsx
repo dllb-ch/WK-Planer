@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { appPath } from './lib/base';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ROLE_LABEL } from '@shared/types';
 import { api } from './api';
 import { errMsg, useToast } from './components/ui';
 import { canViewBefehl, canViewYearPlan } from '@shared/permissions';
@@ -20,6 +19,7 @@ import { AusbildungenPage } from './pages/AusbildungenPage';
 import { BibliothekPage } from './pages/BibliothekPage';
 import { CheckInPage } from './pages/CheckInPage';
 import { ProfilPage } from './pages/ProfilPage';
+import { useT } from './i18n';
 
 export function App() {
   // The QR check-in works without login.
@@ -30,9 +30,10 @@ export function App() {
 
 function AuthedApp() {
   const { user, loading } = useAuth();
+  const { t } = useT();
   // An empty installation: the setup wizard instead of the login.
   const setup = useQuery({ queryKey: ['setup'], queryFn: api.setupStatus, enabled: !loading && !user, staleTime: Infinity });
-  if (loading || (!user && setup.isLoading)) return <div className="p-8 text-slate-500">Laden …</div>;
+  if (loading || (!user && setup.isLoading)) return <div className="p-8 text-slate-500">{t('common.loading')}</div>;
   if (!user && setup.data?.required) return <SetupWizard tokenRequired={setup.data.tokenRequired} />;
   if (!user) return <LoginPage />;
   return (
@@ -70,22 +71,23 @@ type NavItem = { label: string; to: string; end?: boolean; subs?: { label: strin
 
 function useNav(): NavItem[] {
   const me = useUser();
+  const { t } = useT();
   const organisation = [
-    ...(me.role === 'BAT' || me.role === 'KPKDT' ? [{ label: 'Kompanien & Personal', to: '/verwaltung' }] : []),
-    ...(me.role === 'ADMIN' || me.role === 'BAT' ? [{ label: 'Vorlagen & Ressourcen', to: '/vorlagen' }] : []),
+    ...(me.role === 'BAT' || me.role === 'KPKDT' ? [{ label: t('nav.admin'), to: '/verwaltung' }] : []),
+    ...(me.role === 'ADMIN' || me.role === 'BAT' ? [{ label: t('nav.templates'), to: '/vorlagen' }] : []),
   ];
   const planung = [
-    ...(canViewYearPlan(me) ? [{ label: 'Jahresplanung', to: '/jahresplanung' }] : []),
-    ...(canViewBefehl(me) ? [{ label: 'Ausbildungsbefehl', to: '/befehl' }] : []),
+    ...(canViewYearPlan(me) ? [{ label: t('nav.yearPlan'), to: '/jahresplanung' }] : []),
+    ...(canViewBefehl(me) ? [{ label: t('nav.befehl'), to: '/befehl' }] : []),
   ];
   const section = (label: string, subs: { label: string; to: string }[]): NavItem[] =>
     !subs.length ? [] : subs.length === 1 ? [{ label: subs[0].label, to: subs[0].to }] : [{ label, to: subs[0].to, subs }];
   return [
-    ...(me.role !== 'ADMIN' ? [{ label: 'Übersicht', to: '/', end: true }] : []),
-    ...section('Planung', planung),
-    ...(me.role === 'KADER' || me.role === 'ZFHR' ? [{ label: 'Meine Ausbildungen', to: '/ausbildungen' }] : []),
-    ...(me.role !== 'ADMIN' ? [{ label: 'Lektionsbibliothek', to: '/bibliothek' }] : []),
-    ...section('Organisation', organisation),
+    ...(me.role !== 'ADMIN' ? [{ label: t('nav.overview'), to: '/', end: true }] : []),
+    ...section(t('nav.planning'), planung),
+    ...(me.role === 'KADER' || me.role === 'ZFHR' ? [{ label: t('nav.myTraining'), to: '/ausbildungen' }] : []),
+    ...(me.role !== 'ADMIN' ? [{ label: t('nav.library'), to: '/bibliothek' }] : []),
+    ...section(t('nav.organisation'), organisation),
   ];
 }
 
@@ -94,6 +96,7 @@ const isIn = (item: NavItem, path: string) =>
 
 function TopBar() {
   const { logout } = useAuth();
+  const { t } = useT();
   const [menu, setMenu] = useState(false);
   const loc = useLocation();
   useEffect(() => setMenu(false), [loc.pathname]);
@@ -124,13 +127,13 @@ function TopBar() {
         <span className="flex-1" />
         <AccountMenu />
         <button className="hidden rounded-full px-3 py-1.5 text-sm text-zs-blue hover:bg-slate-200/60 md:block" onClick={logout}>
-          Abmelden
+          {t('nav.logout')}
         </button>
         <button
           className="grid h-8 w-8 place-items-center rounded-full text-lg text-zs-blue hover:bg-slate-200/60 md:hidden"
           onClick={() => setMenu(!menu)}
           aria-expanded={menu}
-          aria-label="Menü"
+          aria-label={t('nav.menu')}
         >
           ☰
         </button>
@@ -165,10 +168,10 @@ function TopBar() {
           )}
           <div className="hairline-t mx-2 my-1" />
           <NavLink to="/profil" className={({ isActive }) => pill(isActive)}>
-            Mein Konto
+            {t('nav.account')}
           </NavLink>
           <button className="rounded-full px-3 py-1.5 text-left text-sm text-red-600" onClick={logout}>
-            Abmelden
+            {t('nav.logout')}
           </button>
         </nav>
       )}
@@ -179,6 +182,7 @@ function TopBar() {
 /** Top right: the signed-in user; for demo accounts also a quick switch to the other demo roles. */
 function AccountMenu() {
   const me = useUser();
+  const { t } = useT();
   const { switchTo } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
@@ -207,14 +211,14 @@ function AccountMenu() {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="menu"
-        title={accounts.length ? 'Konto und Rolle wechseln' : 'Mein Konto'}
+        title={accounts.length ? t('nav.switchAccount') : t('nav.account')}
       >
         <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-b from-slate-400 to-slate-500 text-xs font-semibold text-white" aria-hidden>
           {initials(me.name)}
         </span>
         <span className="hidden text-left text-xs leading-tight sm:block">
           <span className="block font-medium text-slate-900">{me.name}</span>
-          <span className="block text-slate-500">{ROLE_LABEL[me.role]}</span>
+          <span className="block text-slate-500">{t(`role.${me.role}`)}</span>
         </span>
         <span className="hidden text-[10px] text-slate-400 sm:inline" aria-hidden>
           ▾
@@ -225,12 +229,12 @@ function AccountMenu() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
           <div role="menu" className="material-menu anim-pop absolute right-0 top-full z-50 mt-1 w-72 rounded-xl p-[5px] text-sm">
             <NavLink to="/profil" role="menuitem" className="block rounded-lg px-3 py-1.5 text-zs-blue hover:bg-slate-200/60" onClick={() => setOpen(false)}>
-              Mein Konto
+              {t('nav.account')}
             </NavLink>
             {accounts.length > 0 && (
               <>
                 <div className="hairline-b mx-2 my-1" />
-                <p className="px-3 pb-0.5 pt-1 text-xs font-medium text-slate-500">Rolle wechseln (Demo)</p>
+                <p className="px-3 pb-0.5 pt-1 text-xs font-medium text-slate-500">{t('nav.switchRole')}</p>
                 <div className="max-h-[60vh] overflow-y-auto">
                   {accounts.map((a) => {
                     const current = a.email.toLowerCase() === me.email.toLowerCase();
@@ -246,7 +250,7 @@ function AccountMenu() {
                           {current ? '✓' : ''}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-slate-900">{ROLE_LABEL[a.role]}</span>
+                          <span className="block truncate text-slate-900">{t(`role.${a.role}`)}</span>
                           <span className="block truncate text-xs font-normal text-slate-500">
                             {a.name}
                             {a.funktion ? ` · ${a.funktion}` : ''}

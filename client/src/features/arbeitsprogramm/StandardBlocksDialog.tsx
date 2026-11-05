@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BlockInput, StandardBlock, StandardScope } from '@shared/types';
-import { BLOCK_TYPE_INFO, BLOCK_TYPES, KDO_ID, STANDARD_SCOPE_LABEL } from '@shared/types';
+import { BLOCK_TYPES, KDO_ID } from '@shared/types';
 import { canCreateBlock, canEditStandardBlocks } from '@shared/permissions';
-import { fmtDate, fmtTime, isAvorDay, isKvkDay, parseTime, servesOnDay, weekday, wkDays } from '@shared/util';
+import { fmtDate, fmtTime, isAvorDay, isKvkDay, parseTime, servesOnDay, wkDays } from '@shared/util';
+import { useT } from '../../i18n';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Button, errMsg, Modal, useToast } from '../../components/ui';
@@ -29,6 +30,7 @@ export function StandardBlocksDialog({ detail, onClose }: { detail: WkDetail; on
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
+  const { t, weekdayShort } = useT();
   const { wk, zuege, blocks } = detail;
   const days = wkDays(wk);
   const columns = withKdo(wk.kpId, zuege);
@@ -82,7 +84,7 @@ export function StandardBlocksDialog({ detail, onClose }: { detail: WkDetail; on
     try {
       await api.createBlocks(wk.id, planned);
       await qc.invalidateQueries({ queryKey: ['wk', wk.id] });
-      toast(`${planned.length} Blöcke eingefügt`);
+      toast(t('std.inserted', { n: planned.length }));
       onClose();
     } catch (e) {
       toast(errMsg(e), 'error');
@@ -93,7 +95,7 @@ export function StandardBlocksDialog({ detail, onClose }: { detail: WkDetail; on
       const saved = await api.saveStandardBlocks(wk.kpId, rows!.map(({ on: _on, ...b }) => b));
       qc.setQueryData(['standardbloecke', wk.kpId], saved);
       setDirty(false);
-      toast('Als Standard der Kompanie gespeichert');
+      toast(t('std.savedAsStandard'));
     } catch (e) {
       toast(errMsg(e), 'error');
     }
@@ -101,43 +103,43 @@ export function StandardBlocksDialog({ detail, onClose }: { detail: WkDetail; on
 
   return (
     <Modal
-      title="Standardblöcke einfügen"
+      title={t('std.title')}
       onClose={onClose}
       wide
       footer={
         <>
           {canSave && (
-            <Button className="mr-auto" disabled={!dirty || !rows} onClick={saveStandard} title="Diese Liste wird beim nächsten Mal vorgeschlagen">
-              Als Standard der Kompanie speichern
+            <Button className="mr-auto" disabled={!dirty || !rows} onClick={saveStandard} title={t('std.saveHint')}>
+              {t('std.saveStandard')}
             </Button>
           )}
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!planned.length} onClick={apply}>
-            {planned.length} Blöcke einfügen
+            {t('std.insertN', { n: planned.length })}
           </Button>
         </>
       }
     >
       <p className="text-sm text-slate-600">
-        Wiederkehrende Blöcke für die gewählten Tage und Spalten. Blöcke, die schon genau so bestehen, werden übersprungen.
-        {q.data?.source === 'DEFAULT' && ' (Vorschlag – die Kompanie hat noch keine eigenen Standardblöcke gespeichert.)'}
+        {t('std.intro')}
+        {q.data?.source === 'DEFAULT' && t('std.suggestion')}
       </p>
       <div>
-        <span className="label">Tage</span>
+        <span className="label">{t('days.label')}</span>
         <div className="flex flex-wrap gap-2">
           {days.map((d) => (
             <label key={d} className="flex items-center gap-1.5 rounded border px-2 py-1 text-sm">
               <input type="checkbox" checked={sel.includes(d)} onChange={(e) => setSel(e.target.checked ? [...sel, d] : sel.filter((x) => x !== d))} />
-              {weekday(d).slice(0, 2)} {fmtDate(d).slice(0, 6)}
-              {isAvorDay(wk, d) && <span className="text-xs text-amber-600">AVOR</span>}
-              {isKvkDay(wk, d) && <span className="text-xs text-sky-600">KVK</span>}
+              {weekdayShort(d)} {fmtDate(d).slice(0, 6)}
+              {isAvorDay(wk, d) && <span className="text-xs text-amber-600">{t('duty.AVOR')}</span>}
+              {isKvkDay(wk, d) && <span className="text-xs text-sky-600">{t('duty.KVK')}</span>}
             </label>
           ))}
         </div>
       </div>
       {allowed.length > 1 && (
         <div>
-          <span className="label">Einfügen für</span>
+          <span className="label">{t('std.insertFor')}</span>
           <div className="flex flex-wrap items-center gap-1.5">
             {columns
               .filter((c) => allowed.includes(c.id))
@@ -157,34 +159,34 @@ export function StandardBlocksDialog({ detail, onClose }: { detail: WkDetail; on
                 );
               })}
             <button type="button" className="ml-1 text-xs text-zs-blue hover:underline" onClick={() => setTargets(allowed)}>
-              alle
+              {t('common.all')}
             </button>
           </div>
-          <p className="mt-1 text-xs text-slate-500">Zusammen mit «Für» der einzelnen Blöcke: z. B. nur Pi Z 2 wählen, um die Standardblöcke für diesen Zug einzufügen.</p>
+          <p className="mt-1 text-xs text-slate-500">{t('std.forHint')}</p>
         </div>
       )}
       {!rows ? (
-        <p className="text-sm text-slate-500">Laden …</p>
+        <p className="text-sm text-slate-500">{t('common.loading')}</p>
       ) : (
         <div className="space-y-1.5">
           <div className="hidden grid-cols-[1.5rem,1fr,9rem,6rem,6rem,9rem,auto,1.5rem] gap-2 text-xs text-slate-500 sm:grid">
             <span />
-            <span>Titel</span>
-            <span>Art</span>
-            <span>Von</span>
-            <span>Bis</span>
-            <span>Für</span>
-            <span>Fix</span>
+            <span>{t('common.title')}</span>
+            <span>{t('bd.type')}</span>
+            <span>{t('bd.from')}</span>
+            <span>{t('bd.to')}</span>
+            <span>{t('std.for')}</span>
+            <span>{t('std.fix')}</span>
             <span />
           </div>
           {rows.map((r, i) => (
             <div key={i} className="grid grid-cols-[1.5rem,1fr] items-center gap-2 sm:grid-cols-[1.5rem,1fr,9rem,6rem,6rem,9rem,auto,1.5rem]">
-              <input type="checkbox" checked={r.on} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} aria-label="einfügen" />
-              <input className="input" value={r.title} onChange={(e) => setRow(i, { title: e.target.value })} aria-label="Titel" />
-              <select className="input max-sm:col-start-2" value={r.type} onChange={(e) => setRow(i, { type: e.target.value as Row['type'] })} aria-label="Art">
-                {BLOCK_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {BLOCK_TYPE_INFO[t].label}
+              <input type="checkbox" checked={r.on} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} aria-label={t('std.insert')} />
+              <input className="input" value={r.title} onChange={(e) => setRow(i, { title: e.target.value })} aria-label={t('common.title')} />
+              <select className="input max-sm:col-start-2" value={r.type} onChange={(e) => setRow(i, { type: e.target.value as Row['type'] })} aria-label={t('bd.type')}>
+                {BLOCK_TYPES.map((x) => (
+                  <option key={x} value={x}>
+                    {t(`block.${x}`)}
                   </option>
                 ))}
               </select>
@@ -193,25 +195,25 @@ export function StandardBlocksDialog({ detail, onClose }: { detail: WkDetail; on
                 className="input max-sm:col-start-2"
                 value={fmtTime(r.startMin)}
                 onChange={(e) => e.target.value && setRow(i, { startMin: parseTime(e.target.value) })}
-                aria-label="Von"
+                aria-label={t('bd.from')}
               />
               <input
                 type="time"
                 className="input max-sm:col-start-2"
                 value={fmtTime(r.endMin)}
                 onChange={(e) => e.target.value && setRow(i, { endMin: parseTime(e.target.value) })}
-                aria-label="Bis"
+                aria-label={t('bd.to')}
               />
-              <select className="input max-sm:col-start-2" value={r.scope} onChange={(e) => setRow(i, { scope: e.target.value as StandardScope })} aria-label="Für">
-                {(Object.keys(STANDARD_SCOPE_LABEL) as StandardScope[]).map((s) => (
+              <select className="input max-sm:col-start-2" value={r.scope} onChange={(e) => setRow(i, { scope: e.target.value as StandardScope })} aria-label={t('std.for')}>
+                {(['ALLE', 'ZUEGE', 'KDO'] as StandardScope[]).map((s) => (
                   <option key={s} value={s}>
-                    {STANDARD_SCOPE_LABEL[s]}
+                    {t(`scope.${s}`)}
                   </option>
                 ))}
               </select>
-              <label className="flex items-center gap-1 text-xs text-slate-600 max-sm:col-start-2" title="Fixe Blöcke können Zugführer nicht verschieben">
+              <label className="flex items-center gap-1 text-xs text-slate-600 max-sm:col-start-2" title={t('std.fixHint')}>
                 <input type="checkbox" checked={r.locked} disabled={!mayLock} onChange={(e) => setRow(i, { locked: e.target.checked })} />
-                <span className="sm:hidden">fix</span>
+                <span className="sm:hidden">{t('std.fixLower')}</span>
               </label>
               <button
                 type="button"
@@ -220,7 +222,7 @@ export function StandardBlocksDialog({ detail, onClose }: { detail: WkDetail; on
                   setRows(rows.filter((_, j) => j !== i));
                   setDirty(true);
                 }}
-                aria-label="Entfernen"
+                aria-label={t('common.remove')}
               >
                 ✕
               </button>
@@ -229,11 +231,11 @@ export function StandardBlocksDialog({ detail, onClose }: { detail: WkDetail; on
           <Button
             className="text-xs"
             onClick={() => {
-              setRows([...rows, { on: true, title: 'Neuer Block', type: 'DIVERSES', startMin: 10 * 60, endMin: 10 * 60 + 15, scope: 'ZUEGE', locked: false }]);
+              setRows([...rows, { on: true, title: t('std.newBlockTitle'), type: 'DIVERSES', startMin: 10 * 60, endMin: 10 * 60 + 15, scope: 'ZUEGE', locked: false }]);
               setDirty(true);
             }}
           >
-            + Block
+            {t('ap.newBlockButton')}
           </Button>
         </div>
       )}

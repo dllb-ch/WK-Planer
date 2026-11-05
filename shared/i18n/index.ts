@@ -38,6 +38,10 @@ export function pickLang(candidates: readonly string[] | string | undefined | nu
   return 'de';
 }
 
+/** Short weekday, e.g. «Mo», «lun.», «lun», «Mon». */
+export const weekdayShortIn = (lang: Lang, iso: string) =>
+  new Intl.DateTimeFormat(LOCALE[lang], { weekday: 'short', timeZone: 'UTC' }).format(new Date(iso + 'T00:00:00Z')).replace(/\.$/, '');
+
 /** Weekday of an ISO date (YYYY-MM-DD), e.g. «Montag», «lundi». */
 export const weekdayIn = (lang: Lang, iso: string) =>
   new Intl.DateTimeFormat(LOCALE[lang], { weekday: 'long', timeZone: 'UTC' }).format(new Date(iso + 'T00:00:00Z'));

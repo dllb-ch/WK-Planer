@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../i18n';
 
 export function useOnline() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -37,6 +38,7 @@ function readDismissed() {
 /** Offline notice and the hint to install the app on Android (prompt) and iOS (Home screen). */
 export function PwaBanners() {
   const online = useOnline();
+  const { t, tn } = useT();
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(readDismissed);
 
@@ -68,12 +70,12 @@ export function PwaBanners() {
     <>
       {!online && (
         <div role="status" className="no-print bg-amber-100 px-4 py-1.5 text-center text-xs text-amber-900">
-          Offline – Sie sehen die zuletzt geladenen Daten. Änderungen sind erst wieder mit Verbindung möglich.
+          {t('pwa.offline')}
         </div>
       )}
       {!dismissed && prompt && (
         <div className="no-print flex items-center gap-3 bg-blue-50 px-4 py-2 text-sm text-zs-blue">
-          <span className="flex-1">WK-Planer als App installieren – auch offline lesbar.</span>
+          <span className="flex-1">{t('pwa.install')}</span>
           <button
             className="rounded-md bg-zs-blue px-3 py-1 text-white"
             onClick={async () => {
@@ -81,9 +83,9 @@ export function PwaBanners() {
               setPrompt(null);
             }}
           >
-            Installieren
+            {t('pwa.installButton')}
           </button>
-          <button className="text-slate-500" onClick={dismiss} aria-label="Hinweis schliessen">
+          <button className="text-slate-500" onClick={dismiss} aria-label={t('pwa.dismiss')}>
             ✕
           </button>
         </div>
@@ -91,9 +93,9 @@ export function PwaBanners() {
       {showIosHint && (
         <div className="no-print flex items-start gap-3 bg-blue-50 px-4 py-2 text-sm text-zs-blue">
           <span className="flex-1">
-            Als App installieren: in Safari auf <b>Teilen</b> tippen und <b>«Zum Home-Bildschirm»</b> wählen.
+            {tn('pwa.ios', { share: <b>{t('pwa.iosShare')}</b>, home: <b>{t('pwa.iosHome')}</b> })}
           </span>
-          <button className="text-slate-500" onClick={dismiss} aria-label="Hinweis schliessen">
+          <button className="text-slate-500" onClick={dismiss} aria-label={t('pwa.dismiss')}>
             ✕
           </button>
         </div>

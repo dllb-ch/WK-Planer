@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Wk } from '@shared/types';
 import { canSeeDay } from '@shared/permissions';
-import { fmtDate, isAvorDay, isKvkDay, weekday, wkDays } from '@shared/util';
+import { fmtDate, isAvorDay, isKvkDay, wkDays } from '@shared/util';
 import { useUser } from '../auth';
+import { useT } from '../i18n';
 
 /** Visible days of a WK, remembered per WK and view in this browser. */
 export function useDaySelection(wk: Wk, view: string) {
@@ -32,6 +33,7 @@ export function useDaySelection(wk: Wk, view: string) {
 
 export function DaySelector({ wk, all, days, onChange }: { wk: Wk; all: string[]; days: string[]; onChange: (d: string[]) => void }) {
   const [open, setOpen] = useState(false);
+  const { t, weekdayShort } = useT();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -51,7 +53,7 @@ export function DaySelector({ wk, all, days, onChange }: { wk: Wk; all: string[]
         {list.map((d) => (
           <label key={d} className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-slate-50">
             <input type="checkbox" checked={days.includes(d)} onChange={() => toggle(d)} />
-            {weekday(d).slice(0, 2)} {fmtDate(d)}
+            {weekdayShort(d)} {fmtDate(d)}
           </label>
         ))}
       </div>
@@ -64,15 +66,15 @@ export function DaySelector({ wk, all, days, onChange }: { wk: Wk; all: string[]
         onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        Tage {days.length < all.length ? `${days.length}/${all.length}` : '(alle)'} ▾
+        {t('days.label')} {days.length < all.length ? `${days.length}/${all.length}` : t('days.all')} ▾
       </button>
       {open && (
         <div className="absolute left-0 z-40 mt-1 w-60 space-y-2 rounded-md border border-slate-200 bg-white p-2 shadow-lg">
           <div className="flex flex-wrap gap-1">
             {[
-              ['Alle', all],
-              ['Nur WK', main],
-              ['Nur AVOR', avor],
+              [t('days.allButton'), all],
+              [t('days.onlyWk'), main],
+              [t('days.onlyAvor'), avor],
             ].map(([label, list]) => (
               <button
                 key={label as string}
@@ -84,9 +86,9 @@ export function DaySelector({ wk, all, days, onChange }: { wk: Wk; all: string[]
               </button>
             ))}
           </div>
-          {group('AVOR (Kp Kdo)', avor)}
-          {group('KVK', kvk)}
-          {group('WK', main)}
+          {group(t('days.avorGroup'), avor)}
+          {group(t('duty.KVK'), kvk)}
+          {group(t('duty.WK'), main)}
         </div>
       )}
     </div>

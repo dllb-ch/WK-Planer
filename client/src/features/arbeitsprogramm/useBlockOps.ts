@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { Block, BlockInput } from '@shared/types';
 import { api, ApiError, type WkDetail } from '../../api';
 import { errMsg, useToast } from '../../components/ui';
+import { useT } from '../../i18n';
 
 const FIELDS = ['date', 'startMin', 'endMin', 'zugIds', 'title', 'type', 'locationId', 'verantwortlich', 'notes', 'locked'] as const;
 export type BlockFields = Partial<Pick<Block, (typeof FIELDS)[number]>>;
@@ -28,6 +29,7 @@ type Op =
 export function useBlockOps(wkId: number) {
   const qc = useQueryClient();
   const toast = useToast();
+  const { t } = useT();
   const key = ['wk', wkId];
   const undoStack = useRef<Op[]>([]);
   const redoStack = useRef<Op[]>([]);
@@ -43,7 +45,7 @@ export function useBlockOps(wkId: number) {
 
   const fail = (e: unknown) => {
     if (e instanceof ApiError && e.status === 409) {
-      toast(errMsg(e) + ' – Ansicht wurde aktualisiert.', 'error');
+      toast(t('ops.refreshed', { error: errMsg(e) }), 'error');
     } else {
       toast(errMsg(e), 'error');
     }

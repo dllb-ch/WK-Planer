@@ -1,5 +1,6 @@
 // Grouped lists as in iOS forms (SwiftUI `Form` / `Section`): caption above, rounded cell, rows with hairlines.
 import { forwardRef, useLayoutEffect, useRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
+import { useT } from '../i18n';
 
 /** Section of a form; the number badge turns green with a check mark once `done`. */
 export function Group({
@@ -120,9 +121,10 @@ export function IconButton({ label, destructive, ...p }: React.ButtonHTMLAttribu
 
 /** − value + as in iOS steppers. */
 export function Stepper({ value, step = 5, min = 0, unit, onChange, label }: { value: number; step?: number; min?: number; unit?: string; onChange: (v: number) => void; label: string }) {
+  const { t } = useT();
   return (
     <span className="inline-flex h-[30px] items-center rounded-lg bg-slate-500/10">
-      <button type="button" className="h-[30px] w-[30px] rounded-lg text-lg leading-none hover:bg-slate-500/10" onClick={() => onChange(Math.max(min, value - step))} aria-label={`${label} verringern`}>
+      <button type="button" className="h-[30px] w-[30px] rounded-lg text-lg leading-none hover:bg-slate-500/10" onClick={() => onChange(Math.max(min, value - step))} aria-label={t('ui.decrease', { label })}>
         −
       </button>
       <input
@@ -135,7 +137,7 @@ export function Stepper({ value, step = 5, min = 0, unit, onChange, label }: { v
         aria-label={label}
       />
       {unit && <span className="pl-[3px] pr-0.5 text-sm text-slate-500">{unit}</span>}
-      <button type="button" className="h-[30px] w-[30px] rounded-lg text-lg leading-none hover:bg-slate-500/10" onClick={() => onChange(value + step)} aria-label={`${label} erhöhen`}>
+      <button type="button" className="h-[30px] w-[30px] rounded-lg text-lg leading-none hover:bg-slate-500/10" onClick={() => onChange(value + step)} aria-label={t('ui.increase', { label })}>
         +
       </button>
     </span>

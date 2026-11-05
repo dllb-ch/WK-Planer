@@ -1,9 +1,9 @@
 // Right-click menu for blocks and empty grid space (Arbeitsprogramm, Zugansicht).
 import { useCallback, useState, type ReactNode } from 'react';
 import type { Block, BlockInput, ResourceKind } from '@shared/types';
-import { BLOCK_TYPE_INFO, RESOURCE_KIND_LABEL } from '@shared/types';
 import { canCreateBlock, canEditBlock, canLockBlocks, canRequestResource } from '@shared/permissions';
-import { blockFitsDay, fmtDate, fmtTime, weekday } from '@shared/util';
+import { blockFitsDay, fmtDate, fmtTime } from '@shared/util';
+import { useT } from '../../i18n';
 import type { WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { ContextMenu, type MenuItem, type MenuState } from '../../components/ContextMenu';
@@ -28,6 +28,7 @@ export function useBlockMenu(opts: {
   extraEmptyItems?: () => MenuItem[];
 }) {
   const me = useUser();
+  const { t, weekday, weekdayShort } = useT();
   const { wk, blocks } = opts.detail;
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [request, setRequest] = useState<{ block: Block; zugId: number; kind: ResourceKind } | null>(null);
@@ -42,12 +43,12 @@ export function useBlockMenu(opts: {
     const nextDay = opts.days.slice(opts.days.indexOf(b.date) + 1).find((d) => blockFitsDay(wk, d, b.zugIds));
     const requestZug = b.zugIds.find((z) => canRequestResource(me, wk, z));
     const items: MenuItem[] = [
-      { label: editable ? 'Bearbeiten' : 'Anzeigen', icon: '✎', onClick: () => opts.onEdit(b.id), hint: 'Doppelklick' },
+      { label: editable ? t('common.edit') : t('menu.show'), icon: '✎', onClick: () => opts.onEdit(b.id), hint: t('menu.doubleClick') },
       ...(mayCopy
         ? ([
-            { label: 'Duplizieren …', icon: '⧉', onClick: () => opts.onDuplicate({ ...toInput(b), locked: me.role === 'BAT' || b.locked }) },
+            { label: t('menu.duplicate'), icon: '⧉', onClick: () => opts.onDuplicate({ ...toInput(b), locked: me.role === 'BAT' || b.locked }) },
             {
-              label: nextDay ? `Kopie am ${weekday(nextDay).slice(0, 2)} ${fmtDate(nextDay).slice(0, 6)}` : 'Kopie am nächsten Tag',
+              label: nextDay ? t('menu.copyOn', { day: `${weekdayShort(nextDay)} ${fmtDate(nextDay).slice(0, 6)}` }) : t('menu.copyNextDay'),
               icon: '↷',
               disabled: !nextDay,
               onClick: () => nextDay && opts.ops.create({ ...toInput(b), date: nextDay }),
@@ -55,24 +56,24 @@ export function useBlockMenu(opts: {
           ] as MenuItem[])
         : []),
       ...(editable && canLockBlocks(me) && b.source === 'KP'
-        ? ([{ label: b.locked ? 'Lösen (Zugführer dürfen verschieben)' : 'Fixieren', icon: b.locked ? '🔓' : '🔒', onClick: () => opts.ops.update(b.id, { locked: !b.locked }) }] as MenuItem[])
+        ? ([{ label: b.locked ? t('menu.unlock') : t('menu.lock'), icon: b.locked ? '🔓' : '🔒', onClick: () => opts.ops.update(b.id, { locked: !b.locked }) }] as MenuItem[])
         : []),
       ...(requestZug !== undefined
-        ? (['separator', ...(['FAHRZEUG', 'RAUM', 'GELAENDE'] as const).map((k) => ({ label: `${RESOURCE_KIND_LABEL[k]} anfragen …`, icon: ICON[k], onClick: () => setRequest({ block: b, zugId: requestZug, kind: k }) }))] as MenuItem[])
+        ? (['separator', ...(['FAHRZEUG', 'RAUM', 'GELAENDE'] as const).map((k) => ({ label: t('menu.request', { kind: t(`resourceArt.${k}`) }), icon: ICON[k], onClick: () => setRequest({ block: b, zugId: requestZug, kind: k }) }))] as MenuItem[])
         : []),
       ...(opts.extraBlockItems ? opts.extraBlockItems(b) : []),
       ...(editable
-        ? (['separator', { label: 'Löschen', icon: '🗑', danger: true, hint: 'Entf', onClick: () => confirm(`«${b.title}» löschen?`) && opts.ops.remove(b.id) }] as MenuItem[])
+        ? (['separator', { label: t('common.delete'), icon: '🗑', danger: true, hint: t('menu.deleteKey'), onClick: () => confirm(t('menu.confirmDelete', { title: b.title })) && opts.ops.remove(b.id) }] as MenuItem[])
         : []),
     ];
     // No two separators in a row, none at the end.
     const clean = items.filter((it, i, all) => it !== 'separator' || (i > 0 && all[i - 1] !== 'separator' && i < all.length - 1));
-    setMenu({ x, y, title: `${b.title} · ${fmtTime(b.startMin)}–${fmtTime(b.endMin)} · ${BLOCK_TYPE_INFO[b.type].label}`, items: clean });
+    setMenu({ x, y, title: `${b.title} · ${fmtTime(b.startMin)}–${fmtTime(b.endMin)} · ${t(`block.${b.type}`)}`, items: clean });
   };
 
   const onEmptyMenu = (at: { date: string; zugId: number; min: number }, x: number, y: number) => {
     const items: MenuItem[] = [
-      ...(opts.onNew && (opts.canCreateAt?.(at.zugId) ?? true) ? ([{ label: `Neuer Block hier (${fmtTime(at.min)})`, icon: '+', onClick: () => opts.onNew!(at) }] as MenuItem[]) : []),
+      ...(opts.onNew && (opts.canCreateAt?.(at.zugId) ?? true) ? ([{ label: t('menu.newHere', { time: fmtTime(at.min) }), icon: '+', onClick: () => opts.onNew!(at) }] as MenuItem[]) : []),
       ...(opts.extraEmptyItems ? opts.extraEmptyItems() : []),
     ];
     if (items.length) setMenu({ x, y, title: `${weekday(at.date)}, ${fmtDate(at.date)}`, items });

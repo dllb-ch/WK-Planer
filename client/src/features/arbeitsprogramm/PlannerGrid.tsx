@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type { Block, Location } from '@shared/types';
 import { BLOCK_TYPE_INFO, KDO_ID } from '@shared/types';
-import { fmtDate, fmtTime, weekday } from '@shared/util';
+import { fmtDate, fmtTime } from '@shared/util';
+import { useT } from '../../i18n';
 import { blockGeom, clamp, colOf, gridH, gridW, nCols, rectOf, snapTo, zugIdsFor, type Layout } from './geometry';
 
 export interface Draft {
@@ -64,6 +65,7 @@ const sameDraft = (a: Draft, b: Draft) =>
 
 export function PlannerGrid(p: Props) {
   const { layout: l } = p;
+  const { t, weekday } = useT();
   const serves = (d: string, zugId: number) => l.serves?.(d, zugId) ?? true;
   /** Duty of a Zug where it differs from the type of the day (e.g. KVK on a WK day). */
   const badge = (d: string, zugId: number) => {
@@ -226,7 +228,7 @@ export function PlannerGrid(p: Props) {
       {/* Header: days and Züge */}
       <div className="sticky top-0 z-20 flex border-b border-slate-300 bg-white" style={{ height: l.headerH }}>
         <div className="sticky left-0 z-10 flex shrink-0 items-end justify-center border-r border-slate-300 bg-white pb-1 text-[11px] text-slate-500" style={{ width: l.axisW }}>
-          Zeit
+          {t('grid.time')}
         </div>
         {l.days.map((d, di) => (
           <div key={d} className={`flex shrink-0 flex-col ${di > 0 ? 'border-l-2 border-slate-400' : ''}`} style={{ width: nZ * l.colW }}>
@@ -235,8 +237,8 @@ export function PlannerGrid(p: Props) {
                 l.avorDays.includes(d) ? 'bg-amber-100 text-amber-900' : l.kvkDays?.includes(d) ? 'bg-sky-100 text-sky-900' : 'text-slate-800'
               }`}
             >
-              {l.avorDays.includes(d) && <span className="rounded bg-amber-500 px-1 text-[10px] text-white">AVOR</span>}
-              {l.kvkDays?.includes(d) && <span className="rounded bg-sky-600 px-1 text-[10px] text-white">KVK</span>}
+              {l.avorDays.includes(d) && <span className="rounded bg-amber-500 px-1 text-[10px] text-white">{t('duty.AVOR')}</span>}
+              {l.kvkDays?.includes(d) && <span className="rounded bg-sky-600 px-1 text-[10px] text-white">{t('duty.KVK')}</span>}
               {weekday(d)} <span className="font-normal opacity-70">{fmtDate(d).slice(0, 6)}</span>
             </div>
             <div className="flex border-t border-slate-200">
@@ -256,7 +258,7 @@ export function PlannerGrid(p: Props) {
                   {z.name}
                   {badge(d, z.id) && (
                     <span className={`ml-0.5 rounded px-0.5 text-[9px] font-semibold text-white ${badge(d, z.id) === 'KVK' ? 'bg-sky-600' : badge(d, z.id) === 'AVOR' ? 'bg-amber-500' : 'bg-slate-500'}`}>
-                      {badge(d, z.id)}
+                      {t(`duty.${badge(d, z.id)!}`)}
                     </span>
                   )}
                 </div>
@@ -265,7 +267,7 @@ export function PlannerGrid(p: Props) {
           </div>
         ))}
         <div className="flex shrink-0 items-end justify-center border-l border-slate-300 pb-1 text-[11px] text-slate-500" style={{ width: l.axisW }}>
-          Zeit
+          {t('grid.time')}
         </div>
       </div>
 
@@ -289,7 +291,7 @@ export function PlannerGrid(p: Props) {
             l.zuege.map((z, zi) => (
               <div
                 key={`${d}-${z.id}`}
-                title={serves(d, z.id) ? undefined : `${z.name}: kein Dienst`}
+                title={serves(d, z.id) ? undefined : t('grid.noService', { zug: z.name })}
                 className={`absolute top-0 h-full ${zi === 0 && di > 0 ? 'border-l-2 border-slate-400' : 'border-l border-slate-200'} ${
                   !serves(d, z.id)
                     ? 'col-off'

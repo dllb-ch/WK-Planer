@@ -1,7 +1,6 @@
 // Own account: change e-mail (login) and password.
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ROLE_LABEL } from '@shared/types';
 import { api } from '../api';
 import { useUser } from '../auth';
 import { Button, Card, errMsg, Field, useToast } from '../components/ui';
@@ -10,31 +9,32 @@ import { useT } from '../i18n';
 
 export function ProfilPage() {
   const me = useUser();
+  const { t } = useT();
   const org = useQuery({ queryKey: ['org'], queryFn: api.org });
   const kp = org.data?.kompanien.find((k) => k.id === me.kpId)?.name;
   const zug = org.data?.zuege.find((z) => z.id === me.zugId)?.name;
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4 overflow-y-auto p-3 sm:p-6">
-      <h1 className="text-xl font-semibold">Mein Konto</h1>
+      <h1 className="text-xl font-semibold">{t('nav.account')}</h1>
       <Card>
         <dl className="grid grid-cols-[8rem,1fr] gap-y-1 text-sm">
-          <dt className="text-slate-500">Name</dt>
+          <dt className="text-slate-500">{t('profile.name')}</dt>
           <dd>{me.name}</dd>
-          <dt className="text-slate-500">Rolle</dt>
-          <dd>{ROLE_LABEL[me.role]}</dd>
+          <dt className="text-slate-500">{t('profile.role')}</dt>
+          <dd>{t(`role.${me.role}`)}</dd>
           {kp && (
             <>
-              <dt className="text-slate-500">Kompanie</dt>
+              <dt className="text-slate-500">{t('profile.kompanie')}</dt>
               <dd>
                 {kp}
                 {zug && ` · ${zug}`}
               </dd>
             </>
           )}
-          <dt className="text-slate-500">E-Mail (Login)</dt>
+          <dt className="text-slate-500">{t('profile.loginEmail')}</dt>
           <dd>{me.email}</dd>
         </dl>
-        <p className="mt-2 text-xs text-slate-500">Name, Rolle und Einteilung ändern Kp Kdt bzw. Bat Kommando unter «Organisation › Kompanien & Personal».</p>
+        <p className="mt-2 text-xs text-slate-500">{t('profile.changedBy')}</p>
       </Card>
       <LanguageCard />
       <EmailForm />
@@ -45,6 +45,7 @@ export function ProfilPage() {
 
 function EmailForm() {
   const me = useUser();
+  const { t } = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const [email, setEmail] = useState('');
@@ -59,7 +60,7 @@ function EmailForm() {
       qc.setQueryData(['me'], u);
       setEmail('');
       setPassword('');
-      toast(`E-Mail geändert – ab sofort mit ${u.email} anmelden`);
+      toast(t('profile.emailChanged', { email: u.email }));
     } catch (err) {
       toast(errMsg(err), 'error');
     } finally {
@@ -67,17 +68,17 @@ function EmailForm() {
     }
   };
   return (
-    <Card title="E-Mail-Adresse ändern">
+    <Card title={t('profile.emailTitle')}>
       <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit}>
-        <Field label="Neue E-Mail-Adresse">
+        <Field label={t('profile.newEmail')}>
           <input className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
-        <Field label="Aktuelles Passwort">
+        <Field label={t('profile.currentPassword')}>
           <input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         <div className="sm:col-span-2">
           <Button variant="primary" type="submit" disabled={!valid || busy}>
-            E-Mail speichern
+            {t('profile.saveEmail')}
           </Button>
         </div>
       </form>
@@ -87,6 +88,7 @@ function EmailForm() {
 
 function PasswordForm() {
   const toast = useToast();
+  const { t } = useT();
   const [f, setF] = useState({ old: '', next: '', repeat: '' });
   const [busy, setBusy] = useState(false);
   const tooShort = f.next.length > 0 && f.next.length < 8;
@@ -98,7 +100,7 @@ function PasswordForm() {
     try {
       await api.changePassword(f.old, f.next);
       setF({ old: '', next: '', repeat: '' });
-      toast('Passwort geändert – auf anderen Geräten ist eine neue Anmeldung nötig');
+      toast(t('profile.passwordChanged'));
     } catch (err) {
       toast(errMsg(err), 'error');
     } finally {
@@ -106,22 +108,22 @@ function PasswordForm() {
     }
   };
   return (
-    <Card title="Passwort ändern">
+    <Card title={t('profile.passwordTitle')}>
       <form className="grid gap-3 sm:grid-cols-3" onSubmit={submit}>
-        <Field label="Aktuelles Passwort">
+        <Field label={t('profile.currentPassword')}>
           <input className="input" type="password" autoComplete="current-password" value={f.old} onChange={(e) => setF({ ...f, old: e.target.value })} />
         </Field>
-        <Field label="Neues Passwort">
+        <Field label={t('profile.newPassword')}>
           <input className="input" type="password" autoComplete="new-password" value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} />
         </Field>
-        <Field label="Neues Passwort wiederholen">
+        <Field label={t('profile.repeatPassword')}>
           <input className="input" type="password" autoComplete="new-password" value={f.repeat} onChange={(e) => setF({ ...f, repeat: e.target.value })} />
         </Field>
         <div className="space-y-1 sm:col-span-3">
-          {tooShort && <p className="text-xs text-red-700">Mindestens 8 Zeichen.</p>}
-          {mismatch && <p className="text-xs text-red-700">Die beiden neuen Passwörter stimmen nicht überein.</p>}
+          {tooShort && <p className="text-xs text-red-700">{t('profile.min8')}</p>}
+          {mismatch && <p className="text-xs text-red-700">{t('profile.mismatch')}</p>}
           <Button variant="primary" type="submit" disabled={!valid || busy}>
-            Passwort ändern
+            {t('profile.passwordTitle')}
           </Button>
         </div>
       </form>

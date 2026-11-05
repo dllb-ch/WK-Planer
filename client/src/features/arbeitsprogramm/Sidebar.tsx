@@ -2,7 +2,8 @@ import { useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Block, Location, Zug } from '@shared/types';
 import { BLOCK_TYPE_INFO, BLOCK_TYPES } from '@shared/types';
-import { fmtDate, fmtTime, weekday } from '@shared/util';
+import { fmtDate, fmtTime } from '@shared/util';
+import { useT } from '../../i18n';
 import { api } from '../../api';
 import { Button, errMsg, useToast } from '../../components/ui';
 import { Comments } from './Comments';
@@ -38,12 +39,13 @@ interface Props {
 }
 
 export function Sidebar(p: Props) {
+  const { t, weekday, weekdayShort } = useT();
   const zugNames = (ids: number[]) => p.zuege.filter((z) => ids.includes(z.id)).map((z) => z.name).join(', ');
   const loc = p.locations.find((l) => l.id === p.selected?.locationId);
   const overlaps = p.hints.filter((h) => h.kind === 'overlap').length;
   return (
     <aside className="no-print flex w-80 shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white">
-      <Section title="Ausgewählter Block">
+      <Section title={t('sb.selected')}>
         {p.selected ? (
           <div className="space-y-2 text-sm">
             <div className="flex items-start gap-2">
@@ -56,13 +58,13 @@ export function Sidebar(p: Props) {
               </div>
             </div>
             <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-xs">
-              <dt className="text-slate-500">Art</dt>
-              <dd>{BLOCK_TYPE_INFO[p.selected.type].label}</dd>
-              <dt className="text-slate-500">Züge</dt>
+              <dt className="text-slate-500">{t('bd.type')}</dt>
+              <dd>{t(`block.${p.selected.type}`)}</dd>
+              <dt className="text-slate-500">{t('bd.zuege')}</dt>
               <dd>{zugNames(p.selected.zugIds)}</dd>
               {loc && (
                 <>
-                  <dt className="text-slate-500">Standort</dt>
+                  <dt className="text-slate-500">{t('bd.location')}</dt>
                   <dd>
                     ({loc.nr}) {loc.name}
                   </dd>
@@ -70,39 +72,39 @@ export function Sidebar(p: Props) {
               )}
               {p.selected.verantwortlich && (
                 <>
-                  <dt className="text-slate-500">Verantw.</dt>
+                  <dt className="text-slate-500">{t('sb.respShort')}</dt>
                   <dd>{p.selected.verantwortlich}</dd>
                 </>
               )}
               {(p.selected.locked || p.selected.source === 'BAT') && (
                 <>
-                  <dt className="text-slate-500">Status</dt>
-                  <dd>{p.selected.source === 'BAT' ? 'Vorgabe Bat (gesperrt)' : 'Gesperrt'}</dd>
+                  <dt className="text-slate-500">{t('common.status')}</dt>
+                  <dd>{p.selected.source === 'BAT' ? t('sb.batLocked') : t('sb.locked')}</dd>
                 </>
               )}
             </dl>
             {p.selected.notes && <p className="whitespace-pre-wrap rounded bg-slate-50 p-2 text-xs">{p.selected.notes}</p>}
             {p.selectedResources.length > 0 && (
               <div>
-                <div className="label">Fahrzeuge, Räume, Gelände</div>
+                <div className="label">{t('sb.resources')}</div>
                 <ResourceChips chips={p.selectedResources} />
               </div>
             )}
             <Button className="w-full" onClick={() => p.onOpen(p.selected!.id)}>
-              {p.canEditSelected ? 'Bearbeiten' : 'Details'}
+              {p.canEditSelected ? t('common.edit') : t('sb.details')}
             </Button>
             <div className="pt-1">
-              <div className="label">Kommentare zum Block</div>
+              <div className="label">{t('sb.blockComments')}</div>
               <Comments wkId={p.wkId} blockId={p.selected.id} compact />
             </div>
           </div>
         ) : (
-          <p className="text-xs text-slate-500">Block anklicken, um Details und Kommentare zu sehen. Doppelklick öffnet den Block.</p>
+          <p className="text-xs text-slate-500">{t('sb.clickHint')}</p>
         )}
       </Section>
 
       <Section
-        title="Hinweise"
+        title={t('sb.hints')}
         badge={
           <>
             {overlaps > 0 && <span className="rounded-full bg-red-100 px-1.5 text-[10px] text-red-700">{overlaps}</span>}
@@ -111,14 +113,14 @@ export function Sidebar(p: Props) {
         }
       >
         {p.hints.length === 0 ? (
-          <p className="text-xs text-emerald-700">Keine Überschneidungen oder fehlenden Verschiebungen.</p>
+          <p className="text-xs text-emerald-700">{t('sb.noHints')}</p>
         ) : (
           <ul className="space-y-1">
             {[...p.hints].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'overlap' ? -1 : 1)).map((h, i) => (
               <li key={i}>
                 <button className="w-full rounded px-1.5 py-1 text-left text-xs hover:bg-slate-100" onClick={() => p.onSelect(h.blockIds[0])}>
                   <span className={h.kind === 'overlap' ? 'text-red-700' : 'text-amber-700'}>{h.kind === 'overlap' ? '⚠' : 'ⓘ'}</span>{' '}
-                  <span className="text-slate-500">{weekday(h.date).slice(0, 2)}:</span> {h.text}
+                  <span className="text-slate-500">{weekdayShort(h.date)}:</span> {h.text}
                 </button>
               </li>
             ))}
@@ -126,22 +128,22 @@ export function Sidebar(p: Props) {
         )}
       </Section>
 
-      <Section title="Legende">
+      <Section title={t('sb.legend')}>
         <LocationsEditor wkId={p.wkId} locations={p.locations} editable={p.canEditLocations} />
         <div className="mt-3 grid grid-cols-2 gap-1">
-          {BLOCK_TYPES.map((t) => (
-            <div key={t} className="flex items-center gap-1.5 text-xs">
-              <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: BLOCK_TYPE_INFO[t].color }} />
-              {BLOCK_TYPE_INFO[t].label}
+          {BLOCK_TYPES.map((x) => (
+            <div key={x} className="flex items-center gap-1.5 text-xs">
+              <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: BLOCK_TYPE_INFO[x].color }} />
+              {t(`block.${x}`)}
             </div>
           ))}
           <div className="col-span-2 mt-1 flex items-center gap-1.5 text-xs">
-            <span className="block-bat h-3 w-3 shrink-0 rounded-sm bg-pink-600" /> Vorgabe Bat · 🔒 gesperrt
+            <span className="block-bat h-3 w-3 shrink-0 rounded-sm bg-pink-600" /> {t('sb.batPresetLegend')}
           </div>
         </div>
       </Section>
 
-      <Section title="Kommentare zum WK" defaultOpen={false}>
+      <Section title={t('sb.wkComments')} defaultOpen={false}>
         <Comments wkId={p.wkId} blockId={null} />
       </Section>
     </aside>
@@ -151,29 +153,30 @@ export function Sidebar(p: Props) {
 function LocationsEditor({ wkId, locations, editable }: { wkId: number; locations: Location[]; editable: boolean }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const { t } = useT();
   const [draft, setDraft] = useState<{ id?: number; nr: number; name: string }[] | null>(null);
 
   if (!draft) {
     return (
       <div>
-        <div className="label">Standorte</div>
-        {locations.length === 0 && <p className="text-xs text-slate-400">Keine Standorte erfasst.</p>}
+        <div className="label">{t('sb.locations')}</div>
+        {locations.length === 0 && <p className="text-xs text-slate-400">{t('sb.noLocations')}</p>}
         <ul className="space-y-0.5 text-xs">
           {locations.map((l) => (
             <li key={l.id}>
               <span className="font-semibold">{l.nr}</span> = {l.name}
               {l.resourceId != null && (
-                <span className="ml-1 text-slate-400" title="Aus dem Katalog: Blöcke an diesem Standort reservieren ihn">
+                <span className="ml-1 text-slate-400" title={t('sb.fromCatalogue')}>
                   🔗
                 </span>
               )}
             </li>
           ))}
-          <li className="text-slate-500">Vs = Verschiebung</li>
+          <li className="text-slate-500">{t('sb.moveLegend')}</li>
         </ul>
         {editable && (
           <Button variant="ghost" className="mt-1 !px-1 text-xs" onClick={() => setDraft(locations.map(({ id, nr, name }) => ({ id, nr, name })))}>
-            Standorte bearbeiten
+            {t('sb.editLocations')}
           </Button>
         )}
       </div>
@@ -191,7 +194,7 @@ function LocationsEditor({ wkId, locations, editable }: { wkId: number; location
   };
   return (
     <div className="space-y-1.5">
-      <div className="label">Standorte</div>
+      <div className="label">{t('sb.locations')}</div>
       {draft.map((d, i) => (
         <div key={i} className="flex gap-1">
           <input
@@ -201,21 +204,21 @@ function LocationsEditor({ wkId, locations, editable }: { wkId: number; location
             onChange={(e) => setDraft(draft.map((x, j) => (j === i ? { ...x, nr: Number(e.target.value) } : x)))}
           />
           <input className="input" value={d.name} onChange={(e) => setDraft(draft.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-          <button className="px-1 text-slate-400 hover:text-red-600" onClick={() => setDraft(draft.filter((_, j) => j !== i))} aria-label="Entfernen">
+          <button className="px-1 text-slate-400 hover:text-red-600" onClick={() => setDraft(draft.filter((_, j) => j !== i))} aria-label={t('common.remove')}>
             ✕
           </button>
         </div>
       ))}
       <div className="flex gap-1">
         <Button variant="ghost" className="text-xs" onClick={() => setDraft([...draft, { nr: Math.max(0, ...draft.map((d) => d.nr)) + 1, name: '' }])}>
-          + Standort
+          {t('sb.addLocation')}
         </Button>
         <span className="flex-1" />
         <Button className="text-xs" onClick={() => setDraft(null)}>
-          Abbrechen
+          {t('common.cancel')}
         </Button>
         <Button variant="primary" className="text-xs" onClick={save}>
-          Speichern
+          {t('common.save')}
         </Button>
       </div>
     </div>

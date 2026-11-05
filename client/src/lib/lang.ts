@@ -1,5 +1,5 @@
 // The language of the interface outside React (API requests send it as X-Lang). Set by the I18nProvider.
-import { pickLang, isLang, type Lang } from '@shared/i18n';
+import { pickLang, isLang, translate, type Key, type Lang, type Vars } from '@shared/i18n';
 
 const STORE = 'zs-lang';
 
@@ -16,6 +16,8 @@ export function initialLang(): Lang {
 
 let current: Lang = initialLang();
 export const currentLang = () => current;
+/** Translation outside React components (helpers called while rendering). */
+export const currentT = (key: Key, vars?: Vars) => translate(current, key, vars);
 
 export function setCurrentLang(lang: Lang, remember: boolean) {
   current = lang;
