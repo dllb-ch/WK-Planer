@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Role, TemplateItem, TemplateScope } from '@shared/types';
+import type { MapView, Role, TemplateItem, TemplateScope } from '@shared/types';
 import { PLANNING_ROLES, ROLE_LABEL } from '@shared/types';
 import { api, type AdminBat } from '../api';
 import { Button, Card, Empty, errMsg, Field, useToast } from '../components/ui';
@@ -9,6 +9,7 @@ import { ImportExportMenu } from '../components/ImportExport';
 import { exportTable, importTable } from '../lib/tableFile';
 import { roleOf, TEMPLATE_COLUMNS } from '../lib/vorbereitungFile';
 import { MaterialOverview } from '../features/ressourcen/MaterialOverview';
+import { SwissMap } from '../components/SwissMap';
 
 const SOURCE_LABEL: Record<TemplateScope, string> = {
   DEFAULT: 'Standardvorlage',
@@ -308,7 +309,9 @@ function KpCatalogue({ batId, kpId }: { batId: number; kpId: number }) {
 function BatSettings({ bat }: { bat: AdminBat }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const initial = { name: bat.name, regionName: bat.regionName, logo: bat.logo, kantonLogo: bat.kantonLogo, briefkopf: bat.briefkopf };
+  const initial = { name: bat.name, regionName: bat.regionName, logo: bat.logo, kantonLogo: bat.kantonLogo, briefkopf: bat.briefkopf, mapView: bat.mapView };
+  // Where the map currently stands (taken over with the button).
+  const [shown, setShown] = useState<MapView | null>(bat.mapView);
   const [f, setF] = useState(initial);
   const dirty = JSON.stringify(f) !== JSON.stringify(initial);
   const pick = (key: 'logo' | 'kantonLogo', file: File | undefined) => {
@@ -383,6 +386,27 @@ function BatSettings({ bat }: { bat: AdminBat }) {
         </Field>
         {logoField('kantonLogo', 'Logo des Kantons (Kopfzeile rechts)')}
         {logoField('logo', 'Logo der Region (Deckblatt)')}
+      </div>
+      <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+        <span className="label">Standard-Kartenausschnitt</span>
+        <p className="text-xs text-slate-500">
+          Hier öffnen sich alle Karten (Gelände, Ressourcen, Erkundungen, Übungen), solange noch keine Fläche eingezeichnet ist.
+          Karte verschieben oder einen Ort suchen, dann übernehmen und speichern.
+        </p>
+        <SwissMap view={bat.mapView} onViewChange={setShown} height={260} />
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Button disabled={!shown} onClick={() => shown && setF({ ...f, mapView: shown })}>
+            Aktuellen Ausschnitt übernehmen
+          </Button>
+          {f.mapView && (
+            <Button variant="ghost" onClick={() => setF({ ...f, mapView: null })}>
+              Zurücksetzen (ganze Schweiz)
+            </Button>
+          )}
+          <span className="text-slate-500">
+            {f.mapView ? `Gewählt: ${f.mapView.lat.toFixed(4)}, ${f.mapView.lon.toFixed(4)} · Zoom ${f.mapView.zoom}` : 'Kein Ausschnitt gewählt – Karten zeigen die ganze Schweiz.'}
+          </span>
+        </div>
       </div>
     </Card>
   );

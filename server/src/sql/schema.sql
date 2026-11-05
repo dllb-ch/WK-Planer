@@ -393,6 +393,7 @@ CREATE INDEX IF NOT EXISTS attachment_uebung ON attachment(uebung_id);
 -- Letterhead of printed documents.
 ALTER TABLE bataillon ADD COLUMN IF NOT EXISTS briefkopf TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE bataillon ADD COLUMN IF NOT EXISTS kanton_logo TEXT;
+ALTER TABLE bataillon ADD COLUMN IF NOT EXISTS map_view TEXT;
 -- KVK days (all Züge) apart from AVOR days (Kp Kdo), and the Züge serving per day.
 ALTER TABLE wk ADD COLUMN IF NOT EXISTS kvk_days TEXT NOT NULL DEFAULT '[]';
 -- NULL: not yet set (WKs of earlier versions, filled on start).

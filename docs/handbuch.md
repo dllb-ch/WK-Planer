@@ -204,7 +204,9 @@ Rapport-Protokoll, Erkundungsprotokoll, Übungsunterlagen, Präsenzliste, QR-Cod
 Briefkopf: links Amt (fett), Abteilung und Region, rechts das Logo des Kantons bzw. der Organisation; Titel in
 Arial Black. Fusszeile: auf der ersten Seite die Adresse, danach der Dokumenttitel; rechts «Seite x / y»
 (Chrome/Edge). Texte, Adresse und Logos stellen Org Admin und Bat Kommando unter
-«Organisation › Vorlagen & Ressourcen» ein. Der Tagesbefehl ist aufgebaut mit Datum / Erfasser / Ersetzt Dok vom,
+«Organisation › Vorlagen & Ressourcen» ein. Dort wählen sie auch den **Standard-Kartenausschnitt**: Alle Karten
+(Gelände, Ressourcen, Erkundungen, Übungen) öffnen sich dort, solange noch keine Fläche eingezeichnet ist; ohne
+Auswahl zeigen sie die ganze Schweiz. Der Tagesbefehl ist aufgebaut mit Datum / Erfasser / Ersetzt Dok vom,
 Tabelle Zeit · Was · Wer · Ort und separaten Rapporten.
 
 **Teilnehmerliste aus dem Personalsystem:** Der Export (Spalten Name, Vorname, Funktion, Grad, *Eff. EinrDatum,

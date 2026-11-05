@@ -47,6 +47,7 @@ export const toBat = (r: Row): Bataillon => ({
   logo: r.logo ?? null,
   briefkopf: { amt: '', abteilung: '', adresse: '', telefon: '', web: '', ...JSON.parse(r.briefkopf || '{}') },
   kantonLogo: r.kanton_logo ?? null,
+  mapView: r.map_view ? JSON.parse(r.map_view) : null,
 });
 
 export const toKp = (r: Row): Kompanie => ({ id: r.id, batId: r.bat_id, name: r.name });

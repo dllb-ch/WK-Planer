@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { Area } from '@shared/types';
+import type { Area, MapView } from '@shared/types';
 import { Button } from './ui';
+import { useBataillon } from './Briefkopf';
 
 // swisstopo WMTS in Web Mercator (free use with attribution, see geo.admin.ch terms).
 const WMTS = (layer: string, ext: string) => `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${ext}`;
@@ -24,9 +25,17 @@ interface Props {
   value?: Area | null;
   onChange?: (a: Area | null) => void;
   height?: number;
+  /** Start view without content; default: the map view of the Bataillon, else all of Switzerland. */
+  view?: MapView | null;
+  /** Reports centre and zoom after each move (e.g. to save it as default). */
+  onViewChange?: (v: MapView) => void;
 }
 
-export function SwissMap({ shapes = [], value = null, onChange, height = 360 }: Props) {
+export function SwissMap({ shapes = [], value = null, onChange, height = 360, view, onViewChange }: Props) {
+  const batView = useBataillon()?.mapView ?? null;
+  const start = view !== undefined ? view : batView;
+  const onViewRef = useRef(onViewChange);
+  onViewRef.current = onViewChange;
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const shapeLayer = useRef<L.LayerGroup | null>(null);
@@ -37,6 +46,8 @@ export function SwissMap({ shapes = [], value = null, onChange, height = 360 }: 
   onChangeRef.current = onChange;
   // Zoom to the content once it is known (shapes often arrive after the map is created).
   const fitted = useRef(false);
+  // The default view was applied (it may arrive after the map is created, too).
+  const placed = useRef(false);
 
   useEffect(() => {
     const m = L.map(el.current!, { zoomControl: true, attributionControl: true });
@@ -50,10 +61,17 @@ export function SwissMap({ shapes = [], value = null, onChange, height = 360 }: 
       if (!onChangeRef.current) return;
       onChangeRef.current([...(valueRef.current ?? []), [round(e.latlng.lat), round(e.latlng.lng)]]);
     });
+    m.on('moveend', () => {
+      const c = m.getCenter();
+      onViewRef.current?.({ lat: round(c.lat), lon: round(c.lng), zoom: m.getZoom() });
+    });
     const all = [...(valueRef.current ?? []), ...shapes.flatMap((s) => s.area)];
     if (all.length) {
       m.fitBounds(L.latLngBounds(all), { padding: [30, 30], maxZoom: 17 });
       fitted.current = true;
+    } else if (start) {
+      m.setView([start.lat, start.lon], start.zoom);
+      placed.current = true;
     } else m.fitBounds(SWITZERLAND);
     map.current = m;
     return () => {
@@ -75,6 +93,12 @@ export function SwissMap({ shapes = [], value = null, onChange, height = 360 }: 
       fitted.current = true;
     }
   }, [shapes]);
+
+  useEffect(() => {
+    if (!map.current || fitted.current || placed.current || !start) return;
+    map.current.setView([start.lat, start.lon], start.zoom);
+    placed.current = true;
+  }, [start]);
 
   useEffect(() => {
     const g = editLayer.current;
@@ -112,9 +136,11 @@ const round = (n: number) => Math.round(n * 1e6) / 1e6;
 function PlaceSearch({ onPick }: { onPick: (lat: number, lon: number) => void }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<{ label: string; lat: number; lon: number }[]>([]);
+  // The name of the place just picked: no new search for it.
+  const picked = useRef('');
 
   useEffect(() => {
-    if (q.trim().length < 3) {
+    if (q.trim().length < 3 || q === picked.current) {
       setResults([]);
       return;
     }
@@ -145,7 +171,7 @@ function PlaceSearch({ onPick }: { onPick: (lat: number, lon: number) => void })
     <div className="relative">
       <input className="input" placeholder="Ort oder Adresse suchen (swisstopo) …" value={q} onChange={(e) => setQ(e.target.value)} />
       {results.length > 0 && (
-        <ul className="absolute z-[1000] mt-1 w-full rounded-md border border-slate-200 bg-white text-sm shadow-lg">
+        <ul className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white text-sm shadow-lg">
           {results.map((r, i) => (
             <li key={i}>
               <button
@@ -153,6 +179,7 @@ function PlaceSearch({ onPick }: { onPick: (lat: number, lon: number) => void })
                 className="w-full px-3 py-1.5 text-left hover:bg-slate-50"
                 onClick={() => {
                   onPick(r.lat, r.lon);
+                  picked.current = r.label;
                   setResults([]);
                   setQ(r.label);
                 }}

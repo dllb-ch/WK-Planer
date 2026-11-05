@@ -1316,6 +1316,16 @@ describe('Briefkopf', () => {
     expect((await (await login('kpkdt@demo.ch')).put(`/api/bataillone/${id}/settings`).send({ name: 'x' })).status).toBe(403);
     expect((await bat.put(`/api/bataillone/${id}/settings`).send({ name: 'x', kantonLogo: 'data:text/html;base64,PGI+' })).status).toBe(400);
   });
+
+  it('stores the default map view of the Bataillon; only within Switzerland', async () => {
+    const bat = await login('bat@demo.ch');
+    const id = ((await db.prepare('SELECT id FROM bataillon LIMIT 1').get()) as any).id;
+    const view = { lat: 46.948, lon: 7.4474, zoom: 13 };
+    expect((await bat.put(`/api/bataillone/${id}/settings`).send({ name: 'Bat 1', mapView: view })).body.mapView).toEqual(view);
+    expect((await (await login('zfhr1@demo.ch')).get('/api/org')).body.bataillon.mapView).toEqual(view);
+    expect((await bat.put(`/api/bataillone/${id}/settings`).send({ name: 'Bat 1', mapView: { lat: 52.5, lon: 13.4, zoom: 12 } })).status).toBe(400);
+    expect((await bat.put(`/api/bataillone/${id}/settings`).send({ name: 'Bat 1', mapView: null })).body.mapView).toBeNull();
+  });
 });
 
 describe('Diensttage pro Zug', () => {

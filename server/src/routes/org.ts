@@ -75,12 +75,17 @@ export function orgRouter(db: DB) {
         logo: image,
         kantonLogo: image,
         briefkopf: z.object({ amt: line, abteilung: line, adresse: line, telefon: line, web: line }).default({}),
+        // Within Switzerland and its surroundings.
+        mapView: z
+          .object({ lat: z.number().min(45.5).max(48.2), lon: z.number().min(5.5).max(11), zoom: z.number().int().min(6).max(19) })
+          .nullable()
+          .default(null),
       }),
       req.body,
     );
     await db
-      .prepare('UPDATE bataillon SET name = ?, region_name = ?, logo = ?, kanton_logo = ?, briefkopf = ? WHERE id = ?')
-      .run(b.name, b.regionName, b.logo, b.kantonLogo, JSON.stringify(b.briefkopf), id);
+      .prepare('UPDATE bataillon SET name = ?, region_name = ?, logo = ?, kanton_logo = ?, briefkopf = ?, map_view = ? WHERE id = ?')
+      .run(b.name, b.regionName, b.logo, b.kantonLogo, JSON.stringify(b.briefkopf), b.mapView ? JSON.stringify(b.mapView) : null, id);
     await audit(db, u.id, 'bataillon', id, 'settings', { name: b.name, regionName: b.regionName, logo: !!b.logo });
     res.json(toBat((await db.prepare('SELECT * FROM bataillon WHERE id = ?').get(id))));
   });

@@ -74,6 +74,15 @@ export interface Bataillon {
   briefkopf: Briefkopf;
   /** Logo of the canton (data URL), top right of the letterhead. */
   kantonLogo: string | null;
+  /** Where maps open when they have nothing to show yet (otherwise all of Switzerland). */
+  mapView: MapView | null;
+}
+
+/** Centre and zoom of a map (WGS84, Leaflet zoom level). */
+export interface MapView {
+  lat: number;
+  lon: number;
+  zoom: number;
 }
 
 export interface Briefkopf {
