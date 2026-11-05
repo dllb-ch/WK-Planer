@@ -187,7 +187,7 @@ export function AvPage({ detail }: { detail: WkDetail }) {
             <div className="flex min-w-0 items-center">
               <Link to="../zug" className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-zs-blue hover:bg-slate-500/10">
                 <span className="text-2xl leading-none">‹</span>
-                <span className="max-sm:hidden">Zugansicht</span>
+                <span className="max-sm:hidden">{t('wk.tab.zug')}</span>
               </Link>
             </div>
             <div className={`max-w-[34vw] truncate font-semibold transition-opacity max-sm:hidden ${scrolled ? 'opacity-100' : 'opacity-0'}`}>{f.thema || t('av.newLesson')}</div>

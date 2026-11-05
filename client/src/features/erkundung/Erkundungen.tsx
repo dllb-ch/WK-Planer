@@ -45,8 +45,7 @@ export function ErkundungenPage({ detail }: { detail: WkDetail }) {
           }
         >
           <p className="mb-3 text-sm text-slate-600">
-            Gelände, Gebäude und Räume beurteilen, Gefahren erkennen, Absprachen treffen – festgehalten im Erkundungsprotokoll (Handbuch S. 61,
-            Anhänge S. 33).
+            {t('erk.intro')}
           </p>
           {q.isLoading ? (
             <Empty>{t('common.loading')}</Empty>

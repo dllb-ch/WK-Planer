@@ -2,15 +2,21 @@ import { useEffect, useState } from 'react';
 import { BASE } from '../../lib/base';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CheckInDay } from '@shared/types';
-import { fmtDate, weekday } from '@shared/util';
+import { fmtDate } from '@shared/util';
+
+const weekday = (d: string) => weekdayIn(currentLang(), d);
 import { api, type WkDetail } from '../../api';
 import { Briefkopf, usePrintPage } from '../../components/Briefkopf';
 import { Button, Card, Empty, errMsg, useToast } from '../../components/ui';
+import { useT } from '../../i18n';
+import { weekdayIn } from '@shared/i18n';
+import { currentLang } from '../../lib/lang';
+import type { Key } from '@shared/i18n';
 
-const MODE_LABEL: Record<CheckInDay['mode'], string> = {
-  AUTO: 'Nur an diesem Tag offen',
-  OPEN: 'Offen',
-  CLOSED: 'Geschlossen',
+const MODE_LABEL: Record<CheckInDay['mode'], Key> = {
+  AUTO: 'qr.mode.AUTO',
+  OPEN: 'qr.mode.OPEN',
+  CLOSED: 'qr.mode.CLOSED',
 };
 
 export const checkinUrl = (token: string) => `${location.origin}${BASE}/checkin/${token}`;
@@ -29,6 +35,7 @@ export function useQr(text: string) {
 
 /** One QR code per WK day; people scan it in the morning and check in. */
 export function QrCodes({ detail }: { detail: WkDetail }) {
+  const { t, tn } = useT();
   const { wk } = detail;
   const q = useQuery({ queryKey: ['checkin-days', wk.id], queryFn: () => api.checkinDays(wk.id) });
   const [printing, setPrinting] = useState<string | null>(null);
@@ -46,19 +53,17 @@ export function QrCodes({ detail }: { detail: WkDetail }) {
 
   return (
     <>
-      <Card title="QR-Codes für den Check-in" className="no-print">
+      <Card title={t('qr.title')} className="no-print">
         <p className="mb-2 text-sm text-slate-600">
-          Pro Tag ein Code: aushängen oder beim Appell zeigen. Die Personen geben Name, E-Mail, Zug und Essen an und werden mit der Teilnehmerliste
-          abgeglichen. Wer nicht eindeutig gefunden wird, erscheint unter «Präsenz» zum Zuordnen.
+          {t('qr.intro')}
         </p>
         {local && (
           <p className="mb-3 rounded bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Der Planer läuft unter <b>{location.host}</b>. Handys können diese Adresse nicht öffnen – für den Check-in muss er unter einer im Netzwerk
-            oder Internet erreichbaren Adresse laufen.
+            {tn('qr.local', { host: <b>{location.host}</b> })}
           </p>
         )}
         {q.isLoading ? (
-          <Empty>Laden …</Empty>
+          <Empty>{t('common.loading')}</Empty>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(q.data ?? []).map((d) => (
@@ -73,6 +78,7 @@ export function QrCodes({ detail }: { detail: WkDetail }) {
 }
 
 function DayQr({ wkId, day, avor, onPrint }: { wkId: number; day: CheckInDay; avor: boolean; onPrint: () => void }) {
+  const { t } = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const url = checkinUrl(day.token);
@@ -94,27 +100,27 @@ function DayQr({ wkId, day, avor, onPrint }: { wkId: number; day: CheckInDay; av
         {avor && <span className="text-xs text-slate-500">AVOR</span>}
       </div>
       {src ? <img src={src} alt={`QR-Code ${fmtDate(day.date)}`} className="mx-auto w-40" /> : <div className="h-40" />}
-      <select className="input" value={day.mode} onChange={(e) => update({ mode: e.target.value as CheckInDay['mode'] })} aria-label="Check-in offen">
+      <select className="input" value={day.mode} onChange={(e) => update({ mode: e.target.value as CheckInDay['mode'] })} aria-label={t('qr.open')}>
         {(Object.keys(MODE_LABEL) as CheckInDay['mode'][]).map((m) => (
           <option key={m} value={m}>
-            {MODE_LABEL[m]}
+            {t(MODE_LABEL[m])}
           </option>
         ))}
       </select>
       <div className="flex flex-wrap gap-1.5">
-        <Button onClick={onPrint}>Drucken</Button>
+        <Button onClick={onPrint}>{t('common.print')}</Button>
         <Button
           onClick={() =>
             navigator.clipboard?.writeText(url).then(
-              () => toast('Link kopiert'),
+              () => toast(t('qr.copied')),
               () => toast(url),
             )
           }
         >
-          Link kopieren
+          {t('qr.copy')}
         </Button>
-        <Button variant="ghost" onClick={() => confirm('Neuen Code erzeugen? Der bisherige Code wird ungültig.') && update({ renew: true })}>
-          Neuer Code
+        <Button variant="ghost" onClick={() => confirm(t('qr.confirmRenew')) && update({ renew: true })}>
+          {t('qr.renew')}
         </Button>
       </div>
     </div>
@@ -132,18 +138,19 @@ function PrintSheet({ detail, day }: { detail: WkDetail; day: CheckInDay }) {
 
 /** Letterhead, title, day and the code; also used as a page of the Dossier. */
 export function QrSheetContent({ wkTitle, day }: { wkTitle: string; day: CheckInDay }) {
+  const { t } = useT();
   const src = useQr(checkinUrl(day.token));
   return (
     <div className="text-center">
       <div className="text-left">
         <Briefkopf />
       </div>
-      <h1 className="mt-10 text-3xl font-bold">Check-in {wkTitle}</h1>
+      <h1 className="mt-10 text-3xl font-bold">{t('qr.sheetTitle', { wk: wkTitle })}</h1>
       <p className="mt-2 text-2xl">
         {weekday(day.date)}, {fmtDate(day.date)}
       </p>
       {src && <img src={src} alt="" className="mx-auto mt-10 w-[120mm]" />}
-      <p className="mt-8 text-lg">Code mit der Handy-Kamera scannen und Angaben ausfüllen.</p>
+      <p className="mt-8 text-lg">{t('qr.sheetHint')}</p>
       <p className="mt-2 text-xs text-slate-500">{checkinUrl(day.token)}</p>
     </div>
   );

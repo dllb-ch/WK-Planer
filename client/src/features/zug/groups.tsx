@@ -6,6 +6,8 @@ import { fmtTime, parseTime } from '@shared/util';
 import { api, type WkDetail } from '../../api';
 import { Button, errMsg, Field, Modal, useToast } from '../../components/ui';
 import { PersonSelect } from '../../components/PersonSelect';
+import { useT } from '../../i18n';
+import { currentT } from '../../lib/lang';
 
 export const toDetailInput = ({ startMin, endMin, title, verantwortlich, groupIds }: BlockDetail | DetailInput): DetailInput => ({
   startMin,
@@ -16,7 +18,7 @@ export const toDetailInput = ({ startMin, endMin, title, verantwortlich, groupId
 });
 
 export const groupLabel = (groups: ZugGroup[], ids: number[]) =>
-  ids.length === 0 ? 'Ganzer Zug' : groups.filter((g) => ids.includes(g.id)).map((g) => g.name).join(' + ');
+  ids.length === 0 ? currentT('grp.whole') : groups.filter((g) => ids.includes(g.id)).map((g) => g.name).join(' + ');
 
 /** Saves the detail plan of one block and Zug, updating the cache first so drags do not snap back. */
 export function useSaveDetails(wkId: number) {
@@ -52,6 +54,7 @@ export function useSaveDetails(wkId: number) {
 // ---- Groups ----
 
 export function GroupsDialog({ wkId, zugId, zugName, groups, onClose }: { wkId: number; zugId: number; zugName: string; groups: ZugGroup[]; onClose: () => void }) {
+  const { t } = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const [list, setList] = useState<{ id?: number; name: string }[]>(groups.length ? groups.map(({ id, name }) => ({ id, name })) : [{ name: 'Gr 1' }, { name: 'Gr 2' }, { name: 'Gr 3' }]);
@@ -67,32 +70,32 @@ export function GroupsDialog({ wkId, zugId, zugName, groups, onClose }: { wkId: 
   };
   return (
     <Modal
-      title={`Gruppen ${zugName}`}
+      title={t('grp.title', { zug: zugName })}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" onClick={save}>
-            Speichern
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <p className="text-sm text-slate-600">
-        Mit Gruppen wird der Zug in der Zugansicht in Spalten aufgeteilt. Sequenzen können pro Gruppe geplant, geklont und im Turnus rotiert werden.
+        {t('grp.intro')}
       </p>
       <ul className="space-y-1.5">
         {list.map((g, i) => (
           <li key={i} className="flex gap-2">
-            <input className="input" value={g.name} onChange={(e) => setList(list.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} aria-label="Name der Gruppe" />
-            <button className="px-1 text-slate-400 hover:text-red-600" onClick={() => setList(list.filter((_, j) => j !== i))} aria-label="Gruppe entfernen">
+            <input className="input" value={g.name} onChange={(e) => setList(list.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} aria-label={t('admin.groupName')} />
+            <button className="px-1 text-slate-400 hover:text-red-600" onClick={() => setList(list.filter((_, j) => j !== i))} aria-label={t('admin.removeGroup')}>
               ✕
             </button>
           </li>
         ))}
       </ul>
       <Button variant="ghost" onClick={() => setList([...list, { name: `Gr ${list.length + 1}` }])}>
-        + Gruppe
+        {t('admin.addGroup')}
       </Button>
       {removed.length > 0 && (
         <p className="text-xs text-amber-700">Sequenzen, die nur {removed.map((g) => g.name).join(', ')} betreffen, werden gelöscht.</p>
@@ -121,6 +124,7 @@ export function DetailCard({
   onSaved?: (d: DetailInput) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const save = useSaveDetails(block.wkId);
   const [f, setF] = useState<DetailInput>(toDetailInput(detail));
   const [cloning, setCloning] = useState(false);
@@ -141,11 +145,11 @@ export function DetailCard({
   }
   return (
     <div className="space-y-2">
-      <input className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="Was / Wo / Womit" aria-label="Inhalt" autoFocus={detail.title === 'Neue Sequenz'} />
+      <input className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder={t('zug.whatWhere')} aria-label={t('grp.content')} autoFocus={detail.title === t('zug.newSeq')} />
       <div className="flex flex-wrap items-center gap-1">
-        <input type="time" className="input !w-[6.5rem]" value={fmtTime(f.startMin)} onChange={(e) => e.target.value && setF({ ...f, startMin: parseTime(e.target.value) })} aria-label="Von" />
+        <input type="time" className="input !w-[6.5rem]" value={fmtTime(f.startMin)} onChange={(e) => e.target.value && setF({ ...f, startMin: parseTime(e.target.value) })} aria-label={t('bd.from')} />
         <span className="text-slate-400">–</span>
-        <input type="time" className="input !w-[6.5rem]" value={fmtTime(f.endMin)} onChange={(e) => e.target.value && setF({ ...f, endMin: parseTime(e.target.value) })} aria-label="Bis" />
+        <input type="time" className="input !w-[6.5rem]" value={fmtTime(f.endMin)} onChange={(e) => e.target.value && setF({ ...f, endMin: parseTime(e.target.value) })} aria-label={t('bd.to')} />
         <div className="min-w-[9rem] flex-1">
           <PersonSelect kpId={0} zugId={detail.zugId} value={f.verantwortlich} onChange={(verantwortlich) => setF({ ...f, verantwortlich })} />
         </div>
@@ -154,25 +158,26 @@ export function DetailCard({
       {!valid && <p className="text-xs text-red-600">Inhalt erforderlich, Zeit innerhalb {fmtTime(block.startMin)}–{fmtTime(block.endMin)}.</p>}
       <div className="flex flex-wrap gap-2">
         <Button variant="danger" className="text-xs" onClick={async () => (await save(block.id, detail.zugId, others)) && onClose()}>
-          Löschen
+          {t('common.delete')}
         </Button>
         <Button className="text-xs" onClick={() => setCloning(true)}>
-          Klonen …
+          {t('grp.clone')}
         </Button>
         <span className="flex-1" />
         {dirty && (
           <Button variant="primary" className="text-xs" disabled={!valid} onClick={async () => (await save(block.id, detail.zugId, [...others, f])) && onSaved?.(f)}>
-            Speichern
+            {t('common.save')}
           </Button>
         )}
       </div>
-      <p className="text-[11px] text-slate-500">Tipp: Im Raster mit gedrückter Alt-/Option-Taste ziehen, um zu klonen.</p>
+      <p className="text-[11px] text-slate-500">{t('grp.tip')}</p>
       {cloning && <CloneDialog detail={detail} block={block} details={details} groups={groups} onClose={() => setCloning(false)} />}
     </div>
   );
 }
 
 export function GroupPicker({ groups, value, onChange }: { groups: ZugGroup[]; value: number[]; onChange: (ids: number[]) => void }) {
+  const { t } = useT();
   if (groups.length === 0) return null;
   const whole = value.length === 0;
   const toggle = (id: number) => {
@@ -183,7 +188,7 @@ export function GroupPicker({ groups, value, onChange }: { groups: ZugGroup[]; v
   return (
     <div className="flex flex-wrap gap-1.5">
       <button className={`rounded-full border px-2.5 py-0.5 text-xs ${whole ? 'border-zs-blue bg-zs-blue text-white' : 'border-slate-300'}`} onClick={() => onChange([])}>
-        Ganzer Zug
+        {t('grp.whole')}
       </button>
       {groups.map((g) => (
         <button
@@ -201,6 +206,7 @@ export function GroupPicker({ groups, value, onChange }: { groups: ZugGroup[]; v
 // ---- Clone ----
 
 function CloneDialog({ detail, block, details, groups, onClose }: { detail: BlockDetail; block: Block; details: BlockDetail[]; groups: ZugGroup[]; onClose: () => void }) {
+  const { t } = useT();
   const save = useSaveDetails(block.wkId);
   const dur = detail.endMin - detail.startMin;
   // Default: the next time window of the same length, for every other group.
@@ -220,13 +226,13 @@ function CloneDialog({ detail, block, details, groups, onClose }: { detail: Bloc
   };
   return (
     <Modal
-      title="Sequenz klonen"
+      title={t('grp.cloneTitle')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={outside || copies.length === 0} onClick={run}>
-            {copies.length} Kopie{copies.length === 1 ? '' : 'n'} erstellen
+            {copies.length === 1 ? t('grp.createCopy') : t('grp.createCopies', { n: copies.length })}
           </Button>
         </>
       }
@@ -236,7 +242,7 @@ function CloneDialog({ detail, block, details, groups, onClose }: { detail: Bloc
       </p>
       {groups.length > 0 && (
         <div>
-          <span className="label">Für Gruppen</span>
+          <span className="label">{t('grp.forGroups')}</span>
           <div className="flex flex-wrap gap-2">
             {groups.map((g) => (
               <label key={g.id} className="flex items-center gap-1.5 text-sm">
@@ -247,17 +253,17 @@ function CloneDialog({ detail, block, details, groups, onClose }: { detail: Bloc
           </div>
           <div className="mt-2 flex flex-col gap-1 text-sm">
             <label className="flex items-center gap-2">
-              <input type="radio" checked={mode === 'same'} onChange={() => setMode('same')} /> zur gleichen Zeit (parallel)
+              <input type="radio" checked={mode === 'same'} onChange={() => setMode('same')} /> {t('grp.same')}
             </label>
             <label className="flex items-center gap-2">
-              <input type="radio" checked={mode === 'shift'} onChange={() => setMode('shift')} /> nacheinander, ab
+              <input type="radio" checked={mode === 'shift'} onChange={() => setMode('shift')} /> {t('grp.shift')}
               <input type="time" className="input !w-[6.5rem]" value={fmtTime(start)} onChange={(e) => e.target.value && setStart(parseTime(e.target.value))} disabled={mode !== 'shift'} />
             </label>
           </div>
         </div>
       )}
       {groups.length === 0 && (
-        <Field label="Beginn der Kopie">
+        <Field label={t('grp.copyStart')}>
           <input type="time" className="input !w-[6.5rem]" value={fmtTime(start)} onChange={(e) => e.target.value && setStart(parseTime(e.target.value))} />
         </Field>
       )}
@@ -268,7 +274,7 @@ function CloneDialog({ detail, block, details, groups, onClose }: { detail: Bloc
           </li>
         ))}
       </ul>
-      {outside && <p className="text-xs text-red-600">Mindestens eine Kopie liegt ausserhalb des Zeitfensters {fmtTime(block.startMin)}–{fmtTime(block.endMin)}.</p>}
+      {outside && <p className="text-xs text-red-600">{t('grp.outside', { from: fmtTime(block.startMin), to: fmtTime(block.endMin) })}</p>}
     </Modal>
   );
 }
@@ -296,6 +302,7 @@ export function buildTurnus(details: BlockDetail[], groups: ZugGroup[], sourceId
 }
 
 export function TurnusDialog({ block, details, groups, onClose }: { block: Block; details: BlockDetail[]; groups: ZugGroup[]; onClose: () => void }) {
+  const { t } = useT();
   const save = useSaveDetails(block.wkId);
   const withSingle = groups.filter((g) => details.some((d) => d.groupIds.length === 1 && d.groupIds[0] === g.id));
   const [sourceId, setSourceId] = useState(withSingle[0]?.id ?? groups[0]?.id);
@@ -306,23 +313,22 @@ export function TurnusDialog({ block, details, groups, onClose }: { block: Block
 
   return (
     <Modal
-      title="Turnus erstellen"
+      title={t('grp.turnusTitle')}
       onClose={onClose}
       wide
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={slots.length < 2 || zugId === undefined} onClick={async () => (await save(block.id, zugId!, result)) && onClose()}>
-            Turnus übernehmen
+            {t('grp.turnusTake')}
           </Button>
         </>
       }
     >
       <p className="text-sm text-slate-600">
-        Planen Sie die Posten für eine Gruppe nacheinander; alle anderen Gruppen erhalten dieselben Posten im Kreis versetzt. Bestehende
-        Sequenzen der anderen Gruppen in diesem Zeitfenster werden ersetzt.
+        {t('grp.turnusIntro')}
       </p>
-      <Field label="Vorlage-Gruppe">
+      <Field label={t('grp.template')}>
         <select className="input !w-auto" value={sourceId} onChange={(e) => setSourceId(Number(e.target.value))}>
           {groups.map((g) => (
             <option key={g.id} value={g.id}>
@@ -333,14 +339,14 @@ export function TurnusDialog({ block, details, groups, onClose }: { block: Block
       </Field>
       {slots.length < 2 ? (
         <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Die Vorlage-Gruppe braucht mindestens zwei Sequenzen nur für sich (z. B. Po 1, Po 2, Po 3 nacheinander).
+          {t('grp.needTwo')}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="py-1 pr-2">Zeit</th>
+                <th className="py-1 pr-2">{t('common.time')}</th>
                 {groups.map((g) => (
                   <th key={g.id} className="py-1 pr-2">
                     {g.name}

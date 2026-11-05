@@ -1,5 +1,5 @@
 import type { Lang } from '@shared/i18n';
-import { currentLang } from './lib/lang';
+import { currentLang, currentT } from './lib/lang';
 import type {
   Ausbildungsbefehl,
   Ausbildungsvorbereitung,
@@ -83,7 +83,7 @@ function uploadFile(url: string, file: File, onProgress?: (p: number) => void) {
         /* not JSON */
       }
       if (x.status >= 200 && x.status < 300) resolve(body);
-      else reject(new ApiError(x.status, body?.error ?? (x.status === 413 ? 'Die Datei ist zu gross' : x.statusText), body));
+      else reject(new ApiError(x.status, body?.error ?? (x.status === 413 ? currentT('err.tooLarge') : x.statusText), body));
     };
     x.onerror = () => reject(new ApiError(0, 'Hochladen fehlgeschlagen (Verbindung)', null));
     x.send(file);

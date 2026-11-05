@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fmtDate } from '@shared/util';
 import { Button } from './ui';
+import { useT } from '../i18n';
 
 /** Several dates (e.g. KVK or AVOR days) as chips with an input to add more. */
 export function DatesEditor({
@@ -14,6 +15,7 @@ export function DatesEditor({
   label?: string;
   tone?: string;
 }) {
+  const { t } = useT();
   const [next, setNext] = useState('');
   return (
     <div className="space-y-1.5">
@@ -26,7 +28,7 @@ export function DatesEditor({
             </button>
           </span>
         ))}
-        {value.length === 0 && <span className="text-xs text-slate-400">Noch keine</span>}
+        {value.length === 0 && <span className="text-xs text-slate-400">{t('dates.none')}</span>}
       </div>
       <div className="flex gap-1">
         <input type="date" className="input !px-1" value={next} onChange={(e) => setNext(e.target.value)} aria-label={label} />
@@ -37,7 +39,7 @@ export function DatesEditor({
             onChange([...value, next].sort());
             setNext('');
           }}
-          aria-label={`${label} hinzufügen`}
+          aria-label={t('dates.add', { label })}
         >
           +
         </Button>

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Area, RequestInput, ResourceKind, ResourceRequest, Zug } from '@shared/types';
-import { KDO_ID, RESOURCE_KIND_LABEL } from '@shared/types';
+import { KDO_ID } from '@shared/types';
 import { canRequestResource } from '@shared/permissions';
-import { fmtDate, fmtTime, parseTime, weekday, wkDays } from '@shared/util';
+import { fmtDate, fmtTime, parseTime, wkDays } from '@shared/util';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Button, errMsg, Field, Modal, TextArea, useToast } from '../../components/ui';
@@ -11,6 +11,7 @@ import { SwissMap, type MapShape } from '../../components/SwissMap';
 import { columnName, withKdo } from '../arbeitsprogramm/columns';
 import { externalClashes, overlapping } from './conflicts';
 import { OwnerBadge } from './Catalogue';
+import { useT } from '../../i18n';
 
 interface Props {
   detail: WkDetail;
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function RequestDialog({ detail, initial, existing, onClose }: Props) {
+  const { t, weekdayShort } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -102,7 +104,7 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
       if (existing) await api.updateRequest(wk.id, existing.id, body);
       else await api.createRequest(wk.id, body);
       qc.invalidateQueries({ queryKey: ['requests', wk.id] });
-      toast(existing ? 'Anfrage geändert – sie muss neu bewilligt werden' : 'Anfrage gesendet');
+      toast(existing ? t('req.changed') : t('req.sent'));
       onClose();
     } catch (e) {
       toast(errMsg(e), 'error');
@@ -111,26 +113,26 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
 
   return (
     <Modal
-      title={existing ? 'Anfrage bearbeiten' : 'Fahrzeug, Raum oder Gelände anfragen'}
+      title={existing ? t('req.edit') : t('req.new')}
       onClose={onClose}
       wide
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!valid} onClick={save}>
-            {existing ? 'Speichern' : 'Anfragen'}
+            {existing ? t('common.save') : t('req.send')}
           </Button>
         </>
       }
     >
       <div className="flex flex-wrap gap-2">
-        {(Object.keys(RESOURCE_KIND_LABEL) as ResourceKind[]).map((k) => (
+        {(['FAHRZEUG', 'ANHAENGER', 'RAUM', 'GELAENDE'] as ResourceKind[]).map((k) => (
           <button
             key={k}
             className={`rounded-md border px-3 py-1.5 text-sm ${f.kind === k ? 'border-zs-blue bg-blue-50 font-medium text-zs-blue' : 'border-slate-300 hover:bg-slate-50'}`}
             onClick={() => set({ kind: k, resourceId: null, area: null, category: '' })}
           >
-            {RESOURCE_KIND_LABEL[k]}
+            {t(`resource.${k}`)}
           </button>
         ))}
       </div>
@@ -138,22 +140,22 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
         <div className="flex flex-wrap gap-4 text-sm">
           {f.kind === 'FAHRZEUG' && (
             <label className="flex items-center gap-1.5">
-              <input type="radio" checked={byPersons} onChange={() => setMode('persons')} /> Anzahl Personen
+              <input type="radio" checked={byPersons} onChange={() => setMode('persons')} /> {t('req.byPersons')}
             </label>
           )}
           <label className="flex items-center gap-1.5">
-            <input type="radio" checked={byAmount} onChange={() => setMode('amount')} /> Anzahl nach Typ
+            <input type="radio" checked={byAmount} onChange={() => setMode('amount')} /> {t('req.byAmount')}
           </label>
           <label className="flex items-center gap-1.5">
             <input type="radio" checked={specific} onChange={() => setMode('specific')} />
-            {f.kind === 'FAHRZEUG' ? 'Bestimmtes Fahrzeug' : f.kind === 'ANHAENGER' ? 'Bestimmter Anhänger' : 'Bestimmter Raum'} (z. B. wegen Ausstattung)
+            {f.kind === 'FAHRZEUG' ? t('req.specificVehicle') : f.kind === 'ANHAENGER' ? t('req.specificTrailer') : t('req.specificRoom')} {t('req.specificHint')}
           </label>
         </div>
       )}
       <div className="grid grid-cols-2 gap-3">
         {byPersons ? (
           <div className="grid grid-cols-[5rem,1fr] gap-2">
-            <Field label="Personen">
+            <Field label={t('req.persons')}>
               <input
                 type="number"
                 min={1}
@@ -166,57 +168,57 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
                 }}
               />
             </Field>
-            <Field label="Fahrzeugtyp">
+            <Field label={t('req.vehicleType')}>
               <select className="input" value={f.category} onChange={(e) => set({ category: e.target.value })}>
-                <option value="">– egal –</option>
-                {types.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                <option value="">{t('req.any')}</option>
+                {types.map((x) => (
+                  <option key={x} value={x}>
+                    {x}
                   </option>
                 ))}
               </select>
             </Field>
             {planned > 0 && planned !== f.persons && (
               <button type="button" className="col-span-2 -mt-1 text-left text-xs text-zs-blue hover:underline" onClick={() => set({ persons: planned })}>
-                Sollbestand an diesem Tag: {planned} Personen übernehmen
+                {t('req.takePlanned', { n: planned })}
               </button>
             )}
             {avail.data && (
               <p className={`col-span-2 -mt-1 text-xs ${freeSeats >= f.persons ? 'text-emerald-700' : 'text-red-700'}`}>
-                Im Zeitraum frei: {avail.data.free.length} Fahrzeuge mit {freeSeats} Plätzen
-                {freeSeats < f.persons && ' – die Anfrage kann so nicht vollständig bewilligt werden'}
+                {t('req.freeSeats', { n: avail.data.free.length, seats: freeSeats })}
+                {freeSeats < f.persons && t('req.notFully')}
               </p>
             )}
           </div>
         ) : byAmount ? (
           <div className="grid grid-cols-[1fr,5rem] gap-2">
-            <Field label="Typ">
+            <Field label={t('setup.type')}>
               <select className="input" value={category} onChange={(e) => set({ category: e.target.value })}>
-                {types.map((t) => (
-                  <option key={t} value={t}>
-                    {t} ({catalogue.filter((r) => r.category === t).length} im Katalog)
+                {types.map((x) => (
+                  <option key={x} value={x}>
+                    {t('req.inCatalogue', { type: x, n: catalogue.filter((r) => r.category === x).length })}
                   </option>
                 ))}
-                {types.length === 0 && <option value="">– keine im Katalog –</option>}
+                {types.length === 0 && <option value="">{t('req.noneInCatalogue')}</option>}
               </select>
             </Field>
-            <Field label="Anzahl">
+            <Field label={t('req.amount')}>
               <input type="number" min={1} max={20} className="input" value={f.quantity} onChange={(e) => set({ quantity: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })} />
             </Field>
             {avail.data && (
               <p className={`col-span-2 -mt-1 text-xs ${avail.data.free.length >= f.quantity ? 'text-emerald-700' : 'text-red-700'}`}>
-                Im Zeitraum frei: {avail.data.free.length} von {avail.data.total}
-                {avail.data.free.length < f.quantity && ' – die Anfrage kann so nicht vollständig bewilligt werden'}
+                {t('req.freeOf', { n: avail.data.free.length, total: avail.data.total })}
+                {avail.data.free.length < f.quantity && t('req.notFully')}
               </p>
             )}
           </div>
         ) : (
-        <Field label={f.kind === 'GELAENDE' ? 'Geländeabschnitt' : RESOURCE_KIND_LABEL[f.kind]}>
+        <Field label={f.kind === 'GELAENDE' ? t('req.siteSection') : t(`resource.${f.kind}`)}>
           <select className="input" value={f.resourceId ?? ''} onChange={(e) => set({ resourceId: e.target.value ? Number(e.target.value) : null })}>
-            <option value="">{f.kind === 'GELAENDE' ? '– eigene Fläche auf der Karte –' : '– wählen –'}</option>
+            <option value="">{f.kind === 'GELAENDE' ? t('req.ownArea') : t('common.choose')}</option>
             {[
-              ['Material des Bataillons', catalogue.filter((r) => r.kpId === null)],
-              ['Material der Kompanie', catalogue.filter((r) => r.kpId !== null)],
+              [t('req.batMaterial'), catalogue.filter((r) => r.kpId === null)],
+              [t('req.kpMaterial'), catalogue.filter((r) => r.kpId !== null)],
             ].map(([label, list]) =>
               (list as typeof catalogue).length ? (
                 <optgroup key={label as string} label={label as string}>
@@ -232,47 +234,47 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
           </select>
         </Field>
         )}
-        <Field label="Für">
+        <Field label={t('std.for')}>
           <select className="input" value={f.zugId} disabled={columns.length < 2} onChange={(e) => set({ zugId: Number(e.target.value), blockId: null })}>
             {columns.map((z) => (
               <option key={z.id} value={z.id}>
-                {z.id === KDO_ID ? 'Kdo' : z.name}
+                {z.id === KDO_ID ? t('kdo') : z.name}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Tag">
+        <Field label={t('ap.day')}>
           <select className="input" value={f.date} onChange={(e) => set({ date: e.target.value })}>
             {days.map((d) => (
               <option key={d} value={d}>
-                {weekday(d).slice(0, 2)} {fmtDate(d)}
+                {weekdayShort(d)} {fmtDate(d)}
                 {wk.avorDays.includes(d) ? ' (AVOR)' : ''}
               </option>
             ))}
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Von">
+          <Field label={t('bd.from')}>
             <input type="time" className="input" value={fmtTime(f.startMin)} onChange={(e) => e.target.value && set({ startMin: parseTime(e.target.value) })} />
           </Field>
-          <Field label="Bis">
+          <Field label={t('bd.to')}>
             <input type="time" className="input" value={fmtTime(f.endMin)} onChange={(e) => e.target.value && set({ endMin: parseTime(e.target.value) })} />
           </Field>
         </div>
       </div>
-      <Field label="Zweck">
-        <input className="input" value={f.zweck} onChange={(e) => set({ zweck: e.target.value })} placeholder="z. B. Materialtransport zum Kieswerk" />
+      <Field label={t('res.zweck')}>
+        <input className="input" value={f.zweck} onChange={(e) => set({ zweck: e.target.value })} placeholder={t('req.zweckPh')} />
       </Field>
-      <Field label="Bemerkungen">
-        <TextArea rows={2} value={f.note} onChange={(e) => set({ note: e.target.value })} placeholder="Besondere Anforderungen (z. B. Anhängerkupplung), Fahrer, Anzahl Personen …" />
+      <Field label={t('common.notes')}>
+        <TextArea rows={2} value={f.note} onChange={(e) => set({ note: e.target.value })} placeholder={t('req.notePh')} />
       </Field>
       {clashes.length > 0 && (
         <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <b>Achtung:</b> {RESOURCE_KIND_LABEL[f.kind]} ist in diesem Zeitraum bereits angefragt:
+          <b>{t('req.attention')}</b> {t('req.alreadyRequested', { kind: t(`resource.${f.kind}`) })}
           <ul className="ml-4 list-disc">
             {clashes.map((q) => (
               <li key={q.id}>
-                {columnName(zuege, q.zugId)} {fmtTime(q.startMin)}–{fmtTime(q.endMin)} ({q.status === 'BEWILLIGT' ? 'bewilligt' : 'beantragt'}): {q.zweck}
+                {columnName(zuege, q.zugId)} {fmtTime(q.startMin)}–{fmtTime(q.endMin)} ({q.status === 'BEWILLIGT' ? t('res.approvedLower') : t('res.requestedLower')}): {q.zweck}
               </li>
             ))}
           </ul>
@@ -280,16 +282,16 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
       )}
       {chosen && chosen.kpId === null && (
         <p className="text-xs text-slate-500">
-          <OwnerBadge r={chosen} /> Wird mit den anderen Kompanien des Bataillons geteilt.
+          <OwnerBadge r={chosen} /> {t('req.shared')}
         </p>
       )}
       {otherKp.length > 0 && (
         <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-900">
-          <b>Bereits durch eine andere Kompanie angefragt:</b>
+          <b>{t('req.otherKp')}</b>
           <ul className="ml-4 list-disc">
             {otherKp.map((b) => (
               <li key={b.requestId}>
-                {b.kpName} ({b.zugName}) {fmtTime(b.startMin)}–{fmtTime(b.endMin)}, {b.status === 'BEWILLIGT' ? 'bewilligt' : 'beantragt'}: {b.zweck}
+                {b.kpName} ({b.zugName}) {fmtTime(b.startMin)}–{fmtTime(b.endMin)}, {b.status === 'BEWILLIGT' ? t('res.approvedLower') : t('res.requestedLower')}: {b.zweck}
               </li>
             ))}
           </ul>

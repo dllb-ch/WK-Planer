@@ -224,7 +224,7 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
         <h3 className="font-semibold">{kp.name}</h3>
         {zuege.length > 0 && (
           <span className="text-xs text-slate-500">
-            Bestand Soll {bestandTotal(sumBestand(zuege.map((z) => z.soll)))} · Ist {bestandTotal(sumBestand(zuege.map((z) => z.ist)))}
+            {t('admin.bestandSummary', { soll: bestandTotal(sumBestand(zuege.map((z) => z.soll))), ist: bestandTotal(sumBestand(zuege.map((z) => z.ist))) })}
           </span>
         )}
         <span className="flex-1" />
@@ -318,14 +318,14 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
                   ))}
                   {zfhr.length === 0 && <span className="text-xs text-amber-700">{t('admin.noZfhr')}</span>}
                 </div>
-                <span className="text-xs text-slate-500">Kader</span>
+                <span className="text-xs text-slate-500">{t('bestand.kader')}</span>
                 <div className="flex flex-wrap gap-1">
                   {kader.map((u) => (
                     <Person key={u.id} u={u} onEdit={canManageUser(me, u) ? () => onEdit(u) : undefined} onRemove={editZuege ? () => unassign(u) : undefined} />
                   ))}
                   {kader.length === 0 && <span className="text-xs text-slate-400">–</span>}
                 </div>
-                <span className="text-xs text-slate-500">Gruppen</span>
+                <span className="text-xs text-slate-500">{t('zf.groups')}</span>
                 <div className="flex flex-wrap items-center gap-1 text-xs">
                   {z.gruppen.map((g) => (
                     <span key={g.id} className="rounded-full bg-slate-500/10 px-2 py-0.5" title={t('admin.groupTitle', { sk: g.soll.kader, ss: g.soll.sdt, ik: g.ist.kader, is: g.ist.sdt })}>
@@ -341,7 +341,7 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
                     </Button>
                   )}
                 </div>
-                <span className="text-xs text-slate-500">Bestand</span>
+                <span className="text-xs text-slate-500">{t('pers.tab.bestand')}</span>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   <BestandText label={t('admin.soll')} b={z.soll} />
                   <BestandText label={t('admin.ist')} b={z.ist} soll={z.soll} />
@@ -502,7 +502,7 @@ function BestandDialog({ zug, onSave, onClose }: { zug: Zug; onSave: (soll: Best
             </tr>
           ))}
           <tr className="border-t font-semibold">
-            <td className="py-1 pr-3">Total</td>
+            <td className="py-1 pr-3">{t('yp.total')}</td>
             <td className="py-1 text-center tabular-nums">{bestandTotal(soll)}</td>
             <td className="py-1 text-center tabular-nums">{bestandTotal(ist)}</td>
           </tr>
@@ -596,7 +596,7 @@ function GruppenDialog({ zug, leaders, onSave, onClose }: { zug: Zug; leaders: U
             ))}
             <tr className="border-t text-xs font-semibold">
               <td className="py-1 pr-2" colSpan={2}>
-                Total Zug (ohne Zugführer)
+                {t('admin.totalZug')}
               </td>
               <td className="py-1 text-center tabular-nums">{total('soll', 'kader')}</td>
               <td className="py-1 text-center tabular-nums">{total('soll', 'sdt')}</td>

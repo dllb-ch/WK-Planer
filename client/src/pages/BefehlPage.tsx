@@ -124,7 +124,7 @@ export function BefehlPage() {
 
         {!d ? (
           <Card>
-            <Empty>Für {activeYear} wurde noch kein Ausbildungsbefehl erteilt.</Empty>
+            <Empty>{t('bef.noneForYear', { year: activeYear })}</Empty>
           </Card>
         ) : (
           <>
@@ -192,7 +192,7 @@ export function BefehlPage() {
                         <h3 className="font-semibold">{k.name}</h3>
                         {editable && (
                           <Link to="/jahresplanung" className="no-print text-sm text-zs-blue hover:underline">
-                            Daten in der Jahresplanung →
+                            {t('bef.datesInYearPlan')}
                           </Link>
                         )}
                       </div>

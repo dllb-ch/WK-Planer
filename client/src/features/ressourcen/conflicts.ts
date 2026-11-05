@@ -1,4 +1,5 @@
 import type { Booking, Resource, ResourceRequest } from '@shared/types';
+import { currentT } from '../../lib/lang';
 
 type Slot = Pick<ResourceRequest, 'id' | 'resourceId' | 'date' | 'startMin' | 'endMin'>;
 
@@ -29,7 +30,7 @@ export function requestLabel(
 ) {
   const name = (id: number) => resources.find((r) => r.id === id)?.name ?? '?';
   if (q.resourceId != null) return name(q.resourceId);
-  if (q.kind === 'GELAENDE') return 'Eigene Fläche';
-  const amount = q.persons ? `Transport ${q.persons} Pers.${q.category ? ` (${q.category})` : ''}` : `${q.quantity}× ${q.category}`;
+  if (q.kind === 'GELAENDE') return currentT('res.ownArea');
+  const amount = q.persons ? currentT('res.transportN', { n: q.persons, cat: q.category ? ` (${q.category})` : '' }) : `${q.quantity}× ${q.category}`;
   return q.assignedIds.length ? `${amount} (${q.assignedIds.map(name).join(', ')})` : amount;
 }

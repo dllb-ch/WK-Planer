@@ -5,8 +5,10 @@ import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Card, Empty } from '../../components/ui';
 import { FileArea } from '../../components/FileArea';
+import { useT } from '../../i18n';
 
 export function DateienPage({ detail }: { detail: WkDetail }) {
+  const { t } = useT();
   const me = useUser();
   const { wk, zuege } = detail;
   const ref = (id: number) => ({ id, kpId: wk.kpId, batId: wk.batId });
@@ -20,10 +22,10 @@ export function DateienPage({ detail }: { detail: WkDetail }) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-4xl space-y-4 p-3 sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="mr-auto text-lg font-semibold">Dateien der Züge</h2>
+          <h2 className="mr-auto text-lg font-semibold">{t('files.title')}</h2>
           {visible.length > 1 && (
-            <select className="input !w-auto" value={only} onChange={(e) => setOnly(e.target.value ? Number(e.target.value) : '')} aria-label="Zug">
-              <option value="">Alle Züge</option>
+            <select className="input !w-auto" value={only} onChange={(e) => setOnly(e.target.value ? Number(e.target.value) : '')} aria-label={t('common.zug')}>
+              <option value="">{t('part.allZuege')}</option>
               {visible.map((z) => (
                 <option key={z.id} value={z.id}>
                   {z.name}
@@ -33,10 +35,9 @@ export function DateienPage({ detail }: { detail: WkDetail }) {
           )}
         </div>
         <p className="text-sm text-slate-600">
-          Ablage pro Zug für Einteilungen, Merkblätter, Präsentationen, Fotos … Sie gilt über alle WKs. Hochladen können die Angehörigen des Zuges und
-          das Kp Kdo; löschen die Person, die hochgeladen hat, der Zugführer und der Kp Kdt.
+          {t('files.intro')}
         </p>
-        {shown.length === 0 && <Empty>Keine Ablage verfügbar.</Empty>}
+        {shown.length === 0 && <Empty>{t('files.noStorage')}</Empty>}
         {shown.map((z) => (
           <Card key={z.id} title={z.name}>
             <FileArea

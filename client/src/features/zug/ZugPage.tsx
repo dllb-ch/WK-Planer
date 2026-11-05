@@ -11,7 +11,10 @@ import {
   canRequestResource,
   canViewZug,
 } from '@shared/permissions';
-import { dutyOf, fmtDate, fmtTime, isAvorDay, isKvkDay, parseTime, servesOnDay, weekday, wkDays } from '@shared/util';
+import { dutyOf, fmtDate, fmtTime, isAvorDay, isKvkDay, parseTime, servesOnDay, wkDays } from '@shared/util';
+
+const weekday = (d: string) => weekdayIn(currentLang(), d);
+const wd = (d: string) => weekdayShortIn(currentLang(), d);
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Button, Empty, useToast } from '../../components/ui';
@@ -27,11 +30,15 @@ import { RequestBadge } from '../ressourcen/RessourcenPage';
 import { BlockRequests, ResourceChips, useBlockResources } from '../ressourcen/BlockResources';
 import { RequestDialog } from '../ressourcen/RequestDialog';
 import { DetailCard, GroupPicker, GroupsDialog, groupLabel, toDetailInput, TurnusDialog, useSaveDetails } from './groups';
+import { useT } from '../../i18n';
+import { weekdayIn, weekdayShortIn } from '@shared/i18n';
+import { currentLang } from '../../lib/lang';
 
 const AXIS_W = 44;
 
 /** Only the assigned Zug: Grobprogramm blocks with the Zfhr's detail plan, documents and requests per slot. */
 export function ZugPage({ detail }: { detail: WkDetail }) {
+  const { t } = useT();
   const me = useUser();
   const { wk, zuege } = detail;
   const visible = zuege.filter((z) => canViewZug(me, wk, z.id));
@@ -41,7 +48,7 @@ export function ZugPage({ detail }: { detail: WkDetail }) {
   const [view, setView] = useState<'grid' | 'zeitplan'>('grid');
   const mobile = useIsMobile();
 
-  if (!zug) return <Empty>Kein Zug zugewiesen.</Empty>;
+  if (!zug) return <Empty>{t('zug.none')}</Empty>;
   // Only the days on which the Zug serves.
   const zugAll = daySel.all.filter((d) => servesOnDay(wk, d, zug.id));
   const zugDays = daySel.days.filter((d) => servesOnDay(wk, d, zug.id));
@@ -52,7 +59,7 @@ export function ZugPage({ detail }: { detail: WkDetail }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="no-print flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
         {pickable ? (
-          <select className="input !w-auto font-semibold" value={zug.id} onChange={(e) => setZugId(Number(e.target.value))} aria-label="Zug">
+          <select className="input !w-auto font-semibold" value={zug.id} onChange={(e) => setZugId(Number(e.target.value))} aria-label={t('common.zug')}>
             {visible.map((z) => (
               <option key={z.id} value={z.id}>
                 {z.name}
@@ -69,14 +76,14 @@ export function ZugPage({ detail }: { detail: WkDetail }) {
               className={`rounded px-2.5 py-1 text-xs font-medium ${view === v ? 'bg-zs-blue text-white' : 'text-slate-600 hover:bg-slate-100'}`}
               onClick={() => setView(v)}
             >
-              {v === 'grid' ? 'Raster' : 'Zeitplan'}
+              {v === 'grid' ? t('ap.grid') : t('zug.zeitplan')}
             </button>
           ))}
         </div>
         {!mobile && <DaySelector wk={wk} all={zugAll} days={shownDays} onChange={daySel.set} />}
         <span className="flex-1" />
         <Button className="max-md:hidden" onClick={() => window.print()}>
-          Drucken
+          {t('common.print')}
         </Button>
       </div>
       {mobile ? (
@@ -96,6 +103,7 @@ type Selection = { kind: 'block'; id: number } | { kind: 'detail'; blockId: numb
 const sigOf = (d: DetailInput) => `${d.startMin}|${d.endMin}|${d.groupIds.join('.')}|${d.title}`;
 
 function ZugGrid({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: string[] }) {
+  const { t } = useT();
   const me = useUser();
   const toast = useToast();
   const { wk, blocks, locations, details } = detail;
@@ -184,11 +192,11 @@ function ZugGrid({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: stri
     const from = original ? zugBlocks.find((b) => b.id === original.blockId) : undefined;
     const target = parentAt(d.date, d.startMin) ?? (from && from.date === d.date ? from : undefined);
     if (!target) {
-      toast('Sequenzen liegen immer innerhalb eines Zeitfensters des Grobprogramms', 'error');
+      toast(t('zug.seqOnlyInSlot'), 'error');
       return;
     }
     const next: DetailInput = {
-      title: original?.title ?? 'Neue Sequenz',
+      title: original?.title ?? t('zug.newSeq'),
       verantwortlich: original?.verantwortlich ?? '',
       ...fit(d, target),
       groupIds: toGroups(d.zugIds),
@@ -220,9 +228,9 @@ function ZugGrid({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: stri
       const own = (avs.data ?? []).filter((a) => a.blockId === b.id && a.zugId === zug.id);
       return [
         'separator',
-        ...own.map((a) => ({ label: `Vorbereitung «${a.thema}» öffnen`, icon: '📄', onClick: () => nav(`../av/${a.id}`) })),
+        ...own.map((a) => ({ label: t('zug.openPrep', { thema: a.thema }), icon: '📄', onClick: () => nav(`../av/${a.id}`) })),
         ...(canCreateAv(me, wk, zug.id) && (b.type === 'AUSBILDUNG' || b.type === 'UEBUNG')
-          ? [{ label: 'Ausbildungsvorbereitung erstellen', icon: '📝', onClick: () => nav(`../av/neu?block=${b.id}&zug=${zug.id}`) }]
+          ? [{ label: t('zug.createPrep'), icon: '📝', onClick: () => nav(`../av/neu?block=${b.id}&zug=${zug.id}`) }]
           : []),
       ];
     },
@@ -234,11 +242,11 @@ function ZugGrid({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: stri
         <div className="no-print flex flex-wrap items-center gap-2 border-b border-slate-100 bg-white px-3 py-1 text-xs text-slate-500">
           {lanes
             ? editDetails
-              ? 'Sequenzen ziehen (auch in andere Gruppen), mit Alt/Option klonen; im Zeitfenster ziehen für eine neue Sequenz.'
-              : 'Sequenzen pro Gruppe; anklicken für Details.'
+              ? t('zug.hintGroupsEdit')
+              : t('zug.hintGroupsView')
             : canCreateIn()
-              ? 'Blöcke des Zuges verschieben und anpassen; Details im Seitenbereich planen.'
-              : 'Block anklicken für Details, Ausbildungsvorbereitungen und Anfragen.'}
+              ? t('zug.hintEdit')
+              : t('zug.hintView')}
           <span className="flex-1" />
           {groups.length >= 2 && (
             <label className="flex items-center gap-1.5">
@@ -250,8 +258,8 @@ function ZugGrid({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: stri
               Gruppen ({groups.length}) …
             </Button>
           )}
-          Höhe
-          <input type="range" min={8} max={30} value={ppm * 10} onChange={(e) => setPpm(Number(e.target.value) / 10)} className="w-24" aria-label="Zeilenhöhe" />
+          {t('ap.height')}
+          <input type="range" min={8} max={30} value={ppm * 10} onChange={(e) => setPpm(Number(e.target.value) / 10)} className="w-24" aria-label={t('ap.rowHeight')} />
         </div>
         <div ref={scroller} className="min-h-0 flex-1 overflow-auto bg-slate-50 p-2">
           {lanes ? (
@@ -334,7 +342,7 @@ function ZugGrid({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: stri
       {dialogBlock && (
         <BlockDialog
           key={dialogBlock.id + ':' + dialogBlock.version}
-          title={canEditBlock(me, wk, dialogBlock) ? 'Block anpassen' : 'Block'}
+          title={canEditBlock(me, wk, dialogBlock) ? t('zug.adjustBlock') : t('ap.block')}
           initial={toInput(dialogBlock)}
           days={days.includes(dialogBlock.date) ? days : [...days, dialogBlock.date].sort()}
           zuege={[zug]}
@@ -358,7 +366,7 @@ function ZugGrid({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: stri
       )}
       {dialog?.kind === 'new' && (
         <BlockDialog
-          title="Neuer Block"
+          title={t('ap.newBlock')}
           initial={dialog.initial}
           days={days}
           zuege={[zug]}
@@ -437,6 +445,7 @@ function SlotPanel({
   /** Full-width variant for the mobile slot sheet. */
   sheet?: boolean;
 }) {
+  const { t } = useT();
   const me = useUser();
   const nav = useNavigate();
   const { wk, locations } = detail;
@@ -448,11 +457,11 @@ function SlotPanel({
   if (!block) {
     return (
       <aside className="no-print w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 text-sm text-slate-500">
-        Zeitfenster (Block) anklicken, um
+        {t('zug.slotIntro')}
         <ul className="ml-4 mt-1 list-disc">
-          <li>die Detailplanung zu erfassen,</li>
-          <li>Ausbildungsvorbereitungen zu schreiben,</li>
-          <li>Fahrzeuge, Räume oder Gelände anzufragen.</li>
+          <li>{t('zug.slotLi1')}</li>
+          <li>{t('zug.slotLi2')}</li>
+          <li>{t('zug.slotLi3')}</li>
         </ul>
       </aside>
     );
@@ -474,7 +483,7 @@ function SlotPanel({
             </div>
           </div>
           <Button variant="ghost" className="text-xs" onClick={() => onEdit(block.id)}>
-            {canEditBlock(me, wk, block) ? 'Anpassen' : 'Details'}
+            {canEditBlock(me, wk, block) ? t('zug.adjust') : t('sb.details')}
           </Button>
         </div>
       </div>
@@ -486,12 +495,12 @@ function SlotPanel({
             <div className="flex gap-1">
               {onManageGroups && (
                 <Button variant="ghost" className="!px-1.5 !py-0.5 text-xs" onClick={onManageGroups}>
-                  Gruppen …
+                  {t('zug.groups')}
                 </Button>
               )}
               {groups.length >= 2 && (
                 <Button variant="ghost" className="!px-1.5 !py-0.5 text-xs" onClick={() => setTurnus(true)}>
-                  Turnus …
+                  {t('zug.turnus')}
                 </Button>
               )}
             </div>
@@ -500,9 +509,9 @@ function SlotPanel({
         {selectedDetail ? (
           <div className="rounded-md border border-orange-200 bg-orange-50/50 p-2">
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-xs font-semibold text-orange-900">Ausgewählte Sequenz</span>
+              <span className="text-xs font-semibold text-orange-900">{t('zug.selectedSeq')}</span>
               <button className="text-xs text-slate-500 hover:text-slate-800" onClick={() => onSelectDetail?.(block.id, null)}>
-                Alle Sequenzen
+                {t('zug.allSeq')}
               </button>
             </div>
             <DetailCard
@@ -530,15 +539,15 @@ function SlotPanel({
 
       <section className="border-b p-4">
         <div className="mb-1 flex items-center justify-between">
-          <h3 className="label !mb-0">Ausbildungsvorbereitungen</h3>
+          <h3 className="label !mb-0">{t('ov.preps')}</h3>
           {canCreateAv(me, wk, zug.id) && (
             <Button variant="ghost" className="text-xs" onClick={() => nav(`../av/neu?block=${block.id}&zug=${zug.id}`)}>
-              + Neu
+              {t('zug.new')}
             </Button>
           )}
         </div>
         {slotAvs.length === 0 ? (
-          <p className="text-xs text-slate-400">Noch keine.</p>
+          <p className="text-xs text-slate-400">{t('zug.noneYet')}</p>
         ) : (
           <ul className="space-y-1 text-sm">
             {slotAvs.map((a) => (
@@ -555,15 +564,15 @@ function SlotPanel({
 
       <section className="p-4">
         <div className="mb-1 flex items-center justify-between">
-          <h3 className="label !mb-0">Fahrzeuge, Räume, Gelände</h3>
+          <h3 className="label !mb-0">{t('sb.resources')}</h3>
           {canRequestResource(me, wk, zug.id) && (
             <Button variant="ghost" className="text-xs" onClick={() => setRequesting(true)}>
-              + Anfragen
+              {t('zug.request')}
             </Button>
           )}
         </div>
         {slotRequests.length === 0 ? (
-          <p className="text-xs text-slate-400">Keine Anfragen für dieses Zeitfenster.</p>
+          <p className="text-xs text-slate-400">{t('zug.noRequests')}</p>
         ) : (
           <ul className="space-y-1.5 text-sm">
             {slotRequests.map((q) => (
@@ -600,6 +609,7 @@ function SlotPanel({
 // ---- Mobile: day agenda with full-screen slot sheet ----
 
 function MobileZug({ detail, zug }: { detail: WkDetail; zug: Zug }) {
+  const { t } = useT();
   const me = useUser();
   const { wk, blocks, locations, details } = detail;
   const ops = useBlockOps(wk.id);
@@ -634,7 +644,7 @@ function MobileZug({ detail, zug }: { detail: WkDetail; zug: Zug }) {
             }`}
             onClick={() => setDay(d)}
           >
-            <div className="text-[11px] uppercase">{dutyOf(wk, d, zug.id) === 'WK' ? weekday(d).slice(0, 2) : dutyOf(wk, d, zug.id)}</div>
+            <div className="text-[11px] uppercase">{dutyOf(wk, d, zug.id) === 'WK' ? wd(d) : t(`duty.${dutyOf(wk, d, zug.id)}`)}</div>
             <div className="text-sm font-semibold">{fmtDate(d).slice(0, 6)}</div>
           </button>
         ))}
@@ -699,10 +709,10 @@ function MobileZug({ detail, zug }: { detail: WkDetail; zug: Zug }) {
         <div className="fixed inset-0 z-40 flex flex-col bg-white">
           <div className="flex items-center gap-2 border-b px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
             <button className="rounded px-2 py-1.5 text-sm font-medium text-zs-blue" onClick={() => setOpenId(null)}>
-              ‹ Zurück
+              ‹ {t('common.back')}
             </button>
             <span className="truncate text-sm text-slate-500">
-              {weekday(open.date).slice(0, 2)} {fmtDate(open.date).slice(0, 6)} · {zug.name}
+              {wd(open.date)} {fmtDate(open.date).slice(0, 6)} · {zug.name}
             </span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
@@ -713,7 +723,7 @@ function MobileZug({ detail, zug }: { detail: WkDetail; zug: Zug }) {
       {edit && (
         <BlockDialog
           key={edit.id + ':' + edit.version}
-          title={canEditBlock(me, wk, edit) ? 'Block anpassen' : 'Block'}
+          title={canEditBlock(me, wk, edit) ? t('zug.adjustBlock') : t('ap.block')}
           initial={toInput(edit)}
           days={days}
           zuege={[zug]}
@@ -740,6 +750,7 @@ function MobileZug({ detail, zug }: { detail: WkDetail; zug: Zug }) {
 }
 
 function DetailEditor({ block, zugId, details, groups, editable }: { block: Block; zugId: number; details: BlockDetail[]; groups: ZugGroup[]; editable: boolean }) {
+  const { t } = useT();
   const toast = useToast();
   const saveDetails = useSaveDetails(block.wkId);
   const [rows, setRows] = useState<DetailInput[]>(details.map(toDetailInput));
@@ -766,7 +777,7 @@ function DetailEditor({ block, zugId, details, groups, editable }: { block: Bloc
         ))}
       </ul>
     ) : (
-      <p className="text-xs text-slate-400">Noch keine Detailplanung.</p>
+      <p className="text-xs text-slate-400">{t('zug.noDetail')}</p>
     );
   }
 
@@ -780,7 +791,7 @@ function DetailEditor({ block, zugId, details, groups, editable }: { block: Bloc
   const save = async () => {
     if (await saveDetails(block.id, zugId, rows)) {
       setDirty(false);
-      toast('Detailplanung gespeichert');
+      toast(t('zug.detailSaved'));
     }
   };
 
@@ -789,9 +800,9 @@ function DetailEditor({ block, zugId, details, groups, editable }: { block: Bloc
       {rows.map((r, i) => (
         <div key={i} className="space-y-1 rounded border border-slate-200 p-1.5">
           <div className="flex flex-wrap items-center gap-1">
-            <input type="time" className="input !w-[6.5rem] !px-1.5 !py-1" value={fmtTime(r.startMin)} onChange={(e) => e.target.value && update(i, { startMin: parseTime(e.target.value) })} aria-label="Von" />
+            <input type="time" className="input !w-[6.5rem] !px-1.5 !py-1" value={fmtTime(r.startMin)} onChange={(e) => e.target.value && update(i, { startMin: parseTime(e.target.value) })} aria-label={t('bd.from')} />
             <span className="text-slate-400">–</span>
-            <input type="time" className="input !w-[6.5rem] !px-1.5 !py-1" value={fmtTime(r.endMin)} onChange={(e) => e.target.value && update(i, { endMin: parseTime(e.target.value) })} aria-label="Bis" />
+            <input type="time" className="input !w-[6.5rem] !px-1.5 !py-1" value={fmtTime(r.endMin)} onChange={(e) => e.target.value && update(i, { endMin: parseTime(e.target.value) })} aria-label={t('bd.to')} />
             <div className="min-w-[9rem] flex-1">
               <PersonSelect kpId={0} zugId={zugId} value={r.verantwortlich} onChange={(verantwortlich) => update(i, { verantwortlich })} />
             </div>
@@ -801,24 +812,24 @@ function DetailEditor({ block, zugId, details, groups, editable }: { block: Bloc
                 setRows(rows.filter((_, j) => j !== i));
                 setDirty(true);
               }}
-              aria-label="Zeile entfernen"
+              aria-label={t('zug.removeRow')}
             >
               ✕
             </button>
           </div>
-          <input className="input !py-1" placeholder="Was / Wo / Womit" value={r.title} onChange={(e) => update(i, { title: e.target.value })} />
+          <input className="input !py-1" placeholder={t('zug.whatWhere')} value={r.title} onChange={(e) => update(i, { title: e.target.value })} />
           <GroupPicker groups={groups} value={r.groupIds} onChange={(groupIds) => update(i, { groupIds })} />
         </div>
       ))}
-      {rows.length === 0 && <p className="text-xs text-slate-400">Das Zeitfenster in Sequenzen unterteilen (Zeitplan, Postenarbeit, Turnus).</p>}
+      {rows.length === 0 && <p className="text-xs text-slate-400">{t('zug.splitHint')}</p>}
       <div className="flex gap-2">
         <Button variant="ghost" className="text-xs" onClick={add} disabled={rows.length > 0 && rows[rows.length - 1].endMin >= block.endMin}>
-          + Sequenz
+          {t('zug.addSeq')}
         </Button>
         <span className="flex-1" />
         {dirty && (
           <Button variant="primary" className="text-xs" disabled={invalid} onClick={save}>
-            Speichern
+            {t('common.save')}
           </Button>
         )}
       </div>
@@ -830,6 +841,7 @@ function DetailEditor({ block, zugId, details, groups, editable }: { block: Bloc
 // ---- Zeitplan (printable detail programme, Anhänge p. 21) ----
 
 function Zeitplan({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: string[] }) {
+  const { t } = useT();
   const { wk, blocks, details, locations } = detail;
   const zugGroups = detail.groups.filter((g) => g.zugId === zug.id);
   const avs = useQuery({ queryKey: ['avs', wk.id], queryFn: () => api.avs(wk.id) });
@@ -848,16 +860,16 @@ function Zeitplan({ detail, zug, days }: { detail: WkDetail; zug: Zug; days: str
                 {isAvorDay(wk, d) && <span className="ml-2 rounded bg-amber-500 px-1.5 text-[10px] text-white">AVOR</span>}
               </h3>
               {list.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-slate-400">Keine Einträge.</p>
+                <p className="px-4 py-3 text-sm text-slate-400">{t('ap.noEntries')}</p>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                      <th className="w-16 px-4 py-1">von</th>
-                      <th className="w-16 py-1">bis</th>
-                      <th className="w-36 py-1">Verantw.</th>
-                      <th className="py-1">Was / Wo / Womit</th>
-                      <th className="w-32 px-4 py-1 text-right">Ausb.-Vorb.</th>
+                      <th className="w-16 px-4 py-1">{t('zug.from')}</th>
+                      <th className="w-16 py-1">{t('zug.to')}</th>
+                      <th className="w-36 py-1">{t('sb.respShort')}</th>
+                      <th className="py-1">{t('zug.whatWhere')}</th>
+                      <th className="w-32 px-4 py-1 text-right">{t('zug.prepShort')}</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -65,7 +65,7 @@ export function KonzeptPage({ detail }: { detail: WkDetail }) {
             </p>
           </div>
           <div className="no-print flex gap-2">
-            <Button onClick={() => window.print()}>Drucken</Button>
+            <Button onClick={() => window.print()}>{t('common.print')}</Button>
             {editable && (
               <Button variant="primary" disabled={!dirty} onClick={save}>
                 {t('common.save')}

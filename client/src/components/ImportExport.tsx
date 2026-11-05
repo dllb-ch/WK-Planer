@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { errMsg, useToast } from './ui';
+import { useT } from '../i18n';
 
 /** Menu with Excel/JSON export and import (file picker). */
 export function ImportExportMenu({
@@ -12,6 +13,7 @@ export function ImportExportMenu({
   onImport?: (file: File) => Promise<string | void>;
   label?: string;
 }) {
+  const { t } = useT();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -43,14 +45,14 @@ export function ImportExportMenu({
       {open && (
         <div className="absolute right-0 z-40 mt-1 w-56 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
           <button className={item} onClick={() => run(() => onExport('xlsx'))}>
-            Export als Excel (.xlsx)
+            {t('ie.exportXlsx')}
           </button>
           <button className={item} onClick={() => run(() => onExport('json'))}>
-            Export als JSON
+            {t('ie.exportJson')}
           </button>
           {onImport && (
             <label className={`${item} cursor-pointer border-t border-slate-100`}>
-              Import aus Excel oder JSON …
+              {t('ie.import')}
               <input
                 type="file"
                 accept=".xlsx,.json,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

@@ -389,7 +389,7 @@ function BatSettings({ bat }: { bat: AdminBat }) {
       <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
         <span className="label">{t('bat.mapView')}</span>
         <p className="text-xs text-slate-500">
-          Hier öffnen sich alle Karten (Gelände, Ressourcen, Erkundungen, Übungen), solange noch keine Fläche eingezeichnet ist.
+          {t('bat.mapIntro')}
           {t('bat.mapHint')}
         </p>
         <SwissMap view={bat.mapView} onViewChange={setShown} height={260} />
@@ -399,7 +399,7 @@ function BatSettings({ bat }: { bat: AdminBat }) {
           </Button>
           {f.mapView && (
             <Button variant="ghost" onClick={() => setF({ ...f, mapView: null })}>
-              Zurücksetzen (ganze Schweiz)
+              {t('bat.resetView')}
             </Button>
           )}
           <span className="text-slate-500">

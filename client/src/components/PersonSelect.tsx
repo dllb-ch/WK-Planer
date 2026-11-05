@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ROLE_LABEL } from '@shared/types';
 import { api } from '../api';
+import { useT } from '../i18n';
 
 /** People assigned to the Züge (Zfhr, Stv, Kader); for the Kdo column (id 0) the Kp command. */
 export function useZugPeople(kpId: number, zugIds: number | number[]) {
@@ -19,7 +20,7 @@ export function PersonSelect({
   zugId,
   value,
   onChange,
-  label = 'Verantwortlich',
+  label,
 }: {
   kpId: number;
   zugId: number | number[];
@@ -27,17 +28,19 @@ export function PersonSelect({
   onChange: (v: string) => void;
   label?: string;
 }) {
+  const { t } = useT();
+  const lbl = label ?? t('bd.responsible');
   const people = useZugPeople(kpId, zugId);
   const known = people.some((p) => p.name === value);
   return (
-    <select className="input" value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
-      <option value="">– {label} –</option>
+    <select className="input" value={value} onChange={(e) => onChange(e.target.value)} aria-label={lbl}>
+      <option value="">– {lbl} –</option>
       {people.map((p) => (
         <option key={p.id} value={p.name}>
           {p.name} ({p.funktion || ROLE_LABEL[p.role]})
         </option>
       ))}
-      {value && !known && <option value={value}>{value} (nicht im Zug)</option>}
+      {value && !known && <option value={value}>{t('person.notInZug', { value })}</option>}
     </select>
   );
 }
@@ -57,6 +60,7 @@ export function PersonMultiSelect({
   legacy?: string;
   onChange: (ids: number[], names: string[]) => void;
 }) {
+  const { t } = useT();
   const people = useZugPeople(kpId, zugId);
   const toggle = (id: number) => {
     const ids = value.includes(id) ? value.filter((x) => x !== id) : [...value, id];
@@ -81,9 +85,9 @@ export function PersonMultiSelect({
             </button>
           );
         })}
-        {people.length === 0 && <span className="text-xs text-slate-400">Keine Personen im Zug erfasst (Organisation › Kompanien & Personal).</span>}
+        {people.length === 0 && <span className="text-xs text-slate-400">{t('person.noneInZug')}</span>}
       </div>
-      {legacy && value.length === 0 && <p className="text-xs text-slate-500">Bisher eingetragen: {legacy}</p>}
+      {legacy && value.length === 0 && <p className="text-xs text-slate-500">{t('person.legacy', { value: legacy })}</p>}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type { Attachment } from '@shared/types';
 import { MAX_UPLOAD_MB } from '@shared/types';
 import { api } from '../api';
 import { Empty, errMsg, useToast } from './ui';
+import { useT } from '../i18n';
 
 export const fmtSize = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
@@ -34,7 +35,7 @@ export function FileArea({
   load,
   upload,
   canUpload,
-  emptyText = 'Noch keine Dateien.',
+  emptyText,
   compact,
   gallery,
 }: {
@@ -47,6 +48,7 @@ export function FileArea({
   /** Show images as thumbnails (sketches, photos). */
   gallery?: boolean;
 }) {
+  const { t } = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const q = useQuery({ queryKey, queryFn: load });
@@ -56,7 +58,7 @@ export function FileArea({
   const send = async (files: FileList | File[]) => {
     const list = [...files];
     const tooBig = list.filter((f) => f.size > MAX_UPLOAD_MB * 1024 * 1024);
-    if (tooBig.length) toast(`Zu gross (max. ${MAX_UPLOAD_MB} MB): ${tooBig.map((f) => f.name).join(', ')}`, 'error');
+    if (tooBig.length) toast(t('files.tooBig', { mb: MAX_UPLOAD_MB, names: tooBig.map((f) => f.name).join(', ') }), 'error');
     const ok = list.filter((f) => !tooBig.includes(f) && f.size > 0);
     for (const f of ok) {
       setBusy((b) => [...b, { name: f.name, p: 0 }]);
@@ -75,7 +77,7 @@ export function FileArea({
     }
   };
   const remove = async (a: Attachment) => {
-    if (!confirm(`«${a.name}» löschen?`)) return;
+    if (!confirm(t('files.confirmDelete', { name: a.name }))) return;
     try {
       await api.deleteAttachment(a.id);
       qc.invalidateQueries({ queryKey });
@@ -111,9 +113,9 @@ export function FileArea({
         </div>
       )}
       {q.isLoading ? (
-        <Empty>Laden …</Empty>
+        <Empty>{t('common.loading')}</Empty>
       ) : files.length === 0 && !busy.length ? (
-        <p className="text-sm text-slate-400">{emptyText}</p>
+        <p className="text-sm text-slate-400">{emptyText ?? t('files.none')}</p>
       ) : (
         <ul className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white">
           {files.map((a) => (
@@ -129,7 +131,7 @@ export function FileArea({
                 </span>
               )}
               {a.canDelete && (
-                <button className="no-print shrink-0 text-slate-400 hover:text-red-600" onClick={() => remove(a)} aria-label={`${a.name} löschen`}>
+                <button className="no-print shrink-0 text-slate-400 hover:text-red-600" onClick={() => remove(a)} aria-label={t('files.delete', { name: a.name })}>
                   ✕
                 </button>
               )}
@@ -148,7 +150,7 @@ export function FileArea({
       )}
       {canUpload && (
         <label className="no-print flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 hover:border-zs-blue hover:text-zs-blue">
-          ⬆ Dateien hochladen <span className="text-xs text-slate-400">(oder hierher ziehen, max. {MAX_UPLOAD_MB} MB)</span>
+          {t('files.upload')} <span className="text-xs text-slate-400">{t('files.uploadHint', { mb: MAX_UPLOAD_MB })}</span>
           <input
             type="file"
             multiple

@@ -1,3 +1,4 @@
+import { currentT } from './lang';
 // Import and export of simple tables as Excel (.xlsx) or JSON. ExcelJS is loaded only when needed.
 
 export interface Column {
@@ -62,7 +63,7 @@ export async function importTable(file: File, columns: Column[]): Promise<Row[]>
   if (/\.json$/i.test(file.name) || file.type === 'application/json') {
     const j = JSON.parse(await file.text());
     const items: unknown[] = Array.isArray(j) ? j : Array.isArray(j?.items) ? j.items : [];
-    if (!items.length) throw new Error('Keine Einträge in der Datei gefunden');
+    if (!items.length) throw new Error(currentT('table.noEntries'));
     return items.filter((x) => x && typeof x === 'object').map((x) => toRow(Object.entries(x as object)));
   }
 
@@ -70,7 +71,7 @@ export async function importTable(file: File, columns: Column[]): Promise<Row[]>
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await file.arrayBuffer());
   const ws = wb.worksheets[0];
-  if (!ws) throw new Error('Die Excel-Datei hat kein Tabellenblatt');
+  if (!ws) throw new Error(currentT('table.noSheet'));
   const headers: string[] = [];
   ws.getRow(1).eachCell((cell, col) => (headers[col] = cell.text));
   const rows: Row[] = [];
@@ -84,7 +85,7 @@ export async function importTable(file: File, columns: Column[]): Promise<Row[]>
     const row = toRow(entries);
     if (Object.values(row).some(Boolean)) rows.push(row);
   });
-  if (!rows.length) throw new Error('Keine Zeilen unter der Kopfzeile gefunden');
+  if (!rows.length) throw new Error(currentT('table.noRows'));
   return rows;
 }
 

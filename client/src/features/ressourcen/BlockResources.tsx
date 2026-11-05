@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Block, RequestStatus, ResourceKind, Wk } from '@shared/types';
-import { REQUEST_STATUS_LABEL } from '@shared/types';
 import { fmtTime } from '@shared/util';
 import { api, type WkDetail } from '../../api';
-import { RESOURCE_KIND_LABEL } from '@shared/types';
 import { canRequestResource } from '@shared/permissions';
 import { useUser } from '../../auth';
 import { Button } from '../../components/ui';
 import { RequestDialog } from './RequestDialog';
 import { requestLabel } from './conflicts';
+import { useT } from '../../i18n';
 
 export interface ResourceChip {
   key: number;
@@ -27,6 +26,7 @@ const DOT: Record<RequestStatus, string> = { BEWILLIGT: 'bg-emerald-500', BEANTR
  * at an overlapping time on that day. Rejected requests are left out.
  */
 export function useBlockResources(wk: Wk) {
+  const { t } = useT();
   const requests = useQuery({ queryKey: ['requests', wk.id], queryFn: () => api.requests(wk.id) });
   const resources = useQuery({ queryKey: ['resources', wk.kpId], queryFn: () => api.resources(wk.kpId) });
   return (b: Pick<Block, 'id' | 'date' | 'startMin' | 'endMin' | 'zugIds'>): ResourceChip[] =>
@@ -38,13 +38,13 @@ export function useBlockResources(wk: Wk) {
           (q.blockId === b.id || (q.blockId === null && b.zugIds.includes(q.zugId) && q.startMin < b.endMin && q.endMin > b.startMin)),
       )
       .map((q) => {
-        const name = q.kind === 'GELAENDE' && q.resourceId == null ? 'Gelände' : requestLabel(q, resources.data ?? []);
+        const name = q.kind === 'GELAENDE' && q.resourceId == null ? t('res.site') : requestLabel(q, resources.data ?? []);
         return {
           key: q.id,
           kind: q.kind,
           name,
           status: q.status,
-          title: `${name}: ${q.zweck}, ${fmtTime(q.startMin)}–${fmtTime(q.endMin)} (${REQUEST_STATUS_LABEL[q.status]})`,
+          title: `${name}: ${q.zweck}, ${fmtTime(q.startMin)}–${fmtTime(q.endMin)} (${t(`request.${q.status}`)})`,
         };
       });
 }
@@ -90,6 +90,7 @@ export function BlockRequests({
   /** New block: save it, then request (the page reopens it). */
   onRequestNew?: (kind: ResourceKind) => void;
 }) {
+  const { t, tn } = useT();
   const me = useUser();
   const { wk } = detail;
   const d = draft ?? block!;
@@ -118,7 +119,7 @@ export function BlockRequests({
               <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[standortReq.status]}`} />
               <span aria-hidden>{ICON[target.kind]}</span>
               <span>
-                {target.name} reserviert: <b>{REQUEST_STATUS_LABEL[standortReq.status]}</b>
+                {tn('res.reserved', { name: target.name, status: <b>{t(`request.${standortReq.status}`)}</b> })}
                 {standortReq.status === 'ABGELEHNT' && standortReq.decisionNote ? ` – ${standortReq.decisionNote}` : ''}
               </span>
             </>
@@ -126,32 +127,32 @@ export function BlockRequests({
             <>
               <span className="h-2 w-2 shrink-0 rounded-full border border-amber-500" />
               <span aria-hidden>{ICON[target.kind]}</span>
-              <span>{target.name} wird beim Speichern reserviert.</span>
+              <span>{t('res.reservedOnSave', { name: target.name })}</span>
             </>
           )}
         </p>
       ) : standortReq ? (
-        <p className="text-xs text-slate-500">Reservation {prevName ? `von ${prevName} ` : ''}wird beim Speichern zurückgezogen.</p>
+        <p className="text-xs text-slate-500">{t('res.withdrawn', { of: prevName ? t('res.withdrawnOf', { name: prevName }) : '' })}</p>
       ) : loc ? (
-        <p className="text-xs text-slate-400">Ort ausserhalb des Katalogs – keine Reservation.</p>
+        <p className="text-xs text-slate-400">{t('res.outsideCatalogue')}</p>
       ) : null}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="label !mb-0 mr-auto">Weitere Ressourcen</span>
+        <span className="label !mb-0 mr-auto">{t('res.more')}</span>
         {canAdd &&
           (['FAHRZEUG', 'ANHAENGER', 'RAUM', 'GELAENDE'] as ResourceKind[]).map((k) => (
             <Button
               key={k}
               className="py-0.5 text-xs"
               disabled={!block && !d.title.trim()}
-              title={block ? undefined : d.title.trim() ? 'Block speichern und anfragen' : 'Zuerst einen Titel erfassen'}
+              title={block ? undefined : d.title.trim() ? t('res.saveAndRequest') : t('res.titleFirst')}
               onClick={() => (block ? setKind(k) : onRequestNew!(k))}
             >
-              + {RESOURCE_KIND_LABEL[k]}
+              + {t(`resource.${k}`)}
             </Button>
           ))}
       </div>
       {chips.length === 0 && rejected.length === 0 ? (
-        <p className="text-xs text-slate-400">{block ? 'Noch nichts angefragt.' : 'Fahrzeuge, Anhänger, weitere Räume oder Gelände – der Block wird dafür gespeichert.'}</p>
+        <p className="text-xs text-slate-400">{block ? t('res.nothingYet') : t('res.blockSavedFor')}</p>
       ) : (
         <ul className="space-y-0.5 text-xs">
           {chips.map((c) => (
@@ -164,7 +165,7 @@ export function BlockRequests({
           {rejected.map((q) => (
             <li key={q.id} className="flex items-center gap-1.5 text-slate-400 line-through">
               <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
-              {ICON[q.kind]} {q.zweck} ({REQUEST_STATUS_LABEL[q.status]}{q.decisionNote ? `: ${q.decisionNote}` : ''})
+              {ICON[q.kind]} {q.zweck} ({t(`request.${q.status}`)}{q.decisionNote ? `: ${q.decisionNote}` : ''})
             </li>
           ))}
         </ul>

@@ -197,7 +197,7 @@ function ProgressOverview({ entries }: { entries: { e: LibraryEntry; p: { done: 
                       <span className={`block h-full ${barColor(pct)}`} style={{ width: `${pct}%` }} />
                     </span>
                     <span className="text-right text-xs tabular-nums text-slate-600">
-                      {pct}% · {g.complete}/{g.n} vollständig
+                      {t('lib.pctComplete', { pct, done: g.complete, n: g.n })}
                     </span>
                   </li>
                 );
@@ -396,8 +396,7 @@ function ReuseDialog({ e, onClose }: { e: LibraryEntry; onClose: () => void }) {
       }
     >
       <p className="text-sm text-slate-600">
-        «{e.av.thema}» wird als neue Ausbildungsvorbereitung für deinen Zug kopiert – mit Zielen, Mitteln und Ablauf. Datum, Zeit und Arbeitsplatz kommen
-        aus dem gewählten Zeitfenster; Teilnehmer und Controlling bleiben leer.
+        {t('lib.reuseHint', { thema: e.av.thema })}
       </p>
       {options.length === 0 ? (
         <p className="text-sm text-red-700">{t('lib.noWks')}</p>
@@ -429,7 +428,7 @@ function ReuseDialog({ e, onClose }: { e: LibraryEntry; onClose: () => void }) {
               ))}
             </select>
           </Field>
-          {detail.data && slots.length === 0 && <p className="text-xs text-slate-500">Keine Ausbildungs- oder Übungsblöcke deines Zuges in {wkDays(detail.data.wk).length} WK-Tagen.</p>}
+          {detail.data && slots.length === 0 && <p className="text-xs text-slate-500">{t('lib.noSlots', { n: wkDays(detail.data.wk).length })}</p>}
         </>
       )}
     </Modal>

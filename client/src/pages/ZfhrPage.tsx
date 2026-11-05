@@ -3,27 +3,29 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Posten, ZfhrProgramm } from '@shared/types';
 import { canEditZfhr, canViewZfhr } from '@shared/permissions';
-import { fmtDate, fmtTime, weekday, zieleFor } from '@shared/util';
+import { fmtDate, fmtTime, zieleFor } from '@shared/util';
 import { api, type WkDetail } from '../api';
 import { Briefkopf, usePrintPage } from '../components/Briefkopf';
 import { useUser } from '../auth';
 import { ListEditor } from '../components/ListEditor';
 import { Button, Card, Empty, errMsg, TextArea, useToast } from '../components/ui';
+import { useT } from '../i18n';
 
 export function ZfhrPage({ detail }: { detail: WkDetail }) {
+  const { t } = useT();
   const me = useUser();
   const { wk, zuege } = detail;
   const visible = zuege.filter((z) => canViewZfhr(me, wk, z.id));
   const [zugId, setZugId] = useState<number | null>(visible.find((z) => z.id === me.zugId)?.id ?? visible[0]?.id ?? null);
 
-  usePrintPage(`Zugführerarbeitsprogramm ${zuege.find((z) => z.id === zugId)?.name ?? ''} · ${wk.title}`);
-  if (!zugId) return <Empty>Kein Zug verfügbar.</Empty>;
+  usePrintPage(t('zf.printTitle', { zug: zuege.find((z) => z.id === zugId)?.name ?? '', wk: wk.title }));
+  if (!zugId) return <Empty>{t('zf.noZug')}</Empty>;
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-5xl space-y-4 p-6">
         <Briefkopf printOnly />
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-lg font-semibold">Zugführerarbeitsprogramm</h2>
+          <h2 className="text-lg font-semibold">{t('zf.title')}</h2>
           <select className="input no-print !w-auto" value={zugId} onChange={(e) => setZugId(Number(e.target.value))}>
             {visible.map((z) => (
               <option key={z.id} value={z.id}>
@@ -33,7 +35,7 @@ export function ZfhrPage({ detail }: { detail: WkDetail }) {
           </select>
           <span className="flex-1" />
           <Button className="no-print" onClick={() => window.print()}>
-            Drucken
+            {t('common.print')}
           </Button>
         </div>
         <ZfhrEditor key={zugId} detail={detail} zugId={zugId} editable={canEditZfhr(me, wk, zugId)} />
@@ -43,6 +45,7 @@ export function ZfhrPage({ detail }: { detail: WkDetail }) {
 }
 
 function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: number; editable: boolean }) {
+  const { t, weekdayShort } = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const { wk, blocks, locations } = detail;
@@ -56,7 +59,7 @@ function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: numb
   useEffect(() => {
     if (q.data && !dirty) setP(q.data);
   }, [q.data, dirty]);
-  if (!p) return <div className="text-slate-500">Laden …</div>;
+  if (!p) return <div className="text-slate-500">{t('common.loading')}</div>;
   const gruppen = zugGroups.length ? zugGroups : p.gruppen;
 
   const set = (patch: Partial<ZfhrProgramm>) => {
@@ -70,7 +73,7 @@ function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: numb
       await api.saveZfhr(wk.id, zugId, data);
       setDirty(false);
       qc.invalidateQueries({ queryKey: ['zfhr', wk.id, zugId] });
-      toast('Zugführerarbeitsprogramm gespeichert');
+      toast(t('zf.saved'));
     } catch (e) {
       toast(errMsg(e), 'error');
     }
@@ -91,12 +94,12 @@ function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: numb
       {editable && (
         <div className="no-print sticky top-0 z-10 flex justify-end">
           <Button variant="primary" disabled={!dirty} onClick={save}>
-            {dirty ? 'Speichern' : 'Gespeichert'}
+            {dirty ? t('common.save') : t('save.saved')}
           </Button>
         </div>
       )}
       {konzept.data && zieleFor(konzept.data.zielsetzungen, zugId).length > 0 && (
-        <Card title="Vorgaben aus dem WK-Konzept">
+        <Card title={t('zf.vorgaben')}>
           <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-600">
             {zieleFor(konzept.data.zielsetzungen, zugId).map((z, i) => (
               <li key={i}>{z.text}</li>
@@ -104,21 +107,21 @@ function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: numb
           </ol>
         </Card>
       )}
-      <Card title="Ziele des Zuges (heruntergebrochen auf Stufe Gruppe)">
-        <ListEditor items={p.ziele} onChange={(v) => set({ ziele: v })} readOnly={!editable} placeholder="Jede Gruppe kann …" />
+      <Card title={t('zf.ziele')}>
+        <ListEditor items={p.ziele} onChange={(v) => set({ ziele: v })} readOnly={!editable} placeholder={t('zf.zielePh')} />
       </Card>
 
-      <Card title="Arbeitsposten">
+      <Card title={t('zf.posten')}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="w-14 py-1 pr-2">Nr</th>
-                <th className="py-1 pr-2">Thema</th>
-                <th className="py-1 pr-2">Ort</th>
-                <th className="py-1 pr-2">Lernziel / Auftrag</th>
-                <th className="py-1 pr-2">Material / Hilfsmittel</th>
-                <th className="py-1 pr-2">Postenchef</th>
+                <th className="w-14 py-1 pr-2">{t('zf.nr')}</th>
+                <th className="py-1 pr-2">{t('zf.thema')}</th>
+                <th className="py-1 pr-2">{t('zf.ort')}</th>
+                <th className="py-1 pr-2">{t('zf.lernziel')}</th>
+                <th className="py-1 pr-2">{t('zf.material')}</th>
+                <th className="py-1 pr-2">{t('zf.postenchef')}</th>
                 {editable && <th />}
               </tr>
             </thead>
@@ -136,7 +139,7 @@ function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: numb
                         </td>
                       ))}
                       <td className="py-1">
-                        <button className="mt-1.5 text-slate-400 hover:text-red-600" onClick={() => set({ posten: p.posten.filter((_, j) => j !== i) })} aria-label="Posten entfernen">
+                        <button className="mt-1.5 text-slate-400 hover:text-red-600" onClick={() => set({ posten: p.posten.filter((_, j) => j !== i) })} aria-label={t('zf.removePosten')}>
                           ✕
                         </button>
                       </td>
@@ -156,33 +159,33 @@ function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: numb
             </tbody>
           </table>
         </div>
-        {p.posten.length === 0 && <Empty>Noch keine Posten erfasst.</Empty>}
+        {p.posten.length === 0 && <Empty>{t('zf.noPosten')}</Empty>}
         {editable && (
           <Button
             variant="ghost"
             onClick={() => set({ posten: [...p.posten, { nr: Math.max(0, ...p.posten.map((x) => x.nr)) + 1, thema: '', ort: '', lernziel: '', material: '', postenchef: '' }] })}
           >
-            + Posten
+            {t('zf.addPosten')}
           </Button>
         )}
       </Card>
 
-      <Card title="Rotationsablauf">
+      <Card title={t('zf.rotation')}>
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="label !mb-0">Gruppen</span>
+          <span className="label !mb-0">{t('zf.groups')}</span>
           <span>{gruppen.join(', ') || '–'}</span>
           <Link to="../zug" className="text-xs text-zs-blue hover:underline">
-            in der Zugansicht verwalten →
+            {t('zf.manageInZug')}
           </Link>
         </div>
         {slots.length === 0 || gruppen.length === 0 ? (
-          <Empty>Gruppen erfassen und Ausbildungsblöcke im Arbeitsprogramm planen, um die Rotation festzulegen.</Empty>
+          <Empty>{t('zf.rotationEmpty')}</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="py-1 pr-2">Zeitfenster (aus Arbeitsprogramm)</th>
+                  <th className="py-1 pr-2">{t('zf.slot')}</th>
                   {gruppen.map((g) => (
                     <th key={g} className="py-1 pr-2">
                       {g}
@@ -196,7 +199,7 @@ function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: numb
                     <td className="py-1 pr-2">
                       <div className="font-medium">{b.title}</div>
                       <div className="text-xs text-slate-500">
-                        {weekday(b.date).slice(0, 2)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)}
+                        {weekdayShort(b.date)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)}
                         {b.locationId && ` · ${locations.find((l) => l.id === b.locationId)?.name ?? ''}`}
                       </div>
                     </td>
@@ -228,7 +231,7 @@ function ZfhrEditor({ detail, zugId, editable }: { detail: WkDetail; zugId: numb
         )}
       </Card>
 
-      <Card title="Kontroll- und Besprechungspunkte / Aktivitäten des Zugführers">
+      <Card title={t('zf.activities')}>
         {editable ? (
           <TextArea rows={4} value={p.zfhrAktivitaeten} onChange={(e) => set({ zfhrAktivitaeten: e.target.value })} />
         ) : (

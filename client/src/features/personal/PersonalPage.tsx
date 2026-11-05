@@ -2,9 +2,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Participant, Strength, Zug } from '@shared/types';
-import { BESTAND_KEYS, BESTAND_LABEL, bestandTotal, sumBestand } from '@shared/types';
+import { BESTAND_KEYS, bestandTotal, sumBestand } from '@shared/types';
 import { canEditStrength, canManagePersonnel, canViewPersonnel } from '@shared/permissions';
-import { fmtDate, weekday, wkDays, servesOnDay, dutyOf } from '@shared/util';
+import { fmtDate, wkDays, servesOnDay, dutyOf } from '@shared/util';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Briefkopf, usePrintPage } from '../../components/Briefkopf';
@@ -14,19 +14,23 @@ import { Participants } from './Participants';
 import { Presence } from './Presence';
 import { Eintrittsbefragung } from './Eintrittsbefragung';
 import { QrCodes } from './QrCodes';
+import { useT } from '../../i18n';
+import { weekdayShortIn } from '@shared/i18n';
+import { currentLang } from '../../lib/lang';
 
 type Tab = 'praesenz' | 'eintritt' | 'bestand' | 'liste' | 'qr';
 
 export function PersonalPage({ detail }: { detail: WkDetail }) {
+  const { t } = useT();
   const me = useUser();
   const { wk } = detail;
   const manage = canManagePersonnel(me, wk);
   const tabs: [Tab, string][] = [
-    ['praesenz', 'Präsenz'],
-    ['eintritt', 'Eintrittsbefragung'],
-    ['bestand', 'Bestand'],
-    ['liste', 'Teilnehmerliste'],
-    ...(manage ? ([['qr', 'QR-Codes Check-in']] as [Tab, string][]) : []),
+    ['praesenz', t('pers.tab.praesenz')],
+    ['eintritt', t('pers.tab.eintritt')],
+    ['bestand', t('pers.tab.bestand')],
+    ['liste', t('pers.tab.liste')],
+    ...(manage ? ([['qr', t('pers.tab.qr')]] as [Tab, string][]) : []),
   ];
   const [tab, setTab] = useState<Tab>(() => (sessionStorage.getItem('zs-personal-tab') as Tab) || 'praesenz');
   useEffect(() => {
@@ -36,15 +40,15 @@ export function PersonalPage({ detail }: { detail: WkDetail }) {
       // ignore
     }
   }, [tab]);
-  const current = tabs.some(([t]) => t === tab) ? tab : 'praesenz';
-  usePrintPage(`${tabs.find(([t]) => t === current)?.[1] ?? 'Personal'} · ${wk.title}`);
-  if (!canViewPersonnel(me, wk)) return <div className="p-6 text-slate-600">Kein Zugriff.</div>;
+  const current = tabs.some(([x]) => x === tab) ? tab : 'praesenz';
+  usePrintPage(`${tabs.find(([x]) => x === current)?.[1] ?? t('pers.personal')} · ${wk.title}`);
+  if (!canViewPersonnel(me, wk)) return <div className="p-6 text-slate-600">{t('yp.noAccess')}</div>;
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl space-y-4 p-3 sm:p-6">
         {/* The QR sheet prints its own letterhead. */}
-        {current !== 'qr' && <Briefkopf printOnly title={current === 'praesenz' ? 'Präsenzliste' : undefined} subtitle={wk.title} />}
+        {current !== 'qr' && <Briefkopf printOnly title={current === 'praesenz' ? t('pers.praesenzliste') : undefined} subtitle={wk.title} />}
         <div className="no-print flex flex-wrap gap-1.5">
           {tabs.map(([t, label]) => (
             <button
@@ -78,6 +82,7 @@ const key = (zugId: number, date: string) => `${zugId}|${date}`;
 
 /** Planned people per Zug and day. Kp Kdt edits all rows, Zfhr the own Zug. */
 function StrengthMatrix({ detail }: { detail: WkDetail }) {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -112,7 +117,7 @@ function StrengthMatrix({ detail }: { detail: WkDetail }) {
       await api.saveStrength(wk.id, entries);
       await qc.invalidateQueries({ queryKey: ['strength', wk.id] });
       setEdits({});
-      toast('Sollbestand gespeichert');
+      toast(t('pers.sollSaved'));
     } catch (e) {
       toast(errMsg(e), 'error');
     }
@@ -120,25 +125,25 @@ function StrengthMatrix({ detail }: { detail: WkDetail }) {
 
   return (
     <Card
-      title="Geplante Personen pro Zug und Tag"
+      title={t('pers.matrixTitle')}
       actions={
         rows.some((r) => editable(r.id)) && (
           <>
             {zuege.some((z) => bestandTotal(z.ist) > 0) && (
-              <Button onClick={fromIst} title="Istbestand der Züge (Organisation › Kompanien & Personal) an allen Diensttagen eintragen">
-                Istbestand übernehmen
+              <Button onClick={fromIst} title={t('pers.fromIstHint')}>
+                {t('pers.fromIst')}
               </Button>
             )}
-            {participants.data && participants.data.length > 0 && <Button onClick={fromList}>Aus Teilnehmerliste übernehmen</Button>}
+            {participants.data && participants.data.length > 0 && <Button onClick={fromList}>{t('pers.fromList')}</Button>}
             <Button variant="primary" disabled={!dirty} onClick={save}>
-              Speichern
+              {t('common.save')}
             </Button>
           </>
         )
       }
     >
       <p className="mb-3 text-sm text-slate-600">
-        Geplante Anzahl Personen. Sie erscheint in der Präsenzliste und als Vorschlag bei Fahrzeug-Anfragen nach Anzahl Personen.
+        {t('pers.matrixHint')}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -147,7 +152,7 @@ function StrengthMatrix({ detail }: { detail: WkDetail }) {
               <th className="py-1 pr-3">Zug</th>
               {days.map((d) => (
                 <th key={d} className="px-1 py-1 text-center font-medium">
-                  {weekday(d).slice(0, 2)} {fmtDate(d).slice(0, 6)}
+                  {weekdayShortIn(currentLang(), d)} {fmtDate(d).slice(0, 6)}
                   {wk.avorDays.includes(d) && <div className="text-[10px] text-amber-600">AVOR</div>}
                   {wk.kvkDays.includes(d) && <div className="text-[10px] text-sky-600">KVK</div>}
                 </th>
@@ -163,7 +168,7 @@ function StrengthMatrix({ detail }: { detail: WkDetail }) {
                   return (
                     <td key={d} className={`px-1 py-1 text-center ${servesOnDay(wk, d, z.id) ? '' : 'col-off'}`}>
                       {!servesOnDay(wk, d, z.id) ? (
-                        <span className="text-xs text-slate-400" title="Kein Dienst an diesem Tag">
+                        <span className="text-xs text-slate-400" title={t('pers.noServiceDay')}>
                           –
                         </span>
                       ) : editable(z.id) ? (
@@ -183,14 +188,14 @@ function StrengthMatrix({ detail }: { detail: WkDetail }) {
                       ) : (
                         <span className="tabular-nums">{value(z.id, d) || '–'}</span>
                       )}
-                      {n > 0 && n !== value(z.id, d) && <div className="text-[10px] text-slate-400">Liste: {n}</div>}
+                      {n > 0 && n !== value(z.id, d) && <div className="text-[10px] text-slate-400">{t('pers.list', { n })}</div>}
                     </td>
                   );
                 })}
               </tr>
             ))}
             <tr className="border-t-2 border-slate-300 font-semibold">
-              <td className="py-1 pr-3">Total</td>
+              <td className="py-1 pr-3">{t('yp.total')}</td>
               {days.map((d) => (
                 <td key={d} className="px-1 py-1 text-center tabular-nums">
                   {rows.reduce((a, z) => a + value(z.id, d), 0)}
@@ -206,33 +211,34 @@ function StrengthMatrix({ detail }: { detail: WkDetail }) {
 
 /** Soll- and Istbestand of the Züge as set in the Verwaltung. */
 function ZugBestand({ zuege }: { zuege: Zug[] }) {
+  const { t } = useT();
   const total = { soll: sumBestand(zuege.map((z) => z.soll)), ist: sumBestand(zuege.map((z) => z.ist)) };
-  const rows = [...zuege.map((z) => ({ key: z.id, name: z.name, soll: z.soll, ist: z.ist })), { key: -1, name: 'Total', ...total }];
+  const rows = [...zuege.map((z) => ({ key: z.id, name: z.name, soll: z.soll, ist: z.ist })), { key: -1, name: t('yp.total'), ...total }];
   return (
-    <Card title="Bestand der Züge">
-      <p className="mb-3 text-sm text-slate-600">Soll- und Istbestand aus «Organisation › Kompanien & Personal».</p>
+    <Card title={t('pers.bestandTitle')}>
+      <p className="mb-3 text-sm text-slate-600">{t('pers.bestandIntro')}</p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-slate-500">
               <th className="py-1 pr-3" rowSpan={2}>
-                Zug
+                {t('common.zug')}
               </th>
               <th className="border-l border-slate-100 px-2 py-1 text-center font-medium" colSpan={4}>
-                Sollbestand
+                {t('admin.sollbestand')}
               </th>
               <th className="border-l border-slate-100 px-2 py-1 text-center font-medium" colSpan={4}>
-                Istbestand
+                {t('admin.istbestand')}
               </th>
               <th className="border-l border-slate-100 px-2 py-1 text-center font-medium" rowSpan={2}>
-                Differenz
+                {t('pers.diff')}
               </th>
             </tr>
             <tr className="text-xs text-slate-500">
               {['soll', 'ist'].map((g) =>
                 [...BESTAND_KEYS, 'total' as const].map((k, i) => (
                   <th key={g + k} className={`px-2 py-1 text-center font-normal ${i === 0 ? 'border-l border-slate-100' : ''}`}>
-                    {k === 'total' ? 'Total' : BESTAND_LABEL[k]}
+                    {k === 'total' ? t('yp.total') : t(`bestand.${k}`)}
                   </th>
                 )),
               )}
@@ -266,7 +272,7 @@ function ZugBestand({ zuege }: { zuege: Zug[] }) {
         </table>
       </div>
       {zuege.every((z) => bestandTotal(z.soll) + bestandTotal(z.ist) === 0) && (
-        <p className="mt-2 text-xs text-slate-400">Noch kein Bestand erfasst – das Bat Kommando oder der Kp Kdt erfasst ihn unter «Organisation › Kompanien & Personal».</p>
+        <p className="mt-2 text-xs text-slate-400">{t('pers.noBestand')}</p>
       )}
     </Card>
   );

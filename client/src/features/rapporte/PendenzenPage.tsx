@@ -1,15 +1,16 @@
 // Pendenzen and Vorbereitung in one view: superiors assign Pendenzen to themselves and their subordinates.
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ROLE_LABEL } from '@shared/types';
 import { canAssignPendenz, canViewMilestones } from '@shared/permissions';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Button, Card, Empty, errMsg, useToast } from '../../components/ui';
 import { MilestonesPage } from '../../pages/MilestonesPage';
 import { PendenzList } from './Pendenzen';
+import { useT } from '../../i18n';
 
 export function PendenzenPage({ detail }: { detail: WkDetail }) {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -41,7 +42,7 @@ export function PendenzenPage({ detail }: { detail: WkDetail }) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-4xl space-y-4 p-3 sm:p-6">
         <Card
-          title="Pendenzen"
+          title={t('rap.pendenzen')}
           actions={
             <div className="flex gap-1">
               {(['offen', 'meine', 'alle'] as const).map((f) => (
@@ -50,7 +51,7 @@ export function PendenzenPage({ detail }: { detail: WkDetail }) {
                   onClick={() => setFilter(f)}
                   className={`rounded-full border px-2.5 py-0.5 text-xs ${filter === f ? 'border-zs-blue bg-blue-50 text-zs-blue' : 'border-slate-300 text-slate-600'}`}
                 >
-                  {f === 'offen' ? 'Offen' : f === 'meine' ? 'Meine' : 'Alle'}
+                  {t(`rap.filter.${f}`)}
                 </button>
               ))}
             </div>
@@ -60,25 +61,25 @@ export function PendenzenPage({ detail }: { detail: WkDetail }) {
             <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 p-2">
               <input
                 className="input min-w-[14rem] flex-1 py-1 text-sm"
-                placeholder="Neue Pendenz / Auftrag (Enter)"
+                placeholder={t('pend.newPh')}
                 value={draft.text}
                 onChange={(e) => setDraft({ ...draft, text: e.target.value })}
                 onKeyDown={(e) => e.key === 'Enter' && add()}
               />
-              <select className="input !w-auto py-1 text-sm" value={draft.who ?? ''} onChange={(e) => setDraft({ ...draft, who: Number(e.target.value) || null })} aria-label="Wer">
+              <select className="input !w-auto py-1 text-sm" value={draft.who ?? ''} onChange={(e) => setDraft({ ...draft, who: Number(e.target.value) || null })} aria-label={t('rap.who')}>
                 {people.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.id === me.id ? `Ich (${p.name})` : `${p.name} · ${p.funktion || ROLE_LABEL[p.role]}${zugName(p.zugId) ? ` · ${zugName(p.zugId)}` : ''}`}
+                    {p.id === me.id ? t('pend.me', { name: p.name }) : `${p.name} · ${p.funktion || t(`role.${p.role}`)}${zugName(p.zugId) ? ` · ${zugName(p.zugId)}` : ''}`}
                   </option>
                 ))}
               </select>
-              <input type="date" className="input !w-auto py-1 text-sm" value={draft.dueDate} onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })} aria-label="Bis wann" />
+              <input type="date" className="input !w-auto py-1 text-sm" value={draft.dueDate} onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })} aria-label={t('rap.until')} />
               <Button variant="primary" className="py-1 text-sm" disabled={!draft.text.trim() || !draft.who} onClick={add}>
-                Zuweisen
+                {t('pend.assign')}
               </Button>
             </div>
           )}
-          {list.length === 0 && <Empty>Keine Pendenzen.</Empty>}
+          {list.length === 0 && <Empty>{t('rap.noPendenzen')}</Empty>}
           <PendenzList wk={wk} items={list} rapporte={rapporte.data ?? []} showSource />
         </Card>
         {canViewMilestones(me, wk) && <MilestonesPage detail={detail} embedded />}

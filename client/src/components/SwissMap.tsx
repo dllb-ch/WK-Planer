@@ -4,6 +4,8 @@ import 'leaflet/dist/leaflet.css';
 import type { Area, MapView } from '@shared/types';
 import { Button } from './ui';
 import { useBataillon } from './Briefkopf';
+import { useT } from '../i18n';
+import { currentT } from '../lib/lang';
 
 // swisstopo WMTS in Web Mercator (free use with attribution, see geo.admin.ch terms).
 const WMTS = (layer: string, ext: string) => `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${ext}`;
@@ -32,6 +34,7 @@ interface Props {
 }
 
 export function SwissMap({ shapes = [], value = null, onChange, height = 360, view, onViewChange }: Props) {
+  const { t } = useT();
   const batView = useBataillon()?.mapView ?? null;
   const start = view !== undefined ? view : batView;
   const onViewRef = useRef(onViewChange);
@@ -54,7 +57,7 @@ export function SwissMap({ shapes = [], value = null, onChange, height = 360, vi
     const karte = L.tileLayer(WMTS('ch.swisstopo.pixelkarte-farbe', 'jpeg'), { attribution: ATTRIBUTION, maxNativeZoom: 18, maxZoom: 20 });
     const luftbild = L.tileLayer(WMTS('ch.swisstopo.swissimage', 'jpeg'), { attribution: ATTRIBUTION, maxNativeZoom: 20, maxZoom: 20 });
     karte.addTo(m);
-    L.control.layers({ 'Landeskarte': karte, 'Luftbild': luftbild }, {}, { position: 'topright' }).addTo(m);
+    L.control.layers({ [currentT('map.topo')]: karte, [currentT('map.aerial')]: luftbild }, {}, { position: 'topright' }).addTo(m);
     shapeLayer.current = L.layerGroup().addTo(m);
     editLayer.current = L.layerGroup().addTo(m);
     m.on('click', (e: L.LeafletMouseEvent) => {
@@ -117,12 +120,12 @@ export function SwissMap({ shapes = [], value = null, onChange, height = 360, vi
       <div ref={el} className="z-0 w-full overflow-hidden rounded-md border border-slate-300" style={{ height }} />
       {onChange && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-          <span className="flex-1">Auf die Karte klicken, um die Eckpunkte des Geländeabschnitts zu setzen (mind. 3).</span>
+          <span className="flex-1">{t('map.drawHint')}</span>
           <Button variant="ghost" className="text-xs" disabled={!value?.length} onClick={() => onChange(value && value.length > 1 ? value.slice(0, -1) : null)}>
-            Letzten Punkt entfernen
+            {t('map.removeLast')}
           </Button>
           <Button variant="ghost" className="text-xs" disabled={!value?.length} onClick={() => onChange(null)}>
-            Fläche löschen
+            {t('map.deleteArea')}
           </Button>
         </div>
       )}
@@ -134,6 +137,7 @@ const round = (n: number) => Math.round(n * 1e6) / 1e6;
 
 /** Location search via the public geo.admin.ch SearchServer. */
 function PlaceSearch({ onPick }: { onPick: (lat: number, lon: number) => void }) {
+  const { t } = useT();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<{ label: string; lat: number; lon: number }[]>([]);
   // The name of the place just picked: no new search for it.
@@ -169,7 +173,7 @@ function PlaceSearch({ onPick }: { onPick: (lat: number, lon: number) => void })
 
   return (
     <div className="relative">
-      <input className="input" placeholder="Ort oder Adresse suchen (swisstopo) …" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="input" placeholder={t('map.search')} value={q} onChange={(e) => setQ(e.target.value)} />
       {results.length > 0 && (
         <ul className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white text-sm shadow-lg">
           {results.map((r, i) => (

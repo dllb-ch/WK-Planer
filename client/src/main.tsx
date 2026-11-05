@@ -9,6 +9,7 @@ import { App } from './App';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import { BASE, DEMO } from './lib/base';
+import { currentT } from './lib/lang';
 
 // A new version is installed in the background and the page reloads into it; open tabs check every 10 minutes.
 // (The browser demo has no service worker.)
@@ -48,7 +49,7 @@ const render = (extra?: React.ReactNode) =>
 
 if (DEMO) {
   // The server runs in this page; it has to be ready before the app asks it anything.
-  root.render(<p className="p-8 text-slate-500">Demo wird vorbereitet …</p>);
+  root.render(<p className="p-8 text-slate-500">{currentT('demo.preparing')}</p>);
   import('./demo/entry')
     .then(async ({ startDemo, DemoBanner }) => {
       await startDemo();
@@ -56,6 +57,6 @@ if (DEMO) {
     })
     .catch((e) => {
       console.error(e);
-      root.render(<p className="p-8 text-red-700">Die Demo konnte nicht gestartet werden: {String(e?.message ?? e)}</p>);
+      root.render(<p className="p-8 text-red-700">{currentT('demo.failed', { error: String(e?.message ?? e) })}</p>);
     });
 } else render();

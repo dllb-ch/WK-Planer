@@ -11,10 +11,12 @@ import { Button, Card, Empty, errMsg, Field, Modal, useToast } from '../../compo
 import { exportTable, importTable } from '../../lib/tableFile';
 
 import { ALIASES, applyZugMapping, COLUMNS, parseParticipants, type ParsedImport } from './participantImport';
+import { useT } from '../../i18n';
 
 const fullName = (p: Pick<Participant, 'grad' | 'vorname' | 'nachname'>) => [p.grad, p.nachname, p.vorname].filter(Boolean).join(' ');
 
 export function Participants({ detail }: { detail: WkDetail }) {
+  const { t, tn } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -58,7 +60,7 @@ export function Participants({ detail }: { detail: WkDetail }) {
   const importFile = async (file: File) => {
     const rows = await importTable(file, [...COLUMNS, ...ALIASES]);
     const parsed = parseParticipants(rows, wk, zuege);
-    if (!parsed.items.length) throw new Error('Keine Personen mit Nachname in der Datei gefunden');
+    if (!parsed.items.length) throw new Error(t('part.noneInFile'));
     let saved: Record<string, number | null> = {};
     try {
       saved = JSON.parse(localStorage.getItem(mappingKey) ?? '{}');
@@ -92,13 +94,13 @@ export function Participants({ detail }: { detail: WkDetail }) {
 
   return (
     <Card
-      title={`Teilnehmerliste (${q.data?.length ?? 0} Personen)`}
+      title={t('part.title', { n: q.data?.length ?? 0 })}
       actions={
         <>
           <ImportExportMenu onExport={exportFile} onImport={manage ? importFile : undefined} />
           {manage && (
             <Button variant="primary" onClick={() => setEdit({ zugId: typeof zugFilter === 'number' ? zugFilter : null })}>
-              + Person
+              {t('part.add')}
             </Button>
           )}
         </>
@@ -106,15 +108,15 @@ export function Participants({ detail }: { detail: WkDetail }) {
     >
       <div className="mb-3 flex flex-wrap gap-2">
         <select className="input w-auto" value={zugFilter} onChange={(e) => setZugFilter(e.target.value === '' || e.target.value === 'none' ? e.target.value : Number(e.target.value))}>
-          <option value="">Alle Züge</option>
+          <option value="">{t('part.allZuege')}</option>
           {zuege.map((z) => (
             <option key={z.id} value={z.id}>
               {z.name}
             </option>
           ))}
-          <option value="none">Ohne Zug</option>
+          <option value="none">{t('part.noZug')}</option>
         </select>
-        <input className="input w-56" placeholder="Suchen …" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input className="input w-56" placeholder={t('part.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       {manage && (q.data?.length ?? 0) === 0 && (
         <p className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-slate-700">
@@ -133,9 +135,9 @@ export function Participants({ detail }: { detail: WkDetail }) {
         />
       )}
       {q.isLoading ? (
-        <Empty>Laden …</Empty>
+        <Empty>{t('common.loading')}</Empty>
       ) : list.length === 0 ? (
-        <Empty>Keine Personen.</Empty>
+        <Empty>{t('part.none')}</Empty>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -145,18 +147,18 @@ export function Participants({ detail }: { detail: WkDetail }) {
                   <th className="w-8 py-1.5">
                     <input
                       type="checkbox"
-                      aria-label="Alle auswählen"
+                      aria-label={t('part.selectAll')}
                       checked={list.length > 0 && list.every((p) => selected.includes(p.id))}
                       onChange={(e) => setSelected(e.target.checked ? [...new Set([...selected, ...list.map((p) => p.id)])] : selected.filter((id) => !list.some((p) => p.id === id)))}
                     />
                   </th>
                 )}
-                <th className="py-1.5 pr-3">Name</th>
-                <th className="py-1.5 pr-3">Funktion</th>
-                <th className="py-1.5 pr-3">Zug</th>
-                <th className="py-1.5 pr-3 max-sm:hidden">E-Mail</th>
-                <th className="py-1.5 pr-3 max-sm:hidden">Tage</th>
-                <th className="py-1.5 pr-3 max-md:hidden">Essen</th>
+                <th className="py-1.5 pr-3">{t('profile.name')}</th>
+                <th className="py-1.5 pr-3">{t('admin.funktion')}</th>
+                <th className="py-1.5 pr-3">{t('common.zug')}</th>
+                <th className="py-1.5 pr-3 max-sm:hidden">{t('login.email')}</th>
+                <th className="py-1.5 pr-3 max-sm:hidden">{t('part.days')}</th>
+                <th className="py-1.5 pr-3 max-md:hidden">{t('part.food')}</th>
               </tr>
             </thead>
             <tbody>
@@ -170,7 +172,7 @@ export function Participants({ detail }: { detail: WkDetail }) {
                     <td className="py-1.5" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        aria-label={`${fullName(p)} auswählen`}
+                        aria-label={t('part.select', { name: fullName(p) })}
                         checked={selected.includes(p.id)}
                         onChange={(e) => setSelected(e.target.checked ? [...selected, p.id] : selected.filter((id) => id !== p.id))}
                       />
@@ -180,9 +182,9 @@ export function Participants({ detail }: { detail: WkDetail }) {
                   <td className="py-1.5 pr-3">{p.funktion}</td>
                   <td className="py-1.5 pr-3">{zugName(p.zugId) || <span className="text-amber-700">–</span>}</td>
                   <td className="py-1.5 pr-3 max-sm:hidden">{p.email}</td>
-                  <td className="py-1.5 pr-3 text-xs max-sm:hidden">{p.days.length ? p.days.map((d) => fmtDate(d).slice(0, 6)).join(', ') : 'ganzer WK'}</td>
+                  <td className="py-1.5 pr-3 text-xs max-sm:hidden">{p.days.length ? p.days.map((d) => fmtDate(d).slice(0, 6)).join(', ') : t('part.wholeWk')}</td>
                   <td className="py-1.5 pr-3 text-xs max-md:hidden">
-                    {p.diet !== 'NORMAL' && DIET_LABEL[p.diet]}
+                    {p.diet !== 'NORMAL' && t(`diet.${p.diet}`)}
                     {p.intolerances && <span className="text-slate-500"> {p.intolerances}</span>}
                   </td>
                 </tr>
@@ -194,38 +196,36 @@ export function Participants({ detail }: { detail: WkDetail }) {
       {edit && <ParticipantDialog detail={detail} initial={edit} onClose={() => setEdit(null)} onSaved={refresh} />}
       {pending && (
         <Modal
-          title="Teilnehmerliste importieren"
+          title={t('part.importTitle')}
           onClose={() => setPending(null)}
           footer={
             <>
-              <Button onClick={() => setPending(null)}>Abbrechen</Button>
+              <Button onClick={() => setPending(null)}>{t('common.cancel')}</Button>
               {(q.data?.length ?? 0) > 0 && (
                 <Button variant="danger" onClick={() => runImport('replace')}>
-                  Liste ersetzen
+                  {t('part.replace')}
                 </Button>
               )}
               <Button variant="primary" onClick={() => runImport('merge')}>
-                {(q.data?.length ?? 0) > 0 ? 'Zusammenführen' : 'Importieren'}
+                {(q.data?.length ?? 0) > 0 ? t('part.merge') : t('part.import')}
               </Button>
             </>
           }
         >
-          <p className="text-sm">{pending.items.length} Personen in der Datei gefunden.</p>
+          <p className="text-sm">{t('part.foundInFile', { n: pending.items.length })}</p>
           {(q.data?.length ?? 0) > 0 && (
             <p className="text-sm text-slate-600">
-              <b>Zusammenführen</b> aktualisiert bekannte Personen (nach Nummer oder Name) und ergänzt neue. <b>Liste ersetzen</b> entfernt zusätzlich alle,
-              die nicht in der Datei sind.
+              {tn('part.mergeHint', { merge: <b>{t('part.merge')}</b>, replace: <b>{t('part.replace')}</b> })}
             </p>
           )}
           {pending.outside > 0 && (
             <p className="rounded bg-amber-50 px-2 py-1 text-sm text-amber-900">
-              {pending.outside} Personen haben laut Datei keine Diensttage in diesem WK ({wk.title}). Sie werden für den ganzen WK übernommen – stimmt
-              die Datei?
+              {t('part.outside', { n: pending.outside, wk: wk.title })}
             </p>
           )}
           {pending.funktionen.length > 0 && (
             <div>
-              <div className="label">Zug pro Funktion (die Datei enthält keinen Zug)</div>
+              <div className="label">{t('part.zugPerFunktion')}</div>
               <div className="max-h-72 space-y-1 overflow-y-auto">
                 {pending.funktionen.map((f) => (
                   <label key={f.funktion} className="flex items-center gap-2 text-sm">
@@ -237,7 +237,7 @@ export function Participants({ detail }: { detail: WkDetail }) {
                       value={mapping[f.funktion] ?? ''}
                       onChange={(e) => setMapping({ ...mapping, [f.funktion]: e.target.value ? Number(e.target.value) : null })}
                     >
-                      <option value="">ohne Zug (Kdo)</option>
+                      <option value="">{t('part.noZugKdo')}</option>
                       {zuege.map((z) => (
                         <option key={z.id} value={z.id}>
                           {z.name}
@@ -247,12 +247,12 @@ export function Participants({ detail }: { detail: WkDetail }) {
                   </label>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-slate-500">Personen, die schon auf der Liste sind, behalten ihren Zug. Die Zuordnung wird für den nächsten Import gemerkt.</p>
+              <p className="mt-1 text-xs text-slate-500">{t('part.keepZug')}</p>
             </div>
           )}
           {pending.unknownZuege.length > 0 && (
             <p className="rounded bg-amber-50 px-2 py-1 text-sm text-amber-900">
-              Unbekannte Züge (Personen werden ohne Zug übernommen): {pending.unknownZuege.join(', ')}. Bekannt sind: {zuege.map((z) => z.name).join(', ')}.
+              {t('part.unknownZuege', { list: pending.unknownZuege.join(', '), known: zuege.map((z) => z.name).join(', ') })}
             </p>
           )}
         </Modal>
@@ -277,6 +277,7 @@ export function ParticipantDialog({
   /** Instead of saving the person: e.g. add from an unmatched check-in. */
   onSubmit?: (p: ParticipantInput) => Promise<void>;
 }) {
+  const { t } = useT();
   const toast = useToast();
   const { wk, zuege } = detail;
   const days = wkDays(wk);
@@ -303,7 +304,7 @@ export function ParticipantDialog({
     run(() => (onSubmit ? onSubmit(p) : initial.id ? api.updateParticipant(wk.id, initial.id, p) : api.createParticipant(wk.id, p)));
   return (
     <Modal
-      title={title ?? (initial.id ? 'Person bearbeiten' : 'Person hinzufügen')}
+      title={title ?? (initial.id ? t('part.edit') : t('part.addTitle'))}
       onClose={onClose}
       footer={
         <>
@@ -311,34 +312,34 @@ export function ParticipantDialog({
             <Button
               variant="danger"
               className="mr-auto"
-              onClick={() => confirm('Person von der Liste entfernen?') && run(() => api.deleteParticipant(wk.id, initial.id!))}
+              onClick={() => confirm(t('part.confirmRemove')) && run(() => api.deleteParticipant(wk.id, initial.id!))}
             >
-              Entfernen
+              {t('common.remove')}
             </Button>
           )}
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!p.nachname.trim()} onClick={save}>
-            Speichern
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Nachname">
+        <Field label={t('part.lastName')}>
           <input className="input" value={p.nachname} onChange={(e) => setP({ ...p, nachname: e.target.value })} />
         </Field>
-        <Field label="Vorname">
+        <Field label={t('part.firstName')}>
           <input className="input" value={p.vorname} onChange={(e) => setP({ ...p, vorname: e.target.value })} />
         </Field>
-        <Field label="Grad">
+        <Field label={t('part.grad')}>
           <input className="input" value={p.grad} onChange={(e) => setP({ ...p, grad: e.target.value })} />
         </Field>
-        <Field label="Funktion">
+        <Field label={t('admin.funktion')}>
           <input className="input" value={p.funktion} onChange={(e) => setP({ ...p, funktion: e.target.value })} />
         </Field>
-        <Field label="Zug">
+        <Field label={t('common.zug')}>
           <select className="input" value={p.zugId ?? ''} onChange={(e) => setP({ ...p, zugId: e.target.value ? Number(e.target.value) : null })}>
-            <option value="">– ohne –</option>
+            <option value="">{t('part.none2')}</option>
             {zuege.map((z) => (
               <option key={z.id} value={z.id}>
                 {z.name}
@@ -346,15 +347,15 @@ export function ParticipantDialog({
             ))}
           </select>
         </Field>
-        <Field label="E-Mail">
+        <Field label={t('login.email')}>
           <input className="input" type="email" value={p.email} onChange={(e) => setP({ ...p, email: e.target.value })} />
         </Field>
-        <Field label="Nummer (Personalsystem)">
+        <Field label={t('part.number')}>
           <input className="input" value={p.extId} onChange={(e) => setP({ ...p, extId: e.target.value })} />
         </Field>
       </div>
       <div>
-        <span className="label">Diensttage (keine Auswahl = ganzer WK)</span>
+        <span className="label">{t('part.serviceDays')}</span>
         <div className="flex flex-wrap gap-1.5">
           {days.map((d) => {
             const on = p.days.includes(d);
@@ -378,6 +379,7 @@ export function ParticipantDialog({
 
 /** Several selected people: Zug and/or days of service at once. */
 function BulkBar({ detail, ids, onDone }: { detail: WkDetail; ids: number[]; onDone: () => void }) {
+  const { t } = useT();
   const toast = useToast();
   const { wk, zuege } = detail;
   const days = wkDays(wk);
@@ -386,17 +388,17 @@ function BulkBar({ detail, ids, onDone }: { detail: WkDetail; ids: number[]; onD
   const run = async (b: { zugId?: number | null; days?: string[] }, what: string) => {
     try {
       const r = await api.bulkParticipants(wk.id, { ids, ...b });
-      toast(`${r.updated} Personen: ${what}`);
+      toast(t('part.updated', { n: r.updated, what }));
       onDone();
     } catch (e) {
       toast(errMsg(e), 'error');
     }
   };
   const remove = async () => {
-    if (!confirm(`${ids.length} Personen von der Teilnehmerliste entfernen? Ihre Check-ins bleiben (ohne Zuordnung) erhalten.`)) return;
+    if (!confirm(t('part.confirmBulkRemove', { n: ids.length }))) return;
     try {
       const r = await api.deleteParticipants(wk.id, ids);
-      toast(`${r.deleted} Personen entfernt`);
+      toast(t('part.removed', { n: r.deleted }));
       onDone();
     } catch (e) {
       toast(errMsg(e), 'error');
@@ -405,19 +407,19 @@ function BulkBar({ detail, ids, onDone }: { detail: WkDetail; ids: number[]; onD
   return (
     <div className="no-print sticky top-0 z-10 mb-3 space-y-2 rounded-md border border-zs-blue bg-blue-50 p-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <b>{ids.length} ausgewählt</b>
+        <b>{t('part.selected', { n: ids.length })}</b>
         <span className="text-slate-400">|</span>
-        <select className="input !w-auto py-1 text-sm" value={zug} onChange={(e) => setZug(e.target.value)} aria-label="Zug">
-          <option value="">Zug wählen …</option>
-          <option value="none">ohne Zug (Kdo)</option>
+        <select className="input !w-auto py-1 text-sm" value={zug} onChange={(e) => setZug(e.target.value)} aria-label={t('common.zug')}>
+          <option value="">{t('part.chooseZug')}</option>
+          <option value="none">{t('part.noZugKdo')}</option>
           {zuege.map((z) => (
             <option key={z.id} value={z.id}>
               {z.name}
             </option>
           ))}
         </select>
-        <Button className="py-1 text-xs" disabled={!zug} onClick={() => run({ zugId: zug === 'none' ? null : Number(zug) }, 'Zug zugewiesen')}>
-          Zug zuweisen
+        <Button className="py-1 text-xs" disabled={!zug} onClick={() => run({ zugId: zug === 'none' ? null : Number(zug) }, t('part.zugAssigned'))}>
+          {t('part.assignZug')}
         </Button>
         <span className="flex-1" />
         <Button variant="danger" className="py-1 text-xs" onClick={remove}>
@@ -425,7 +427,7 @@ function BulkBar({ detail, ids, onDone }: { detail: WkDetail; ids: number[]; onD
         </Button>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-slate-600">Diensttage:</span>
+        <span className="text-slate-600">{t('part.serviceDaysLabel')}</span>
         {days.map((d) => {
           const on = serve.includes(d);
           return (
@@ -436,16 +438,16 @@ function BulkBar({ detail, ids, onDone }: { detail: WkDetail; ids: number[]; onD
               onClick={() => setServe(on ? serve.filter((x) => x !== d) : [...serve, d].sort())}
               className={`rounded-full border px-2 py-0.5 text-xs ${on ? 'border-zs-blue bg-zs-blue text-white' : 'border-slate-300 bg-white text-slate-600'}`}
             >
-              {wk.avorDays.includes(d) ? 'AVOR ' : wk.kvkDays.includes(d) ? 'KVK ' : ''}
+              {wk.avorDays.includes(d) ? t('duty.AVOR') + ' ' : wk.kvkDays.includes(d) ? t('duty.KVK') + ' ' : ''}
               {fmtDate(d).slice(0, 6)}
             </button>
           );
         })}
-        <Button className="py-1 text-xs" disabled={!serve.length} onClick={() => run({ days: serve }, 'Diensttage gesetzt')}>
-          Tage setzen
+        <Button className="py-1 text-xs" disabled={!serve.length} onClick={() => run({ days: serve }, t('part.daysSet'))}>
+          {t('part.setDays')}
         </Button>
-        <Button className="py-1 text-xs" onClick={() => run({ days: [] }, 'ganzer WK')}>
-          Ganzer WK
+        <Button className="py-1 text-xs" onClick={() => run({ days: [] }, t('part.wholeWk'))}>
+          {t('part.wholeWkButton')}
         </Button>
       </div>
     </div>

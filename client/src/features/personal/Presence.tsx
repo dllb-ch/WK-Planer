@@ -1,15 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CheckIn, Diet, HealthCheck, Participant } from '@shared/types';
-import { DIET_LABEL, KDO_ID } from '@shared/types';
+import { DIETS, KDO_ID } from '@shared/types';
 import { canManagePersonnel, canMarkPresent } from '@shared/permissions';
-import { fmtDate, weekday, wkDays } from '@shared/util';
+import { fmtDate, wkDays } from '@shared/util';
+
+const weekday = (d: string) => weekdayIn(currentLang(), d);
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Button, Card, Empty, errMsg, useToast } from '../../components/ui';
 import { withKdo } from '../arbeitsprogramm/columns';
 import { ParticipantDialog } from './Participants';
 import { servesOn } from './PersonalPage';
+import { useT } from '../../i18n';
+import { weekdayIn } from '@shared/i18n';
+import { currentLang } from '../../lib/lang';
 
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Zurich' }).format(new Date());
 const time = (c: CheckIn) => new Date(c.createdAt.replace(' ', 'T') + 'Z').toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
@@ -23,6 +28,7 @@ const norm = (s: string) =>
 
 /** Presence of a day: per Zug planned / on the list / present, the list with check-ins, open matches and the meal count. */
 export function Presence({ detail }: { detail: WkDetail }) {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -95,21 +101,21 @@ export function Presence({ detail }: { detail: WkDetail }) {
           ))}
         </select>
         <span className="text-sm text-slate-600">
-          <b className="text-lg tabular-nums text-slate-900">{totalPresent}</b> eingecheckt
-          {people.length > 0 && <> von {people.length} auf der Liste</>}
+          <b className="text-lg tabular-nums text-slate-900">{totalPresent}</b> {t('pres.checkedIn')}
+          {people.length > 0 && t('pres.ofList', { n: people.length })}
         </span>
       </div>
 
       <div className="grid gap-4 md:grid-cols-[2fr,1fr]">
-        <Card title="Bestand pro Zug">
+        <Card title={t('pres.bestand')}>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-500">
-                <th className="py-1 pr-2">Zug</th>
-                <th className="py-1 pr-2 text-right">Soll</th>
-                <th className="py-1 pr-2 text-right">Liste</th>
-                <th className="py-1 pr-2 text-right">Anwesend</th>
-                <th className="py-1 text-right">Fehlend</th>
+                <th className="py-1 pr-2">{t('common.zug')}</th>
+                <th className="py-1 pr-2 text-right">{t('pres.soll')}</th>
+                <th className="py-1 pr-2 text-right">{t('pres.liste')}</th>
+                <th className="py-1 pr-2 text-right">{t('pres.present')}</th>
+                <th className="py-1 text-right">{t('pres.missing')}</th>
               </tr>
             </thead>
             <tbody>
@@ -124,7 +130,7 @@ export function Presence({ detail }: { detail: WkDetail }) {
               ))}
               {noZug.length > 0 && (
                 <tr className="border-t border-slate-100 text-slate-500">
-                  <td className="py-1 pr-2">ohne Zug</td>
+                  <td className="py-1 pr-2">{t('pres.noZug')}</td>
                   <td />
                   <td className="py-1 pr-2 text-right tabular-nums">{noZug.length}</td>
                   <td className="py-1 pr-2 text-right tabular-nums">{noZug.filter((p) => byParticipant.has(p.id)).length}</td>
@@ -133,7 +139,7 @@ export function Presence({ detail }: { detail: WkDetail }) {
               )}
               {unmatched.length > 0 && (
                 <tr className="border-t border-slate-100 text-amber-800">
-                  <td className="py-1 pr-2">nicht zugeordnet</td>
+                  <td className="py-1 pr-2">{t('pres.unassigned')}</td>
                   <td />
                   <td />
                   <td className="py-1 pr-2 text-right tabular-nums">{unmatched.length}</td>
@@ -143,27 +149,27 @@ export function Presence({ detail }: { detail: WkDetail }) {
             </tbody>
           </table>
         </Card>
-        <Card title="Verpflegung">
+        <Card title={t('pres.food')}>
           {ofDay.length === 0 ? (
-            <Empty>Noch niemand eingecheckt.</Empty>
+            <Empty>{t('pres.nobody')}</Empty>
           ) : (
             <>
               <ul className="space-y-0.5 text-sm">
-                {(Object.keys(DIET_LABEL) as Diet[]).map((d) => (
+                {DIETS.map((d: Diet) => (
                   <li key={d} className="flex justify-between">
-                    <span>{DIET_LABEL[d]}</span>
+                    <span>{t(`diet.${d}`)}</span>
                     <b className="tabular-nums">{meals.count[d]}</b>
                   </li>
                 ))}
               </ul>
               {meals.special.length > 0 && (
                 <div className="mt-2 border-t border-slate-100 pt-2 text-xs">
-                  <div className="font-medium text-slate-700">Unverträglichkeiten</div>
+                  <div className="font-medium text-slate-700">{t('pres.intolerances')}</div>
                   <ul>
                     {meals.special.map((s, i) => (
                       <li key={i}>
                         {s.name}: <b>{s.text}</b>
-                        {s.diet !== 'NORMAL' && ` (${DIET_LABEL[s.diet]})`}
+                        {s.diet !== 'NORMAL' && ` (${t(`diet.${s.diet}`)})`}
                       </li>
                     ))}
                   </ul>
@@ -175,8 +181,8 @@ export function Presence({ detail }: { detail: WkDetail }) {
       </div>
 
       {unmatched.length > 0 && (manage || me.role !== 'ZFHR') && (
-        <Card title={`Nicht zugeordnete Check-ins (${unmatched.length})`}>
-          <p className="mb-2 text-sm text-slate-600">Diese Personen wurden nicht eindeutig auf der Teilnehmerliste gefunden.</p>
+        <Card title={t('pres.unmatchedTitle', { n: unmatched.length })}>
+          <p className="mb-2 text-sm text-slate-600">{t('pres.unmatchedIntro')}</p>
           <ul className="divide-y divide-slate-100">
             {unmatched.map((c) => (
               <Unmatched
@@ -188,7 +194,7 @@ export function Presence({ detail }: { detail: WkDetail }) {
                 manage={manage}
                 onMatch={(participantId) => run(() => api.matchCheckin(wk.id, c.id, { participantId }))}
                 onAdd={() => setAdding(c)}
-                onDelete={() => confirm('Check-in löschen?') && run(() => api.deleteCheckin(wk.id, c.id))}
+                onDelete={() => confirm(t('pres.confirmDelete')) && run(() => api.deleteCheckin(wk.id, c.id))}
               />
             ))}
           </ul>
@@ -196,16 +202,16 @@ export function Presence({ detail }: { detail: WkDetail }) {
       )}
 
       <Card
-        title="Präsenzliste"
+        title={t('pers.praesenzliste')}
         actions={
           <Button onClick={() => window.print()} className="no-print">
-            Drucken
+            {t('common.print')}
           </Button>
         }
       >
         <div className="no-print mb-3 flex flex-wrap items-center gap-3 text-sm">
           <select className="input w-auto" value={zugFilter} onChange={(e) => setZugFilter(e.target.value ? Number(e.target.value) : '')}>
-            <option value="">Alle Züge</option>
+            <option value="">{t('part.allZuege')}</option>
             {zuege.map((z) => (
               <option key={z.id} value={z.id}>
                 {z.name}
@@ -213,21 +219,21 @@ export function Presence({ detail }: { detail: WkDetail }) {
             ))}
           </select>
           <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> nur fehlende
+            <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> {t('pres.onlyMissing')}
           </label>
         </div>
         {participants.isLoading ? (
-          <Empty>Laden …</Empty>
+          <Empty>{t('common.loading')}</Empty>
         ) : people.length === 0 ? (
-          <Empty>Keine Teilnehmerliste für diesen Tag. Sie wird im Bereich «Teilnehmerliste» importiert.</Empty>
+          <Empty>{t('pres.noList')}</Empty>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="w-10 py-1.5" />
-                <th className="py-1.5 pr-3">Name</th>
-                <th className="py-1.5 pr-3 max-sm:hidden">Funktion</th>
-                <th className="py-1.5 pr-3">Zug</th>
+                <th className="py-1.5 pr-3">{t('profile.name')}</th>
+                <th className="py-1.5 pr-3 max-sm:hidden">{t('admin.funktion')}</th>
+                <th className="py-1.5 pr-3">{t('common.zug')}</th>
                 <th className="py-1.5 pr-3">Check-in</th>
               </tr>
             </thead>
@@ -243,7 +249,7 @@ export function Presence({ detail }: { detail: WkDetail }) {
                         className="h-4 w-4"
                         checked={!!c}
                         disabled={!can}
-                        aria-label={`${p.vorname} ${p.nachname} anwesend`}
+                        aria-label={t('pres.presentOf', { name: `${p.vorname} ${p.nachname}` })}
                         onChange={(e) => run(() => api.setPresence(wk.id, p.id, date, e.target.checked))}
                       />
                     </td>
@@ -253,13 +259,13 @@ export function Presence({ detail }: { detail: WkDetail }) {
                     <td className="py-1.5 pr-3 text-xs">
                       {c ? (
                         <>
-                          {time(c)} {c.source === 'MANUAL' ? '(manuell)' : '(QR)'}
-                          {c.diet !== 'NORMAL' && <span className="ml-1 rounded bg-slate-100 px-1">{DIET_LABEL[c.diet]}</span>}
+                          {time(c)} {c.source === 'MANUAL' ? t('pres.manual') : '(QR)'}
+                          {c.diet !== 'NORMAL' && <span className="ml-1 rounded bg-slate-100 px-1">{t(`diet.${c.diet}`)}</span>}
                           {c.intolerances && <span className="ml-1 rounded bg-amber-100 px-1">{c.intolerances}</span>}
                           <HealthBadge h={healthOf.get(p.id)} />
                         </>
                       ) : (
-                        <span className="text-red-700">fehlt</span>
+                        <span className="text-red-700">{t('pres.missingShort')}</span>
                       )}
                     </td>
                   </tr>
@@ -273,7 +279,7 @@ export function Presence({ detail }: { detail: WkDetail }) {
       {adding && (
         <ParticipantDialog
           detail={detail}
-          title="Auf die Teilnehmerliste nehmen"
+          title={t('pres.addToList')}
           initial={{ nachname: adding.nachname, vorname: adding.vorname, email: adding.email, zugId: adding.zugId }}
           onClose={() => setAdding(null)}
           onSaved={refresh}
@@ -323,9 +329,10 @@ function Unmatched({
   onAdd: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useT();
   const [pick, setPick] = useState<number | ''>('');
   const sugg = suggestions(c, people);
-  const label = (p: Participant) => `${p.nachname} ${p.vorname}${p.zugId ? ` (${zugName(p.zugId)})` : ''}${taken.has(p.id) ? ' – bereits eingecheckt' : ''}`;
+  const label = (p: Participant) => `${p.nachname} ${p.vorname}${p.zugId ? ` (${zugName(p.zugId)})` : ''}${taken.has(p.id) ? t('pres.alreadyIn') : ''}`;
   return (
     <li className="space-y-1.5 py-2">
       <div className="text-sm">
@@ -345,7 +352,7 @@ function Unmatched({
             </button>
           ))}
           <select className="input w-auto py-0.5 text-xs" value={pick} onChange={(e) => setPick(e.target.value ? Number(e.target.value) : '')}>
-            <option value="">Andere Person …</option>
+            <option value="">{t('pres.otherPerson')}</option>
             {[...people]
               .sort((a, b) => a.nachname.localeCompare(b.nachname))
               .map((p) => (
@@ -355,13 +362,13 @@ function Unmatched({
               ))}
           </select>
           <Button className="py-0.5 text-xs" disabled={pick === ''} onClick={() => pick !== '' && onMatch(pick)}>
-            Zuordnen
+            {t('pres.assign')}
           </Button>
           <Button className="py-0.5 text-xs" onClick={onAdd}>
-            Neu auf Liste
+            {t('pres.newOnList')}
           </Button>
           <Button variant="ghost" className="py-0.5 text-xs text-red-700" onClick={onDelete}>
-            Löschen
+            {t('common.delete')}
           </Button>
         </div>
       )}
@@ -371,8 +378,9 @@ function Unmatched({
 
 /** Eintrittsbefragung of a present person: not asked, reported (to the Kursarzt) or a restriction. */
 function HealthBadge({ h }: { h: HealthCheck | undefined }) {
-  if (!h) return <span className="ml-1 rounded bg-slate-100 px-1 text-slate-600" title="Sanitarische Eintrittsbefragung fehlt">nicht befragt</span>;
-  if (h.restriction) return <span className="ml-1 rounded bg-sky-100 px-1 text-sky-900" title="Vom Kursarzt angeordnet">⚕ {h.restriction}</span>;
-  if (h.status === 'MELDUNG') return <span className="ml-1 rounded bg-orange-100 px-1 text-orange-900">⚕ zum Kursarzt</span>;
+  const { t } = useT();
+  if (!h) return <span className="ml-1 rounded bg-slate-100 px-1 text-slate-600" title={t('pres.healthMissing')}>{t('pres.notAsked')}</span>;
+  if (h.restriction) return <span className="ml-1 rounded bg-sky-100 px-1 text-sky-900" title={t('pres.byDoctor')}>⚕ {h.restriction}</span>;
+  if (h.status === 'MELDUNG') return <span className="ml-1 rounded bg-orange-100 px-1 text-orange-900">{t('pres.toDoctor')}</span>;
   return null;
 }

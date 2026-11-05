@@ -5,11 +5,15 @@ import { exportTable, importTable, type Column } from '../../lib/tableFile';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Area, Resource, ResourceKind } from '@shared/types';
 import { RESOURCE_KIND_LABEL } from '@shared/types';
+
+const KINDS: ResourceKind[] = ['FAHRZEUG', 'ANHAENGER', 'RAUM', 'GELAENDE'];
 import { canAdministrate, canManageResources } from '@shared/permissions';
 import { api } from '../../api';
 import { useUser } from '../../auth';
 import { Button, Card, errMsg, Field, Modal, useToast } from '../../components/ui';
 import { SwissMap } from '../../components/SwissMap';
+import { useT } from '../../i18n';
+import { currentT } from '../../lib/lang';
 
 /** Refreshes every cached catalogue (per Kp and per Bat). */
 export const invalidateResources = (qc: ReturnType<typeof useQueryClient>) =>
@@ -37,13 +41,14 @@ const kindOf = (s = ''): ResourceKind | null => {
 };
 
 export const OwnerBadge = ({ r }: { r: Resource }) =>
-  r.kpId === null ? <span className="rounded bg-indigo-100 px-1.5 text-[10px] font-medium text-indigo-800">Bataillon</span> : null;
+  r.kpId === null ? <span className="rounded bg-indigo-100 px-1.5 text-[10px] font-medium text-indigo-800">{currentT('cat.bat')}</span> : null;
 
 /**
  * Catalogue of vehicles, rooms and terrain. kpId is the Kp in context (its own material plus the shared material of
  * the Bataillon); null shows the Bataillon's shared material only.
  */
 export function Catalogue({ batId, kpId, resources, title }: { batId: number; kpId: number | null; resources: Resource[]; title?: string }) {
+  const { t } = useT();
   const me = useUser();
   const [edit, setEdit] = useState<Partial<Resource> | null>(null);
   const list = kpId === null ? resources.filter((r) => r.kpId === null) : resources;
@@ -53,7 +58,7 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
   const org = useQuery({ queryKey: ['org'], queryFn: api.org });
   const adminOrg = useQuery({ queryKey: ['admin-org'], queryFn: api.adminOrg, enabled: me.role === 'ADMIN' });
   const kompanien = (me.role === 'ADMIN' ? adminOrg.data?.find((b) => b.id === batId)?.kompanien : org.data?.kompanien) ?? [];
-  const kpName = (id: number | null) => (id === null ? 'Bataillon' : (kompanien.find((k) => k.id === id)?.name ?? ''));
+  const kpName = (id: number | null) => (id === null ? t('cat.bat') : (kompanien.find((k) => k.id === id)?.name ?? ''));
 
   const exportFile = (format: 'xlsx' | 'json') =>
     exportTable(
@@ -83,7 +88,7 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
     for (const row of rows) {
       const kind = kindOf(row.art);
       if (!kind || !row.bezeichnung) {
-        skipped.push(`${row.bezeichnung || '(ohne Bezeichnung)'}: Art oder Bezeichnung fehlt`);
+        skipped.push(t('cat.missing', { name: row.bezeichnung || t('cat.noName') }));
         continue;
       }
       const owner = !row.gehoertZu ? kpId : /^bataillon$/i.test(row.gehoertZu) ? null : (kompanien.find((k) => k.name === row.gehoertZu)?.id ?? -1);
@@ -92,7 +97,7 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
         continue;
       }
       if (!canManageResources(me, { batId, kpId: owner })) {
-        skipped.push(`${row.bezeichnung}: keine Berechtigung für «${kpName(owner)}»`);
+        skipped.push(t('cat.noRight', { name: row.bezeichnung, kp: kpName(owner) }));
         continue;
       }
       let area: Area | null = null;
@@ -113,28 +118,28 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
       }
     }
     invalidateResources(qc);
-    if (skipped.length) alert(`Nicht übernommen:\n${skipped.join('\n')}`);
+    if (skipped.length) alert(t('cat.notTaken', { list: skipped.join('\n') }));
     return `${created} neu, ${updated} aktualisiert${skipped.length ? `, ${skipped.length} übersprungen` : ''}`;
   };
   return (
     <Card
-      title={title ?? (kpId === null ? 'Material des Bataillons' : 'Katalog der Kompanie')}
+      title={title ?? (kpId === null ? t('cat.batTitle') : t('cat.kpTitle'))}
       actions={
         <>
           <ImportExportMenu onExport={exportFile} onImport={canAddShared || canAddKp ? importFile : undefined} />
         {(canAddShared || canAddKp) && (
           <Button onClick={() => setEdit({ kind: 'FAHRZEUG', category: '', name: '', description: '', capacity: '', seats: 0, nr: null, area: null, kpId: canAddKp ? kpId : null })}>
-            + Ressource
+            {t('cat.add')}
           </Button>
         )}
         </>
       }
     >
-      {kpId === null && <p className="mb-3 text-xs text-slate-500">Geteilt von allen Kompanien des Bataillons; alle Kompanien können es anfragen.</p>}
+      {kpId === null && <p className="mb-3 text-xs text-slate-500">{t('cat.shared')}</p>}
       <div className="grid gap-4 md:grid-cols-3">
-        {(Object.keys(RESOURCE_KIND_LABEL) as ResourceKind[]).map((k) => (
+        {KINDS.map((k) => (
           <div key={k}>
-            <h3 className="label">{RESOURCE_KIND_LABEL[k]}</h3>
+            <h3 className="label">{t(`resource.${k}`)}</h3>
             <ul className="space-y-1 text-sm">
               {list
                 .filter((r) => r.kind === k)
@@ -148,12 +153,12 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
                     </span>
                     {canManageResources(me, r) && (
                       <button className="text-xs text-slate-500 hover:text-zs-blue" onClick={() => setEdit(r)}>
-                        Bearbeiten
+                        {t('common.edit')}
                       </button>
                     )}
                   </li>
                 ))}
-              {!list.some((r) => r.kind === k) && <li className="text-xs text-slate-400">Keine Einträge</li>}
+              {!list.some((r) => r.kind === k) && <li className="text-xs text-slate-400">{t('cat.noEntries')}</li>}
             </ul>
           </div>
         ))}
@@ -164,6 +169,7 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
 }
 
 function ResourceDialog({ batId, kpId, initial, types, onClose }: { batId: number; kpId: number | null; initial: Partial<Resource>; types: string[]; onClose: () => void }) {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -182,7 +188,7 @@ function ResourceDialog({ batId, kpId, initial, types, onClose }: { batId: numbe
   const ownKp = initial.kpId ?? kpId;
   const scopes = [
     ...(canAdministrate(me, batId) ? [{ value: null, label: 'Bataillon (geteilt)' }] : []),
-    ...(ownKp !== null && canManageResources(me, { batId, kpId: ownKp }) ? [{ value: ownKp, label: 'Nur diese Kompanie' }] : []),
+    ...(ownKp !== null && canManageResources(me, { batId, kpId: ownKp }) ? [{ value: ownKp, label: t('cat.onlyKp') }] : []),
   ];
   const run = async (fn: () => Promise<unknown>) => {
     try {
@@ -196,54 +202,54 @@ function ResourceDialog({ batId, kpId, initial, types, onClose }: { batId: numbe
   const body = { ...r, area: r.kind === 'GELAENDE' && r.area && r.area.length >= 3 ? r.area : null };
   return (
     <Modal
-      title={initial.id ? 'Ressource bearbeiten' : 'Neue Ressource'}
+      title={initial.id ? t('cat.edit') : t('cat.new')}
       onClose={onClose}
       wide
       footer={
         <>
           {initial.id && (
-            <Button variant="danger" className="mr-auto" onClick={() => confirm('Ressource löschen?') && run(() => api.deleteResource(initial.id!))}>
-              Löschen
+            <Button variant="danger" className="mr-auto" onClick={() => confirm(t('cat.confirmDelete')) && run(() => api.deleteResource(initial.id!))}>
+              {t('common.delete')}
             </Button>
           )}
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
             disabled={!r.name.trim()}
             onClick={() => run(() => (initial.id ? api.updateResource(initial.id, body) : api.createResource(batId, body)))}
           >
-            Speichern
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="grid grid-cols-3 gap-3">
-        <Field label="Art">
+        <Field label={t('bd.type')}>
           <select className="input" value={r.kind} onChange={(e) => setR({ ...r, kind: e.target.value as ResourceKind })}>
-            {(Object.keys(RESOURCE_KIND_LABEL) as ResourceKind[]).map((k) => (
+            {KINDS.map((k) => (
               <option key={k} value={k}>
-                {RESOURCE_KIND_LABEL[k]}
+                {t(`resource.${k}`)}
               </option>
             ))}
           </select>
         </Field>
         <div className="col-span-2 grid grid-cols-[5rem,1fr] gap-3">
-          <Field label="Nr.">
+          <Field label={t('cat.nr')}>
             <input
               type="number"
               min={0}
               className="input"
               value={r.nr ?? ''}
-              title="Nummerierte werden zuerst und nach Nummer sortiert angezeigt"
+              title={t('cat.nrHint')}
               onChange={(e) => setR({ ...r, nr: e.target.value === '' ? null : Math.max(0, Math.round(Number(e.target.value))) })}
             />
           </Field>
-          <Field label="Bezeichnung">
+          <Field label={t('dash.designation')}>
             <input className="input" value={r.name} onChange={(e) => setR({ ...r, name: e.target.value })} />
           </Field>
         </div>
-        <Field label="Typ (für Anfragen nach Anzahl)">
-          <input className="input" list="res-types" value={r.category} onChange={(e) => setR({ ...r, category: e.target.value })} placeholder="z. B. Mannschaftsbus" />
+        <Field label={t('cat.typeLabel')}>
+          <input className="input" list="res-types" value={r.category} onChange={(e) => setR({ ...r, category: e.target.value })} placeholder={t('cat.typePh')} />
           <datalist id="res-types">
             {[...new Set(types)].map((t) => (
               <option key={t} value={t} />
@@ -251,7 +257,7 @@ function ResourceDialog({ batId, kpId, initial, types, onClose }: { batId: numbe
           </datalist>
         </Field>
         {r.kind === 'FAHRZEUG' ? (
-          <Field label="Sitzplätze (inkl. Fahrer)">
+          <Field label={t('cat.seats')}>
             <input
               type="number"
               min={0}
@@ -265,14 +271,14 @@ function ResourceDialog({ batId, kpId, initial, types, onClose }: { batId: numbe
             />
           </Field>
         ) : (
-          <Field label="Kapazität">
-            <input className="input" value={r.capacity} onChange={(e) => setR({ ...r, capacity: e.target.value })} placeholder="40 Pers." />
+          <Field label={t('cat.capacity')}>
+            <input className="input" value={r.capacity} onChange={(e) => setR({ ...r, capacity: e.target.value })} placeholder={t('cat.capacityPh')} />
           </Field>
         )}
-        <Field label="Beschreibung / Ausstattung" className="col-span-3">
+        <Field label={t('cat.description')} className="col-span-3">
           <input className="input" value={r.description} onChange={(e) => setR({ ...r, description: e.target.value })} />
         </Field>
-        <Field label="Gehört zu" className="col-span-3">
+        <Field label={t('setup.belongsTo')} className="col-span-3">
           <select
             className="input"
             value={r.kpId ?? ''}

@@ -7,6 +7,7 @@ import { fmtDate } from '@shared/util';
 import { api } from '../../api';
 import { useUser } from '../../auth';
 import { Button, errMsg, useToast } from '../../components/ui';
+import { useT } from '../../i18n';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -38,6 +39,7 @@ export function PendenzList({
   newFor?: Pick<PendenzInput, 'rapportId' | 'traktandumKey' | 'zugId'>;
   showSource?: boolean;
 }) {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -65,8 +67,8 @@ export function PendenzList({
     return r ? `${r.title} ${fmtDate(r.date).slice(0, 6)}` : '';
   };
   const whoSelect = (value: number | null, onChange: (v: number | null) => void) => (
-    <select className="input w-auto py-1 text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)} aria-label="Wer">
-      <option value="">– wer –</option>
+    <select className="input w-auto py-1 text-xs" value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)} aria-label={t('rap.who')}>
+      <option value="">{t('pend.whoChoose')}</option>
       {people.map((u) => (
         <option key={u.id} value={u.id}>
           {u.name}
@@ -90,7 +92,7 @@ export function PendenzList({
                   className="mt-0.5 h-4 w-4"
                   checked={p.done}
                   disabled={!tick}
-                  aria-label="erledigt"
+                  aria-label={t('pend.doneLower')}
                   onChange={(e) => run(() => api.tickPendenz(wk.id, p.id, e.target.checked))}
                 />
                 {editing === p.id ? (
@@ -99,7 +101,7 @@ export function PendenzList({
                     whoSelect={whoSelect}
                     onCancel={() => setEditing(null)}
                     onSave={(b) => run(async () => (await api.updatePendenz(wk.id, p.id, b), setEditing(null)))}
-                    onDelete={() => confirm('Pendenz löschen?') && run(() => api.deletePendenz(wk.id, p.id))}
+                    onDelete={() => confirm(t('pend.confirmDelete')) && run(() => api.deletePendenz(wk.id, p.id))}
                   />
                 ) : (
                   <>
@@ -107,11 +109,11 @@ export function PendenzList({
                       {p.text}
                       {showSource && p.rapportId && <span className="ml-1 text-xs text-slate-400 no-underline">· {rapTitle(p.rapportId)}</span>}
                     </span>
-                    <span className="text-xs text-slate-600">{p.responsibleName || <span className="text-slate-400">wer?</span>}</span>
+                    <span className="text-xs text-slate-600">{p.responsibleName || <span className="text-slate-400">{t('pend.whoQ')}</span>}</span>
                     {p.dueDate && <span className={`text-xs tabular-nums ${overdue ? 'font-semibold text-red-600' : 'text-slate-500'}`}>bis {fmtDate(p.dueDate)}</span>}
                     {p.done && <span className="text-xs text-emerald-700">✓ {p.doneByName}</span>}
                     {edit && (
-                      <button className="no-print text-xs text-slate-400 hover:text-zs-blue" onClick={() => setEditing(p.id)} aria-label="Bearbeiten">
+                      <button className="no-print text-xs text-slate-400 hover:text-zs-blue" onClick={() => setEditing(p.id)} aria-label={t('common.edit')}>
                         ✎
                       </button>
                     )}
@@ -126,15 +128,15 @@ export function PendenzList({
         <div className="no-print flex flex-wrap items-center gap-1.5">
           <input
             className="input min-w-[12rem] flex-1 py-1 text-sm"
-            placeholder="+ Pendenz / Auftrag (Enter)"
+            placeholder={t('pend.addPh')}
             value={draft.text}
             onChange={(e) => setDraft({ ...draft, text: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && add()}
           />
           {whoSelect(draft.responsibleUserId, (responsibleUserId) => setDraft({ ...draft, responsibleUserId }))}
-          <input type="date" className="input w-auto py-1 text-xs" value={draft.dueDate} onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })} aria-label="Bis wann" />
+          <input type="date" className="input w-auto py-1 text-xs" value={draft.dueDate} onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })} aria-label={t('rap.until')} />
           <Button className="py-1 text-xs" disabled={!draft.text.trim()} onClick={add}>
-            Hinzufügen
+            {t('common.add')}
           </Button>
         </div>
       )}
@@ -155,20 +157,21 @@ function EditRow({
   onCancel: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useT();
   const [b, setB] = useState({ text: p.text, responsibleUserId: p.responsibleUserId, dueDate: p.dueDate, traktandumKey: p.traktandumKey });
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
       <input className="input min-w-[12rem] flex-1 py-1 text-sm" value={b.text} autoFocus onChange={(e) => setB({ ...b, text: e.target.value })} />
       {whoSelect(b.responsibleUserId, (responsibleUserId) => setB({ ...b, responsibleUserId }))}
-      <input type="date" className="input w-auto py-1 text-xs" value={b.dueDate} onChange={(e) => setB({ ...b, dueDate: e.target.value })} aria-label="Bis wann" />
+      <input type="date" className="input w-auto py-1 text-xs" value={b.dueDate} onChange={(e) => setB({ ...b, dueDate: e.target.value })} aria-label={t('rap.until')} />
       <Button className="py-1 text-xs" variant="primary" disabled={!b.text.trim()} onClick={() => onSave(b)}>
-        OK
+        {t('pend.ok')}
       </Button>
       <Button className="py-1 text-xs" onClick={onCancel}>
-        Abbrechen
+        {t('common.cancel')}
       </Button>
       <Button className="py-1 text-xs" variant="ghost" onClick={onDelete}>
-        Löschen
+        {t('common.delete')}
       </Button>
     </div>
   );

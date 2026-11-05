@@ -5,11 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import type { Block, RapportSchema } from '@shared/types';
 import { canCreateRapport } from '@shared/permissions';
 import { RAPPORT_SCHEMAS } from '@shared/rapport';
-import { fmtDate, fmtTime, parseTime, weekday, wkDays } from '@shared/util';
+import { fmtDate, fmtTime, parseTime, wkDays } from '@shared/util';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Button, Card, Empty, errMsg, Field, Modal, useToast } from '../../components/ui';
 import { PendenzList } from './Pendenzen';
+import { useT } from '../../i18n';
 
 /** Before or on AVOR days: preparation Rapport; during the WK: Kaderrapport. */
 export const schemaFor = (detail: WkDetail, date: string): RapportSchema =>
@@ -17,6 +18,7 @@ export const schemaFor = (detail: WkDetail, date: string): RapportSchema =>
 
 /** `part`: the Rapporte (tab «Rapporte») or all Pendenzen (tab «Pendenzen»). */
 export function RapportePage({ detail, part = 'rapporte' }: { detail: WkDetail; part?: 'rapporte' | 'pendenzen' }) {
+  const { t, weekdayShort } = useT();
   const me = useUser();
   const { wk, zuege, blocks } = detail;
   const rapporte = useQuery({ queryKey: ['rapporte', wk.id], queryFn: () => api.rapporte(wk.id) });
@@ -38,19 +40,19 @@ export function RapportePage({ detail, part = 'rapporte' }: { detail: WkDetail; 
       <div className="mx-auto w-full max-w-5xl space-y-4 p-3 sm:p-6">
         {part === 'rapporte' && (
         <Card
-          title="Rapporte"
+          title={t('rap.title')}
           actions={
             canNew && (
               <Button variant="primary" onClick={() => setCreating({})}>
-                + Rapport
+                {t('rap.add')}
               </Button>
             )
           }
         >
           {rapporte.isLoading ? (
-            <Empty>Laden …</Empty>
+            <Empty>{t('common.loading')}</Empty>
           ) : list.length === 0 ? (
-            <Empty>Noch keine Rapporte. Protokolle werden nach dem Schema des Handbuchs (Traktanden) geführt.</Empty>
+            <Empty>{t('rap.none')}</Empty>
           ) : (
             <ul className="divide-y divide-slate-100">
               {list.map((r) => {
@@ -59,11 +61,11 @@ export function RapportePage({ detail, part = 'rapporte' }: { detail: WkDetail; 
                   <li key={r.id}>
                     <Link to={`${r.id}`} className="flex flex-wrap items-baseline gap-x-3 py-2 hover:bg-slate-50">
                       <span className="w-32 shrink-0 text-sm tabular-nums text-slate-500">
-                        {weekday(r.date).slice(0, 2)} {fmtDate(r.date)} {r.startMin !== null && fmtTime(r.startMin)}
+                        {weekdayShort(r.date)} {fmtDate(r.date)} {r.startMin !== null && fmtTime(r.startMin)}
                       </span>
                       <span className="min-w-0 flex-1 font-medium text-zs-blue">{r.title}</span>
                       <span className="rounded bg-slate-100 px-1.5 text-xs text-slate-600">{zugName(r.zugId)}</span>
-                      <span className="text-xs text-slate-500">{RAPPORT_SCHEMAS[r.schema].label}</span>
+                      <span className="text-xs text-slate-500">{t(`rap.schema.${r.schema}.label`)}</span>
                       {open > 0 && <span className="text-xs font-medium text-amber-700">{open} Pendenzen offen</span>}
                       <span className={`text-xs ${r.status === 'ABGESCHLOSSEN' ? 'text-emerald-700' : 'text-slate-400'}`}>
                         {r.status === 'ABGESCHLOSSEN' ? 'abgeschlossen' : 'offen'}
@@ -76,7 +78,7 @@ export function RapportePage({ detail, part = 'rapporte' }: { detail: WkDetail; 
           )}
           {planned.length > 0 && (
             <div className="mt-3 border-t border-slate-100 pt-3">
-              <div className="label">Im Arbeitsprogramm geplant, noch ohne Protokoll</div>
+              <div className="label">{t('rap.plannedNoProtocol')}</div>
               <ul className="space-y-1 text-sm">
                 {planned.map((b) => {
                   const zugId = zugOfBlock(b);
@@ -84,7 +86,7 @@ export function RapportePage({ detail, part = 'rapporte' }: { detail: WkDetail; 
                   return (
                     <li key={b.id} className="flex flex-wrap items-center gap-x-3">
                       <span className="w-32 shrink-0 tabular-nums text-slate-500">
-                        {weekday(b.date).slice(0, 2)} {fmtDate(b.date)} {fmtTime(b.startMin)}
+                        {weekdayShort(b.date)} {fmtDate(b.date)} {fmtTime(b.startMin)}
                       </span>
                       <span className="flex-1">
                         {b.title} <span className="text-xs text-slate-400">({zugName(zugId)})</span>
@@ -94,7 +96,7 @@ export function RapportePage({ detail, part = 'rapporte' }: { detail: WkDetail; 
                           className="py-0.5 text-xs"
                           onClick={() => setCreating({ blockId: b.id, zugId, title: b.title, date: b.date, startMin: b.startMin, schema: schemaFor(detail, b.date) })}
                         >
-                          Protokoll anlegen
+                          {t('rap.createProtocol')}
                         </Button>
                       )}
                     </li>
@@ -108,7 +110,7 @@ export function RapportePage({ detail, part = 'rapporte' }: { detail: WkDetail; 
 
         {part === 'pendenzen' && (
         <Card
-          title="Pendenzen"
+          title={t('rap.pendenzen')}
           actions={
             <div className="flex gap-1">
               {(['offen', 'meine', 'alle'] as const).map((f) => (
@@ -117,13 +119,13 @@ export function RapportePage({ detail, part = 'rapporte' }: { detail: WkDetail; 
                   onClick={() => setFilter(f)}
                   className={`rounded-full border px-2.5 py-0.5 text-xs ${filter === f ? 'border-zs-blue bg-blue-50 text-zs-blue' : 'border-slate-300 text-slate-600'}`}
                 >
-                  {f === 'offen' ? 'Offen' : f === 'meine' ? 'Meine' : 'Alle'}
+                  {t(`rap.filter.${f}`)}
                 </button>
               ))}
             </div>
           }
         >
-          {shownPendenzen.length === 0 && <Empty>Keine Pendenzen.</Empty>}
+          {shownPendenzen.length === 0 && <Empty>{t('rap.noPendenzen')}</Empty>}
           <PendenzList wk={wk} items={shownPendenzen} rapporte={list} showSource />
         </Card>
         )}
@@ -144,6 +146,7 @@ interface NewRapport {
 }
 
 function NewRapportDialog({ detail, initial, onClose }: { detail: WkDetail; initial: Partial<NewRapport>; onClose: () => void }) {
+  const { t, weekdayShort } = useT();
   const me = useUser();
   const nav = useNavigate();
   const toast = useToast();
@@ -166,7 +169,7 @@ function NewRapportDialog({ detail, initial, onClose }: { detail: WkDetail; init
   });
   const create = async () => {
     try {
-      const r = await api.createRapport(wk.id, { ...f, title: f.title.trim() || RAPPORT_SCHEMAS[f.schema].label });
+      const r = await api.createRapport(wk.id, { ...f, title: f.title.trim() || t(`rap.schema.${f.schema}.label`) });
       nav(`${r.id}`);
     } catch (e) {
       toast(errMsg(e), 'error');
@@ -174,23 +177,23 @@ function NewRapportDialog({ detail, initial, onClose }: { detail: WkDetail; init
   };
   return (
     <Modal
-      title="Neuer Rapport"
+      title={t('rap.new')}
       onClose={onClose}
       wide
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!f.date} onClick={create}>
-            Anlegen
+            {t('erk.create')}
           </Button>
         </>
       }
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Titel">
-          <input className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="z. B. Kaderrapport" />
+        <Field label={t('common.title')}>
+          <input className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder={t('rap.titlePh')} />
         </Field>
-        <Field label="Für">
+        <Field label={t('std.for')}>
           <select
             className="input"
             value={f.zugId ?? ''}
@@ -204,11 +207,11 @@ function NewRapportDialog({ detail, initial, onClose }: { detail: WkDetail; init
             ))}
           </select>
         </Field>
-        <Field label="Datum">
+        <Field label={t('common.date')}>
           <input type="date" className="input" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Zeit">
+          <Field label={t('common.time')}>
             <input
               type="time"
               className="input"
@@ -216,16 +219,16 @@ function NewRapportDialog({ detail, initial, onClose }: { detail: WkDetail; init
               onChange={(e) => setF({ ...f, startMin: e.target.value ? parseTime(e.target.value) : null })}
             />
           </Field>
-          <Field label="Ort">
+          <Field label={t('rap.ort')}>
             <input className="input" value={f.ort} onChange={(e) => setF({ ...f, ort: e.target.value })} />
           </Field>
         </div>
       </div>
       <div>
-        <span className="label">Schema (Handbuch Führung im Zivilschutz)</span>
+        <span className="label">{t('rap.schema')}</span>
         <div className="grid gap-2 sm:grid-cols-2">
           {(Object.keys(RAPPORT_SCHEMAS) as RapportSchema[]).map((k) => {
-            const s = RAPPORT_SCHEMAS[k];
+            const s = { label: t(`rap.schema.${k}.label`), hint: t(`rap.schema.${k}.hint`), traktanden: RAPPORT_SCHEMAS[k].traktanden };
             const on = f.schema === k;
             return (
               <button
@@ -239,8 +242,8 @@ function NewRapportDialog({ detail, initial, onClose }: { detail: WkDetail; init
                 <div className="text-xs text-slate-500">{s.hint}</div>
                 {on && (
                   <ol className="mt-1 list-decimal pl-4 text-xs text-slate-600">
-                    {s.traktanden.map((t) => (
-                      <li key={t.key}>{t.title}</li>
+                    {s.traktanden.map((x) => (
+                      <li key={x.key}>{x.title}</li>
                     ))}
                   </ol>
                 )}

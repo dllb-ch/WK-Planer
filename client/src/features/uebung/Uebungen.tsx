@@ -195,7 +195,7 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
       <div className="mx-auto w-full max-w-5xl space-y-4 p-3 sm:p-6">
         <div className="no-print flex flex-wrap items-center gap-2">
           <Link to="../uebungen" className="text-sm text-slate-500 hover:text-zs-blue">
-            ← Übungen
+            {t('ueb.back')}
           </Link>
           <div className="flex flex-wrap gap-1">
             {parts.map((p) => (

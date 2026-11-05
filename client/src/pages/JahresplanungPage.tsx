@@ -178,7 +178,7 @@ export function JahresplanungPage() {
       <div className="mx-auto w-full max-w-7xl space-y-4 p-3 sm:p-6 print:max-w-none print:p-0">
         <Briefkopf printOnly compact title={t('yp.printTitle', { year })} subtitle={view === 'monat' ? `${monthName(month)} ${year}` : org.data?.bataillon.name} />
         <div className="no-print flex flex-wrap items-center gap-2">
-          <h1 className="mr-2 text-xl font-semibold">Jahresplanung</h1>
+          <h1 className="mr-2 text-xl font-semibold">{t('nav.yearPlan')}</h1>
           <div className="flex items-center gap-1">
             <Button className="!px-2.5" aria-label={t('yp.prevYear')} onClick={() => setYear(year - 1)}>
               ‹
@@ -607,7 +607,7 @@ function Summary({ year, kps, zuege, wks, onEdit }: { year: number; kps: Kompani
   return (
     <Card title={`Dienstleistungen ${year}`} className="break-inside-avoid print:break-before-page">
       {wks.length === 0 ? (
-        <Empty>Für {year} ist noch nichts geplant.</Empty>
+        <Empty>{t('yp.nothingPlanned', { year })}</Empty>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -745,7 +745,7 @@ function DayDialog({
       </ul>
       {plan && free.length > 0 && (
         <section className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-          <h3 className="label !mb-0">Planen</h3>
+          <h3 className="label !mb-0">{t('yp.planHeading')}</h3>
           {kpId === null && (
             <Field label={t('common.kompanie')}>
               <select
@@ -878,7 +878,7 @@ function PlanDialog({
           )}
           {wk && (
             <Link to={`/wk/${wk.id}`} className="mr-auto self-center text-sm text-zs-blue hover:underline">
-              WK öffnen →
+              {t('yp.openWk')}
             </Link>
           )}
           <Button onClick={onClose}>{ro ? t('common.close') : t('common.cancel')}</Button>

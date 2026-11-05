@@ -11,6 +11,20 @@ import { lektionen } from './lektionen';
 import { uebung } from './uebung';
 import { erkundung_check } from './erkundung_check';
 import { erkundung } from './erkundung';
+import { zug } from './zug';
+import { gruppen } from './gruppen';
+import { personal } from './personal';
+import { praesenz } from './praesenz';
+import { ressourcen } from './ressourcen';
+import { anfrage } from './anfrage';
+import { rapporte } from './rapporte';
+import { uebersicht } from './uebersicht';
+import { komponenten } from './komponenten';
+import { komponenten2 } from './komponenten2';
+import { rest } from './rest';
+import { rest2 } from './rest2';
+import { rest3 } from './rest3';
+import { rest4 } from './rest4';
 // AREA-IMPORTS
 
 export const AREAS = {
@@ -25,6 +39,20 @@ export const AREAS = {
   ...uebung,
   ...erkundung_check,
   ...erkundung,
+  ...zug,
+  ...gruppen,
+  ...personal,
+  ...praesenz,
+  ...ressourcen,
+  ...anfrage,
+  ...rapporte,
+  ...uebersicht,
+  ...komponenten,
+  ...komponenten2,
+  ...rest,
+  ...rest2,
+  ...rest3,
+  ...rest4,
   // AREA-SPREAD
 };
 export type AreaKey = keyof typeof AREAS;

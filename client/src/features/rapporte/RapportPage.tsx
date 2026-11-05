@@ -3,20 +3,21 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Pendenz, Rapport, RapportInput, Traktandum } from '@shared/types';
-import { DIET_LABEL, ROLE_LABEL } from '@shared/types';
+import { DIETS } from '@shared/types';
 import { canCreateRapport, canEditRapport, canViewPersonnel } from '@shared/permissions';
-import { RAPPORT_SCHEMAS } from '@shared/rapport';
-import { fmtDate, fmtTime, parseTime, weekday } from '@shared/util';
+import { fmtDate, fmtTime, parseTime } from '@shared/util';
 import { api, ApiError, type WkDetail } from '../../api';
 import { Briefkopf, usePrintPage } from '../../components/Briefkopf';
 import { useUser } from '../../auth';
 import { Button, errMsg, Field, TextArea, useToast } from '../../components/ui';
 import { requestLabel } from '../ressourcen/conflicts';
 import { PendenzList, useKpPeople } from './Pendenzen';
+import { useT } from '../../i18n';
 
 const strip = ({ id: _i, wkId: _w, createdBy: _c, updatedAt: _u, ...rest }: Rapport): RapportInput => rest;
 
 export function RapportPage({ detail }: { detail: WkDetail }) {
+  const { t, weekday } = useT();
   const { rid } = useParams();
   const me = useUser();
   const nav = useNavigate();
@@ -79,8 +80,8 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
     [wk.id, id],
   );
 
-  if (q.error) return <div className="p-6 text-slate-600">{q.error instanceof ApiError && q.error.status === 404 ? 'Rapport nicht gefunden.' : errMsg(q.error)}</div>;
-  if (!f || !q.data) return <div className="p-6 text-slate-500">Laden …</div>;
+  if (q.error) return <div className="p-6 text-slate-600">{q.error instanceof ApiError && q.error.status === 404 ? t('rap.notFound') : errMsg(q.error)}</div>;
+  if (!f || !q.data) return <div className="p-6 text-slate-500">{t('common.loading')}</div>;
 
   const rap = q.data;
   const editable = canEditRapport(me, wk, rap);
@@ -91,7 +92,7 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
   const earlier = (pendenzen.data ?? []).filter(
     (p) => p.rapportId !== rap.id && !p.done && (rap.zugId === null || p.zugId === rap.zugId) && (rapporte.data ?? []).some((r) => r.id === p.rapportId && r.date <= rap.date),
   );
-  const zugName = rap.zugId === null ? 'Kompanie' : (zuege.find((z) => z.id === rap.zugId)?.name ?? '');
+  const zugName = rap.zugId === null ? t('common.kompanie') : (zuege.find((z) => z.id === rap.zugId)?.name ?? '');
   const name = (uid: number | null) => people.find((p) => p.id === uid)?.name ?? '';
 
   const setT = (i: number, patch: Partial<Traktandum>) => set({ traktanden: f.traktanden.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
@@ -100,11 +101,11 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
     [t[i], t[i + d]] = [t[i + d], t[i]];
     set({ traktanden: t });
   };
-  const addT = () => set({ traktanden: [...f.traktanden, { key: `t${Date.now().toString(36)}`, title: 'Neues Traktandum', hint: '', notes: '' }] });
+  const addT = () => set({ traktanden: [...f.traktanden, { key: `t${Date.now().toString(36)}`, title: t('rap.newTraktandum'), hint: '', notes: '' }] });
   const removeT = (i: number) => {
-    const t = f.traktanden[i];
-    if (mine.some((p) => p.traktandumKey === t.key)) return toast('Das Traktandum hat Pendenzen – zuerst diese verschieben oder löschen', 'error');
-    if ((!t.notes.trim() || confirm(`«${t.title}» mit Notizen entfernen?`)) && true) set({ traktanden: f.traktanden.filter((_, j) => j !== i) });
+    const x = f.traktanden[i];
+    if (mine.some((p) => p.traktandumKey === x.key)) return toast(t('rap.traktandumHasPendenzen'), 'error');
+    if ((!x.notes.trim() || confirm(t('rap.confirmRemoveT', { title: x.title }))) && true) set({ traktanden: f.traktanden.filter((_, j) => j !== i) });
   };
 
   const followUp = async () => {
@@ -116,7 +117,7 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
     }
   };
   const remove = async () => {
-    if (!confirm('Rapport löschen? Seine Pendenzen bleiben erhalten.')) return;
+    if (!confirm(t('rap.confirmDelete'))) return;
     try {
       latest.current = null;
       clearTimeout(timer.current);
@@ -137,20 +138,20 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
           </Link>
           <span className="flex-1" />
           <span className="text-xs text-slate-500">
-            {state === 'saving' ? 'Speichern …' : state === 'dirty' ? 'Ungespeichert' : state === 'error' ? 'Nicht gespeichert' : editable ? 'Gespeichert' : 'nur lesen'}
+            {state !== 'saved' || editable ? t(`save.${state}`) : t('ueb.readOnly')}
           </span>
-          <Button onClick={() => window.print()}>Drucken / PDF</Button>
-          {canCreateRapport(me, wk, rap.zugId) && <Button onClick={followUp}>Folgerapport</Button>}
+          <Button onClick={() => window.print()}>{t('av.printPdf')}</Button>
+          {canCreateRapport(me, wk, rap.zugId) && <Button onClick={followUp}>{t('rap.followUp')}</Button>}
           {editable && (
             <Button variant={closed ? 'secondary' : 'primary'} onClick={() => set({ status: closed ? 'OFFEN' : 'ABGESCHLOSSEN' })}>
-              {closed ? 'Wieder öffnen' : 'Abschliessen'}
+              {closed ? t('wk.reopen') : t('rap.close')}
             </Button>
           )}
         </div>
 
         <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-xs text-slate-500">
-            {RAPPORT_SCHEMAS[f.schema].label} · {zugName}
+            {t(`rap.schema.${f.schema}.label`)} · {zugName}
             {closed && <span className="ml-2 rounded bg-emerald-100 px-1.5 text-emerald-800">abgeschlossen</span>}
           </div>
           <input
@@ -158,13 +159,13 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
             value={f.title}
             disabled={!writable}
             onChange={(e) => set({ title: e.target.value })}
-            aria-label="Titel"
+            aria-label={t('common.title')}
           />
           <div className="grid gap-3 sm:grid-cols-4">
-            <Field label="Datum">
+            <Field label={t('common.date')}>
               <input type="date" className="input" value={f.date} disabled={!writable} onChange={(e) => e.target.value && set({ date: e.target.value })} />
             </Field>
-            <Field label="Zeit">
+            <Field label={t('common.time')}>
               <input
                 type="time"
                 className="input"
@@ -173,16 +174,16 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
                 onChange={(e) => set({ startMin: e.target.value ? parseTime(e.target.value) : null })}
               />
             </Field>
-            <Field label="Ort" className="sm:col-span-2">
+            <Field label={t('rap.ort')} className="sm:col-span-2">
               <input className="input" value={f.ort} disabled={!writable} onChange={(e) => set({ ort: e.target.value })} />
             </Field>
             {(['leitungUserId', 'protokollUserId'] as const).map((k) => (
-              <Field key={k} label={k === 'leitungUserId' ? 'Leitung' : 'Protokoll'} className="sm:col-span-2">
+              <Field key={k} label={k === 'leitungUserId' ? t('rap.leitung') : t('rap.protokoll')} className="sm:col-span-2">
                 <select className="input" value={f[k] ?? ''} disabled={!writable} onChange={(e) => set({ [k]: e.target.value ? Number(e.target.value) : null })}>
                   <option value="">–</option>
                   {people.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name} ({u.funktion || ROLE_LABEL[u.role]})
+                      {u.name} ({u.funktion || t(`role.${u.role}`)})
                     </option>
                   ))}
                 </select>
@@ -190,7 +191,7 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
             ))}
           </div>
           <div>
-            <span className="label">Teilnehmende</span>
+            <span className="label">{t('rap.participants')}</span>
             <div className="flex flex-wrap gap-1.5">
               {people
                 .filter((u) => writable || f.teilnehmerIds.includes(u.id))
@@ -208,63 +209,63 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
                     >
                       {on ? '✓ ' : ''}
                       {u.name}
-                      <span className={on ? 'text-blue-100' : 'text-slate-400'}> · {u.funktion || ROLE_LABEL[u.role]}</span>
+                      <span className={on ? 'text-blue-100' : 'text-slate-400'}> · {u.funktion || t(`role.${u.role}`)}</span>
                     </button>
                   );
                 })}
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Abwesend / entschuldigt">
+            <Field label={t('rap.absent')}>
               <input className="input" value={f.abwesend} disabled={!writable} onChange={(e) => set({ abwesend: e.target.value })} />
             </Field>
-            <Field label="Gäste / weitere">
+            <Field label={t('rap.guests')}>
               <input className="input" value={f.gaeste} disabled={!writable} onChange={(e) => set({ gaeste: e.target.value })} />
             </Field>
           </div>
         </section>
 
         <ol className="space-y-3">
-          {f.traktanden.map((t, i) => (
-            <li key={t.key} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          {f.traktanden.map((tk, i) => (
+            <li key={tk.key} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zs-blue text-xs font-semibold text-white">{i + 1}</span>
                 <input
                   className="min-w-0 flex-1 border-0 bg-transparent p-0 font-semibold focus:ring-0 disabled:text-slate-900"
-                  value={t.title}
+                  value={tk.title}
                   disabled={!writable}
                   onChange={(e) => setT(i, { title: e.target.value })}
-                  aria-label="Traktandum"
+                  aria-label={t('rap.traktandum')}
                 />
                 {writable && (
                   <span className="flex gap-0.5 text-slate-400">
-                    <button disabled={i === 0} onClick={() => move(i, -1)} className="px-1 hover:text-zs-blue disabled:opacity-30" aria-label="Nach oben">
+                    <button disabled={i === 0} onClick={() => move(i, -1)} className="px-1 hover:text-zs-blue disabled:opacity-30" aria-label={t('tpl.up')}>
                       ↑
                     </button>
-                    <button disabled={i === f.traktanden.length - 1} onClick={() => move(i, 1)} className="px-1 hover:text-zs-blue disabled:opacity-30" aria-label="Nach unten">
+                    <button disabled={i === f.traktanden.length - 1} onClick={() => move(i, 1)} className="px-1 hover:text-zs-blue disabled:opacity-30" aria-label={t('tpl.down')}>
                       ↓
                     </button>
-                    <button onClick={() => removeT(i)} className="px-1 hover:text-red-600" aria-label="Entfernen">
+                    <button onClick={() => removeT(i)} className="px-1 hover:text-red-600" aria-label={t('common.remove')}>
                       ✕
                     </button>
                   </span>
                 )}
               </div>
-              {t.hint && <p className="ml-8 text-xs text-slate-500">{t.hint}</p>}
+              {tk.hint && <p className="ml-8 text-xs text-slate-500">{tk.hint}</p>}
               <div className="ml-8 mt-2 space-y-2">
-                <Facts detail={detail} rap={rap} t={t} earlier={earlier} />
+                <Facts detail={detail} rap={rap} t={tk} earlier={earlier} />
                 <TextArea
-                  rows={Math.min(14, Math.max(2, t.notes.split('\n').length + 1))}
-                  value={t.notes}
+                  rows={Math.min(14, Math.max(2, tk.notes.split('\n').length + 1))}
+                  value={tk.notes}
                   disabled={!writable}
-                  placeholder={writable ? 'Notizen …' : ''}
+                  placeholder={writable ? t('rap.notes') : ''}
                   onChange={(e) => setT(i, { notes: e.target.value })}
                 />
                 <PendenzList
                   wk={wk}
-                  items={mine.filter((p) => p.traktandumKey === t.key)}
+                  items={mine.filter((p) => p.traktandumKey === tk.key)}
                   rapporte={rapporte.data ?? [rap]}
-                  newFor={writable ? { rapportId: rap.id, traktandumKey: t.key, zugId: rap.zugId } : undefined}
+                  newFor={writable ? { rapportId: rap.id, traktandumKey: tk.key, zugId: rap.zugId } : undefined}
                 />
               </div>
             </li>
@@ -272,9 +273,9 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
         </ol>
         {writable && (
           <div className="flex justify-between">
-            <Button onClick={addT}>+ Traktandum</Button>
+            <Button onClick={addT}>{t('rap.addT')}</Button>
             <Button variant="ghost" className="text-red-700" onClick={remove}>
-              Rapport löschen
+              {t('rap.delete')}
             </Button>
           </div>
         )}
@@ -294,6 +295,7 @@ export function RapportPage({ detail }: { detail: WkDetail }) {
 
 /** Data from the planner for some Traktanden: open Pendenzen, presence, meals, transports of the day. */
 function Facts({ detail, rap, t, earlier }: { detail: WkDetail; rap: Rapport; t: Traktandum; earlier: Pendenz[] }) {
+  const { t: tr } = useT();
   const me = useUser();
   const { wk } = detail;
   const personnel = canViewPersonnel(me, wk) && (t.key === 'stand' || t.key === 'logistik');
@@ -311,15 +313,15 @@ function Facts({ detail, rap, t, earlier }: { detail: WkDetail; rap: Rapport; t:
       <>
         {earlier.length > 0 && (
           <div className={box}>
-            <div className="mb-1 font-medium">Offene Pendenzen aus früheren Rapporten</div>
+            <div className="mb-1 font-medium">{tr('rap.openEarlier')}</div>
             <PendenzList wk={wk} items={earlier} rapporte={rapporte.data ?? []} showSource />
           </div>
         )}
         {personnel && (planned > 0 || ofDay.length > 0) && (
           <div className={box}>
-            Personelles {fmtDate(rap.date)}: <b>{ofDay.length}</b> eingecheckt{planned > 0 && <> von {planned} geplant</>} ·{' '}
+            {tr('rap.personnel', { date: fmtDate(rap.date), n: ofDay.length })}{planned > 0 && tr('rap.ofPlanned', { n: planned })} ·{' '}
             <Link className="text-zs-blue hover:underline" to="../personal">
-              Präsenz
+              {tr('pers.tab.praesenz')}
             </Link>
           </div>
         )}
@@ -330,7 +332,7 @@ function Facts({ detail, rap, t, earlier }: { detail: WkDetail; rap: Rapport; t:
     const transports = (requests.data ?? []).filter(
       (q) => q.date === rap.date && q.status === 'BEWILLIGT' && (q.kind === 'FAHRZEUG' || q.kind === 'ANHAENGER') && (rap.zugId === null || q.zugId === rap.zugId),
     );
-    const meals = (Object.keys(DIET_LABEL) as (keyof typeof DIET_LABEL)[])
+    const meals = DIETS
       .map((d) => [d, ofDay.filter((c) => c.diet === d).length] as const)
       .filter(([, n]) => n > 0);
     const special = ofDay.filter((c) => c.intolerances.trim());
@@ -339,13 +341,13 @@ function Facts({ detail, rap, t, earlier }: { detail: WkDetail; rap: Rapport; t:
       <div className={`${box} space-y-0.5`}>
         {meals.length > 0 && (
           <div>
-            Verpflegung: {meals.map(([d, n]) => `${n} ${DIET_LABEL[d]}`).join(', ')}
-            {special.length > 0 && ` · Unverträglichkeiten: ${special.map((c) => `${c.vorname} ${c.nachname} (${c.intolerances})`).join(', ')}`}
+            {tr('rap.food', { list: meals.map(([d, n]) => `${n} ${tr(`diet.${d}`)}`).join(', ') })}
+            {special.length > 0 && tr('rap.intol', { list: special.map((c) => `${c.vorname} ${c.nachname} (${c.intolerances})`).join(', ') })}
           </div>
         )}
         {transports.length > 0 && (
           <div>
-            Transporte:{' '}
+            {tr('rap.transports')}{' '}
             {transports
               .map((q) => `${fmtTime(q.startMin)}–${fmtTime(q.endMin)} ${requestLabel(q, resources.data ?? [])}${q.zweck ? ` (${q.zweck})` : ''}`)
               .join(' · ')}
@@ -372,10 +374,11 @@ function PrintProtocol({
   name: (id: number | null) => string;
   pendenzen: Pendenz[];
 }) {
+  const { t, weekday } = useT();
   const people = useKpPeople(detail.wk.kpId);
   const teilnehmer = people.filter((p) => f.teilnehmerIds.includes(p.id)).map((p) => p.name);
   const nr = new Map(pendenzen.map((p, i) => [p.id, i + 1]));
-  usePrintPage(['Protokoll', f.title, zugName, detail.wk.title].filter(Boolean).join(' · '));
+  usePrintPage([t('rap.protocolDoc'), f.title, zugName, detail.wk.title].filter(Boolean).join(' · '));
   void region;
   return (
     <div className="print-only text-[10pt] leading-snug" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
@@ -383,7 +386,7 @@ function PrintProtocol({
       <table className="mt-2 w-full text-[9pt]">
         <tbody>
           <tr>
-            <td className="w-32 align-top font-semibold">Datum, Zeit, Ort</td>
+            <td className="w-32 align-top font-semibold">{t('rap.dateTimePlace')}</td>
             <td>
               {weekday(f.date)}, {fmtDate(f.date)}
               {f.startMin !== null && `, ${fmtTime(f.startMin)}`}
@@ -391,37 +394,37 @@ function PrintProtocol({
             </td>
           </tr>
           <tr>
-            <td className="align-top font-semibold">Leitung / Protokoll</td>
+            <td className="align-top font-semibold">{t('rap.leitungProtokoll')}</td>
             <td>
               {name(f.leitungUserId) || '–'} / {name(f.protokollUserId) || '–'}
             </td>
           </tr>
           <tr>
-            <td className="align-top font-semibold">Teilnehmende</td>
+            <td className="align-top font-semibold">{t('rap.participants')}</td>
             <td>{teilnehmer.join(', ') || '–'}</td>
           </tr>
           {f.abwesend && (
             <tr>
-              <td className="align-top font-semibold">Abwesend</td>
+              <td className="align-top font-semibold">{t('rap.absentShort')}</td>
               <td>{f.abwesend}</td>
             </tr>
           )}
           {f.gaeste && (
             <tr>
-              <td className="align-top font-semibold">Gäste</td>
+              <td className="align-top font-semibold">{t('rap.guestsShort')}</td>
               <td>{f.gaeste}</td>
             </tr>
           )}
         </tbody>
       </table>
-      {f.traktanden.map((t, i) => {
-        const ps = pendenzen.filter((p) => p.traktandumKey === t.key);
+      {f.traktanden.map((tk, i) => {
+        const ps = pendenzen.filter((p) => p.traktandumKey === tk.key);
         return (
-          <section key={t.key} className="mt-3 break-inside-avoid">
+          <section key={tk.key} className="mt-3 break-inside-avoid">
             <h2 className="border-b border-slate-400 text-[11pt] font-semibold">
-              {i + 1}. {t.title}
+              {i + 1}. {tk.title}
             </h2>
-            {t.notes ? <p className="mt-1 whitespace-pre-wrap">{t.notes}</p> : <p className="mt-1 text-slate-500">–</p>}
+            {tk.notes ? <p className="mt-1 whitespace-pre-wrap">{tk.notes}</p> : <p className="mt-1 text-slate-500">–</p>}
             {ps.length > 0 && (
               <ul className="mt-1">
                 {ps.map((p) => (
@@ -437,15 +440,15 @@ function PrintProtocol({
       })}
       {pendenzen.length > 0 && (
         <section className="mt-4 break-inside-avoid">
-          <h2 className="text-[11pt] font-semibold">Pendenzenliste</h2>
+          <h2 className="text-[11pt] font-semibold">{t('rap.pendenzList')}</h2>
           <table className="mt-1 w-full border-collapse text-[9pt]">
             <thead>
               <tr className="border-b border-black text-left">
-                <th className="w-10 py-0.5">Nr.</th>
-                <th>Was</th>
-                <th className="w-36">Wer</th>
-                <th className="w-24">Bis wann</th>
-                <th className="w-20">Erledigt</th>
+                <th className="w-10 py-0.5">{t('rap.nr')}</th>
+                <th>{t('res.what')}</th>
+                <th className="w-36">{t('rap.who')}</th>
+                <th className="w-24">{t('rap.until')}</th>
+                <th className="w-20">{t('rap.done')}</th>
               </tr>
             </thead>
             <tbody>

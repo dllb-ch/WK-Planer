@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Booking, Resource, ResourceKind } from '@shared/types';
-import { RESOURCE_KIND_LABEL } from '@shared/types';
-import { addDays, dateRange, fmtDate, fmtTime, weekday } from '@shared/util';
+
+const KINDS: ResourceKind[] = ['FAHRZEUG', 'ANHAENGER', 'RAUM', 'GELAENDE'];
+import { addDays, dateRange, fmtDate, fmtTime } from '@shared/util';
+
+const wd = (d: string) => weekdayShortIn(currentLang(), d);
 import { api } from '../../api';
 import { Button, Card, Empty } from '../../components/ui';
 import { Catalogue, OwnerBadge } from './Catalogue';
 import { ResourceTimeline } from './ResourceTimeline';
 import { RequestBadge } from './RessourcenPage';
+import { useT } from '../../i18n';
+import { weekdayShortIn } from '@shared/i18n';
+import { currentLang } from '../../lib/lang';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -25,6 +31,7 @@ function doubleBooked(list: Booking[]) {
 
 /** Org Admin / Bat Kdo: the Bataillon's material and who uses it when, across all Kompanien and WKs. */
 export function MaterialOverview({ batId }: { batId: number }) {
+  const { t } = useT();
   const resources = useQuery({ queryKey: ['bat-resources', batId], queryFn: () => api.batResources(batId) });
   const bookings = useQuery({ queryKey: ['bat-bookings', batId], queryFn: () => api.batBookings(batId), refetchInterval: 30000 });
   const [kind, setKind] = useState<ResourceKind | ''>('FAHRZEUG');
@@ -44,7 +51,7 @@ export function MaterialOverview({ batId }: { batId: number }) {
     <div className="space-y-4">
       <Catalogue batId={batId} kpId={null} resources={resources.data ?? []} />
       <Card
-        title="Materialübersicht (Belegung)"
+        title={t('mat.title')}
         actions={
           <>
             {openClashes > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">{openClashes} Doppelbelegungen</span>}
@@ -55,7 +62,7 @@ export function MaterialOverview({ batId }: { batId: number }) {
                   className={`rounded px-2.5 py-1 text-xs font-medium ${view === v ? 'bg-zs-blue text-white' : 'text-slate-600 hover:bg-slate-100'}`}
                   onClick={() => setView(v)}
                 >
-                  {v === 'timeline' ? 'Zeitachse' : 'Liste'}
+                  {v === 'timeline' ? t('mat.timeline') : t('ap.list')}
                 </button>
               ))}
             </div>
@@ -63,11 +70,11 @@ export function MaterialOverview({ batId }: { batId: number }) {
         }
       >
         <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
-          <select className="input !w-auto" value={kind} onChange={(e) => setKind(e.target.value as ResourceKind | '')} aria-label="Art">
-            <option value="">Alle Arten</option>
-            {(Object.keys(RESOURCE_KIND_LABEL) as ResourceKind[]).map((k) => (
+          <select className="input !w-auto" value={kind} onChange={(e) => setKind(e.target.value as ResourceKind | '')} aria-label={t('bd.type')}>
+            <option value="">{t('res.allKinds')}</option>
+            {KINDS.map((k) => (
               <option key={k} value={k}>
-                {RESOURCE_KIND_LABEL[k]}
+                {t(`resource.${k}`)}
               </option>
             ))}
           </select>
@@ -80,11 +87,11 @@ export function MaterialOverview({ batId }: { batId: number }) {
         </div>
         {openDemand.length > 0 && (
           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-            <b>Noch nicht zugeteilt:</b>
+            <b>{t('mat.notAssigned')}</b>
             <ul className="mt-1 space-y-0.5">
               {openDemand.map((b) => (
                 <li key={b.requestId}>
-                  {b.persons ? `Transport ${b.persons} Pers.${b.category ? ` (${b.category})` : ''}` : `${b.quantity}× ${b.category}`} · {weekday(b.date).slice(0, 2)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)} · {b.kpName} ({b.zugName}) ·{' '}
+                  {b.persons ? t('res.transportN', { n: b.persons, cat: b.category ? ` (${b.category})` : '' }) : `${b.quantity}× ${b.category}`} · {wd(b.date)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)} · {b.kpName} ({b.zugName}) ·{' '}
                   {b.zweck}
                 </li>
               ))}
@@ -92,7 +99,7 @@ export function MaterialOverview({ batId }: { batId: number }) {
           </div>
         )}
         {shown.length === 0 ? (
-          <Empty>Kein Material für diese Auswahl.</Empty>
+          <Empty>{t('mat.none')}</Empty>
         ) : view === 'timeline' ? (
           <WeekTimeline resources={shown} bookings={all} start={weekStart ?? firstWeek(all)} onStart={setWeekStart} />
         ) : (
@@ -107,13 +114,13 @@ export function MaterialOverview({ batId }: { batId: number }) {
                     <span className="ml-auto text-xs font-normal text-slate-500">{list.length} Anfragen</span>
                   </h3>
                   {list.length === 0 ? (
-                    <p className="px-3 py-2 text-xs text-slate-400">Frei – keine Anfragen.</p>
+                    <p className="px-3 py-2 text-xs text-slate-400">{t('mat.free')}</p>
                   ) : (
                     <ul className="divide-y divide-slate-100 text-sm">
                       {list.map((b) => (
                         <li key={b.requestId} className={`flex flex-wrap items-start gap-x-3 gap-y-0.5 px-3 py-1.5 ${clashes.has(b.requestId) ? 'bg-red-50' : ''}`}>
                           <span className="w-36 shrink-0 tabular-nums">
-                            {weekday(b.date).slice(0, 2)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)}
+                            {wd(b.date)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)}
                           </span>
                           <span className="w-40 shrink-0 font-medium">
                             {b.kpName} · {b.zugName}
@@ -124,7 +131,7 @@ export function MaterialOverview({ batId }: { batId: number }) {
                               {' '}
                               · {b.wkTitle} · {b.requestedByName}
                             </span>
-                            {clashes.has(b.requestId) && <span className="ml-1 text-xs font-semibold text-red-700">⚠ Doppelbelegung</span>}
+                            {clashes.has(b.requestId) && <span className="ml-1 text-xs font-semibold text-red-700">{t('mat.double')}</span>}
                           </span>
                           <RequestBadge status={b.status} />
                         </li>
@@ -149,23 +156,24 @@ function firstWeek(bookings: Booking[]) {
 }
 
 function WeekTimeline({ resources, bookings, start, onStart }: { resources: Resource[]; bookings: Booking[]; start: string; onStart: (d: string) => void }) {
+  const { t } = useT();
   const days = dateRange(start, addDays(start, 6));
   const inWeek = bookings.filter((b) => b.date >= days[0] && b.date <= days[6]);
   const nextBooking = bookings.filter((b) => b.date > days[6] && b.status !== 'ABGELEHNT').map((b) => b.date).sort()[0];
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Button onClick={() => onStart(addDays(start, -7))} aria-label="Vorherige Woche">
+        <Button onClick={() => onStart(addDays(start, -7))} aria-label={t('mat.prevWeek')}>
           ‹
         </Button>
         <span className="font-medium">
           {fmtDate(days[0])} – {fmtDate(days[6])}
         </span>
-        <Button onClick={() => onStart(addDays(start, 7))} aria-label="Nächste Woche">
+        <Button onClick={() => onStart(addDays(start, 7))} aria-label={t('mat.nextWeek')}>
           ›
         </Button>
         <Button variant="ghost" onClick={() => onStart(firstWeek(bookings))}>
-          Nächste Belegung
+          {t('mat.nextBooking')}
         </Button>
         {inWeek.length === 0 && nextBooking && (
           <span className="text-xs text-slate-500">Keine Belegung in dieser Woche – nächste am {fmtDate(nextBooking)}.</span>

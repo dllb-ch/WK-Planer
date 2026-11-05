@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RequestStatus } from '@shared/types';
-import { fmtDate, fmtTime, weekday } from '@shared/util';
+import { fmtDate, fmtTime } from '@shared/util';
+
+const weekday = (d: string) => weekdayIn(currentLang(), d);
+import { useT } from '../../i18n';
+import { weekdayIn, weekdayShortIn } from '@shared/i18n';
+import { currentLang } from '../../lib/lang';
 
 export interface TimelineRow {
   id: string;
@@ -86,6 +91,7 @@ export function ResourceTimeline({
   onItemClick?: (key: string) => void;
   highlightDays?: string[];
 }) {
+  const { t } = useT();
   // Fit all days into the available width; the zoom slider overrides.
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(900);
@@ -123,8 +129,8 @@ export function ResourceTimeline({
         </span>
         <span className="flex-1" />
         <label className="flex items-center gap-1 max-md:hidden">
-          Zoom
-          <input type="range" min={10} max={120} value={Math.round(ppm * 100)} onChange={(e) => setZoom(Number(e.target.value) / 100)} className="w-24" aria-label="Zoom" />
+          {t('res.zoom')}
+          <input type="range" min={10} max={120} value={Math.round(ppm * 100)} onChange={(e) => setZoom(Number(e.target.value) / 100)} className="w-24" aria-label={t('res.zoom')} />
         </label>
       </div>
       <div ref={box} className="overflow-x-auto rounded-md border border-slate-200 bg-white">
@@ -135,7 +141,7 @@ export function ResourceTimeline({
             {days.map((d) => (
               <div key={d} className={`shrink-0 border-r border-slate-300 ${highlightDays.includes(d) ? 'bg-amber-50' : ''}`} style={{ width: dayW }}>
                 <div className="truncate px-1 pt-1 text-center text-xs font-semibold">
-                  {weekday(d).slice(0, 2)} {fmtDate(d).slice(0, 6)}
+                  {weekdayShortIn(currentLang(), d)} {fmtDate(d).slice(0, 6)}
                 </div>
                 <div className="relative h-4">
                   {hours.map((m, i) =>
@@ -190,7 +196,7 @@ export function ResourceTimeline({
               </div>
             </div>
           ))}
-          {rows.length === 0 && <p className="p-4 text-sm text-slate-400">Keine Ressourcen.</p>}
+          {rows.length === 0 && <p className="p-4 text-sm text-slate-400">{t('res.noResources')}</p>}
         </div>
       </div>
     </div>
