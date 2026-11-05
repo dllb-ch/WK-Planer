@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/media/icon.png" alt="" width="88" height="88">
+<img src="docs/media/logo.svg" alt="WK-Planer" width="112" height="112">
 
 # WK-Planer Zivilschutz
 

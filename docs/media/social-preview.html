@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- Source of social-preview.png (GitHub › Settings › Social preview), rendered at 1280×640:
+     node docs/media/render-social.mjs -->
+<html lang="de">
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1280px; height: 640px; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(1200px 700px at 0% 0%, #fff3e8 0%, #f5f5f7 55%, #eef2fb 100%);
+    color: #111827; position: relative;
+  }
+  .text { position: absolute; left: 88px; top: 120px; width: 560px; }
+  .logo { width: 128px; height: 128px; display: block; margin-bottom: 36px; }
+  h1 { font-size: 76px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+  p { margin-top: 22px; font-size: 30px; line-height: 1.3; color: #4b5563; letter-spacing: -0.01em; }
+  .tags { margin-top: 34px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .tags span { font-size: 19px; font-weight: 600; padding: 8px 16px; border-radius: 999px; background: #1e3a8a; color: #fff; }
+  .tags span.o { background: #f26a00; }
+  .shot {
+    position: absolute; left: 700px; top: 92px; width: 900px; border-radius: 18px;
+    box-shadow: 0 30px 80px rgba(15, 23, 42, .22), 0 0 0 1px rgba(15, 23, 42, .06);
+  }
+</style>
+<body>
+  <div class="text">
+    <img class="logo" src="logo.svg" alt="">
+    <h1>WK-Planer</h1>
+    <p>Wiederholungskurse im Zivilschutz planen – vom Ausbildungsbefehl bis zum Check-in.</p>
+    <div class="tags"><span class="o">Open Source</span><span>Arbeitsprogramm</span><span>Check-in</span></div>
+  </div>
+  <img class="shot" src="arbeitsprogramm-light.webp" alt="">
+</body>
+</html>
