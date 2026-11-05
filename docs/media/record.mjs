@@ -3,6 +3,11 @@
 //   rm -rf /tmp/wk-record && DATABASE_URL= PGLITE_DIR=/tmp/wk-record API_PORT=3012 SEED_DEMO=1 npm start   # in one terminal (after npm run build)
 //   BASE=http://localhost:3012 node docs/media/record.mjs                      # in another
 //
+// The setup wizard needs a second, empty instance (without SEED_DEMO), e.g. on port 3014:
+//   rm -rf /tmp/wk-empty && DATABASE_URL= PGLITE_DIR=/tmp/wk-empty API_PORT=3014 npm start
+//   SETUP_BASE=http://localhost:3014 BASE=http://localhost:3012 node docs/media/record.mjs einrichtung
+// It sets the instance up, so delete /tmp/wk-empty before recording it again.
+//
 // Needs Chromium (npx playwright install chromium, or CHROME=/path/to/chromium) and ffmpeg. Writes docs/media/*.gif.
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
@@ -15,6 +20,7 @@ const BASE = process.env.BASE ?? 'http://localhost:3012';
 const OUT = fileURLToPath(new URL('.', import.meta.url));
 const PASSWORD = 'zivilschutz';
 const only = process.argv.slice(2);
+const SETUP_BASE = process.env.SETUP_BASE;
 
 const pause = (page, ms) => page.waitForTimeout(ms);
 // CHROME=/path/to/Chromium uses an installed browser instead of the Playwright download.
@@ -198,4 +204,135 @@ await record('ressourcen', { viewport: { width: 1280, height: 760 }, email: 'kpk
   await pause(page, 600);
   await click(page, dialog.getByRole('button', { name: 'Bewilligen' }), { after: 1200 });
   await click(page, page.getByRole('button', { name: 'Belegungsplan' }), { after: 2200 });
+});
+
+// ---- 5. Setup wizard of a fresh installation ----
+if (SETUP_BASE || only.includes('einrichtung'))
+  await record('einrichtung', { viewport: { width: 1100, height: 760 } }, async (page) => {
+    if (!SETUP_BASE) throw new Error('einrichtung: SETUP_BASE (an empty instance) is missing');
+    await page.goto(SETUP_BASE);
+    await click(page, page.getByRole('button', { name: 'Eigene Organisation einrichten' }), { after: 700 });
+    // Bataillon
+    await typeInto(page, page.getByPlaceholder('z. B. ZS Bat Musterregion'), 'ZS Bat Musterland');
+    await typeInto(page, page.getByPlaceholder('z. B. Zivilschutzorganisation Region Musterland'), 'ZSO Region Musterland');
+    await typeInto(page, page.getByPlaceholder('Amt für Bevölkerungsschutz'), 'Amt für Bevölkerungsschutz');
+    await click(page, page.getByRole('button', { name: 'Weiter' }), { after: 700 });
+    // Kompanie and Züge with their Sollbestand
+    await typeInto(page, page.getByPlaceholder('z. B. Pi Kp'), 'Pi Kp');
+    const zug = page.getByLabel('Name des Zuges');
+    for (const [i, name] of ['Pi Z 1', 'Pi Z 2'].entries()) {
+      await click(page, zug.nth(i), { after: 100 });
+      await page.keyboard.press('ControlOrMeta+A');
+      await zug.nth(i).pressSequentially(name, { delay: 60 });
+    }
+    await click(page, page.getByRole('button', { name: 'Zug hinzufügen' }), { after: 500 });
+    await click(page, zug.nth(2), { after: 100 });
+    await page.keyboard.press('ControlOrMeta+A');
+    await zug.nth(2).pressSequentially('Log Z', { delay: 60 });
+    const sdt = page.locator('label', { hasText: 'Sdt' }).locator('input');
+    for (const [i, n] of ['24', '22', '10'].entries()) {
+      await click(page, sdt.nth(i), { after: 100 });
+      await page.keyboard.press('ControlOrMeta+A');
+      await sdt.nth(i).pressSequentially(n, { delay: 80 });
+    }
+    await pause(page, 500);
+    await click(page, page.getByRole('button', { name: 'Weiter' }), { after: 700 });
+    // The own account
+    await typeInto(page, page.getByPlaceholder('z. B. Maj Muster'), 'Maj Muster');
+    await typeInto(page, page.locator('input[type=email]').first(), 'bat@musterland.ch');
+    const pw = page.locator('input[type=password]');
+    await typeInto(page, pw.nth(0), 'geheim1234');
+    await typeInto(page, pw.nth(1), 'geheim1234');
+    await pause(page, 400);
+    await click(page, page.getByRole('button', { name: 'Weiter' }), { after: 700 });
+    // Resources
+    for (const [kind, name] of [['+ Fahrzeug', 'Mannschaftsbus 1'], ['+ Raum', 'Theoriesaal']]) {
+      await click(page, page.getByRole('button', { name: kind }), { after: 400 });
+      await typeInto(page, page.getByLabel('Name', { exact: true }).last(), name);
+    }
+    await pause(page, 500);
+    await click(page, page.getByRole('button', { name: 'Weiter' }), { after: 1500 });
+    // Map: keep the whole of Switzerland
+    await click(page, page.getByRole('button', { name: 'Weiter' }), { after: 1400 });
+    await click(page, page.getByRole('button', { name: 'Einrichten' }), { after: 2600 });
+  });
+
+// ---- 6. Lesson preparation of a Zugführer, then the Dossier of the Kp Kdt ----
+await record('lektion-dossier', { viewport: { width: 1280, height: 800 }, email: 'zfhr1@demo.ch' }, async (page, context) => {
+  const wk = await piWk(context);
+  await page.goto(`${BASE}/wk/${wk.id}/lektionen`);
+  const create = page.getByRole('link', { name: /Vorbereitung erstellen/ }).first();
+  await create.waitFor();
+  await pause(page, 900);
+  await click(page, create, { after: 1200 });
+  // Ziele
+  const ziel = page.getByLabel('Ziel 1');
+  await typeInto(page, ziel, 'Die AdZS können eine Baustelle signalisieren');
+  await page.keyboard.press('Enter');
+  await page.getByLabel('Ziel 2').pressSequentially('Die AdZS bauen eine Stützmauer nach Plan', { delay: 45 });
+  await pause(page, 400);
+  // Ausbildungsstufe
+  await click(page, page.getByRole('radiogroup', { name: 'Ausbildungsstufe' }).getByRole('radio').nth(1), { after: 600 });
+  // Ablauf: phases with their duration, the time check below follows
+  const phase = page.getByLabel('Phase');
+  await phase.first().scrollIntoViewIfNeeded();
+  await pause(page, 500);
+  // Three steps (P, I, T); the time check below shows the total against the available time.
+  const texts = ['Auftrag, Sicherheit, Ablauf', 'Vorzeigen am Objekt', 'Üben in Gruppen'];
+  const activity = page.getByLabel('Tätigkeit');
+  for (let i = 0; i < 3; i++) {
+    if ((await phase.count()) <= i) await click(page, page.getByRole('button', { name: 'Schritt hinzufügen' }), { after: 400 });
+    await phase.nth(i).scrollIntoViewIfNeeded();
+    await phase.nth(i).selectOption({ index: i + 1 });
+    await pause(page, 300);
+    if (!(await activity.nth(i).inputValue())) await typeInto(page, activity.nth(i), texts[i]);
+  }
+  await pause(page, 900);
+  await click(page, page.getByRole('button', { name: 'Speichern' }), { after: 1400 });
+
+  // The Kp Kdt prints the Dossier: cover, Arbeitsprogramm, lessons …
+  const r = await context.request.post(`${BASE}/api/auth/login`, { data: { email: 'kpkdt@demo.ch', password: PASSWORD } });
+  if (!r.ok()) throw new Error(`Login kpkdt: ${r.status()}`);
+  await page.goto(`${BASE}/wk/${wk.id}/dossier`);
+  await page.getByRole('button', { name: 'Drucken / PDF' }).and(page.locator(':enabled')).waitFor();
+  await pause(page, 1300);
+  await page.mouse.move(640, 500, { steps: 10 });
+  for (let i = 0; i < 14; i++) {
+    await page.mouse.wheel(0, 260);
+    await pause(page, 160);
+  }
+  await pause(page, 700);
+  // Point at the print button (the print dialog itself is not part of the page).
+  const print = await page.getByRole('button', { name: 'Drucken / PDF' }).boundingBox();
+  await page.mouse.move(print.x + print.width / 2, print.y + print.height / 2, { steps: 20 });
+  await pause(page, 1500);
+});
+
+// ---- 7. On the phone, in light and dark mode ----
+await record('mobil', { viewport: { width: 390, height: 780 }, email: 'kpkdt@demo.ch' }, async (page, context) => {
+  const wk = await piWk(context);
+  await page.goto(`${BASE}/`);
+  await page.getByText('Guten Tag').waitFor();
+  await pause(page, 1200);
+  await page.mouse.move(195, 500);
+  for (let i = 0; i < 5; i++) {
+    await page.mouse.wheel(0, 140);
+    await pause(page, 140);
+  }
+  await pause(page, 500);
+  await page.goto(`${BASE}/wk/${wk.id}`);
+  await pause(page, 1400);
+  await page.mouse.move(195, 550);
+  for (let i = 0; i < 6; i++) {
+    await page.mouse.wheel(0, 150);
+    await pause(page, 140);
+  }
+  await pause(page, 700);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await pause(page, 1400);
+  for (let i = 0; i < 6; i++) {
+    await page.mouse.wheel(0, -150);
+    await pause(page, 140);
+  }
+  await pause(page, 1500);
 });

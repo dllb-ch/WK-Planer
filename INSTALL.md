@@ -63,6 +63,8 @@ SQL wird mit `?`-Platzhaltern geschrieben; `server/src/db.ts` übersetzt sie fü
 
 Eine leere Installation zeigt statt der Anmeldung einen Assistenten, der die Organisation in einem Durchgang anlegt:
 
+<p align="center"><img src="docs/media/einrichtung.gif" alt="Einrichtungsassistent einer neuen Installation" width="760"></p>
+
 1. **Bataillon:** Name, Region, Briefkopf der Dokumente (Amt, Abteilung, Adresse, Telefon, Web) und Logos.
 2. **Kompanien und Züge** mit dem Sollbestand pro Zug (Zugführer, Kader, Soldaten).
 3. **Personen:** das eigene Konto (Bat Kommando) und, wenn gewünscht, Kp Kdt und Zugführer mit einem gemeinsamen

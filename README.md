@@ -89,6 +89,35 @@ und teilt zu. Der Belegungsplan zeigt Auslastung und Doppelbelegungen – auch �
 
 <p align="center"><img src="docs/media/ressourcen.gif" alt="Ressourcen: Anfrage bewilligen und Fahrzeuge zuteilen" width="860"></p>
 
+### 📝 Ausbildungsvorbereitung und Dossier
+
+Zugführer bereiten ihre Lektionen direkt beim Ausbildungsblock vor: Ziele, Ausbildungsstufe, Mittel und Ablauf nach
+PITT – die Zeitkontrolle zeigt, ob das Programm ins Zeitfenster passt. Daraus entsteht das Dossier als PDF mit
+Briefkopf: für die Kompanie (Deckblatt, Auftrag, WK-Konzept, Arbeitsprogramm, Ressourcen) oder pro Zug mit
+Zugführerarbeitsprogramm und allen Lektionen.
+
+<p align="center"><img src="docs/media/lektion-dossier.gif" alt="Lektion vorbereiten und Dossier des WK erstellen" width="860"></p>
+
+### 🌗 Unterwegs, hell und dunkel
+
+<table>
+<tr>
+<td width="38%" align="center">
+<img src="docs/media/mobil.gif" alt="WK-Planer auf dem Handy, im hellen und dunklen Modus" width="260">
+</td>
+<td width="62%" valign="middle">
+
+Die ganze App läuft auch auf dem Handy – mit Listenansicht für das Arbeitsprogramm, angepasster Navigation und
+grossen Bedienelementen.
+
+- Als App installierbar (PWA), offline lesbar
+- Heller und dunkler Modus nach Systemeinstellung
+- Gleiche Daten und Rechte wie am Computer
+
+</td>
+</tr>
+</table>
+
 ### Ausserdem
 
 <table>
@@ -149,6 +178,11 @@ Danach <http://localhost:8080> öffnen und mit `kpkdt@demo.ch` (Passwort `zivils
 mit einem Beispiel-WK und Demo-Konten für alle Rollen.
 
 Oder ohne Docker direkt im Browser: [Demo](https://dllb-ch.github.io/WK-Planer/).
+
+Ohne Demo-Daten (`SEED_DEMO` weglassen) führt ein Assistent durch die [erste Einrichtung](INSTALL.md#erste-einrichtung):
+Bataillon, Kompanien und Züge, Konten, Ressourcen und Karte – in wenigen Minuten.
+
+<p align="center"><img src="docs/media/einrichtung.gif" alt="Einrichtungsassistent einer neuen Installation" width="760"></p>
 
 ## Dokumentation
 
