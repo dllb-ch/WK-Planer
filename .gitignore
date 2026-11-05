@@ -1,0 +1,22 @@
+node_modules
+dist
+.DS_Store
+
+# Local data and secrets
+.env
+*.env
+!.env.example
+server/data
+*.db
+*.db-*
+deploy/pgdata
+deploy/backups
+
+# Organisation documents and local tool settings (not part of the project)
+specs/
+.claude/
+
+# Test output
+e2e/.tmp
+test-results
+playwright-report

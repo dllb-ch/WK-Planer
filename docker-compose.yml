@@ -1,0 +1,28 @@
+# Quick start:   docker compose up -d --build   → http://localhost:8080 (demo data on first start)
+# Development:   docker compose up -d db        → PostgreSQL on 127.0.0.1:54329 for `npm run dev`
+services:
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://zs:zs@db:5432/zs
+    ports:
+      - 127.0.0.1:8080:8080
+  db:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: zs
+      POSTGRES_PASSWORD: zs
+      POSTGRES_DB: zs
+    ports:
+      - 127.0.0.1:54329:5432
+    volumes:
+      - zs-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U zs -d zs']
+      interval: 2s
+      retries: 30
+volumes:
+  zs-pgdata:

@@ -1,0 +1,53 @@
+// File area per Zug: documents the Zug shares (Einteilungen, Merkblätter, Fotos …). Not tied to one WK.
+import { useState } from 'react';
+import { canUploadZugFiles, canViewZugFiles } from '@shared/permissions';
+import { api, type WkDetail } from '../../api';
+import { useUser } from '../../auth';
+import { Card, Empty } from '../../components/ui';
+import { FileArea } from '../../components/FileArea';
+
+export function DateienPage({ detail }: { detail: WkDetail }) {
+  const me = useUser();
+  const { wk, zuege } = detail;
+  const ref = (id: number) => ({ id, kpId: wk.kpId, batId: wk.batId });
+  const visible = zuege.filter((z) => canViewZugFiles(me, ref(z.id)));
+  // Own Zug first.
+  const sorted = [...visible].sort((a, b) => Number(b.id === me.zugId) - Number(a.id === me.zugId));
+  const [only, setOnly] = useState<number | ''>(me.zugId && visible.some((z) => z.id === me.zugId) && visible.length > 3 ? me.zugId : '');
+  const shown = sorted.filter((z) => only === '' || z.id === only);
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-4xl space-y-4 p-3 sm:p-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="mr-auto text-lg font-semibold">Dateien der Züge</h2>
+          {visible.length > 1 && (
+            <select className="input !w-auto" value={only} onChange={(e) => setOnly(e.target.value ? Number(e.target.value) : '')} aria-label="Zug">
+              <option value="">Alle Züge</option>
+              {visible.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <p className="text-sm text-slate-600">
+          Ablage pro Zug für Einteilungen, Merkblätter, Präsentationen, Fotos … Sie gilt über alle WKs. Hochladen können die Angehörigen des Zuges und
+          das Kp Kdo; löschen die Person, die hochgeladen hat, der Zugführer und der Kp Kdt.
+        </p>
+        {shown.length === 0 && <Empty>Keine Ablage verfügbar.</Empty>}
+        {shown.map((z) => (
+          <Card key={z.id} title={z.name}>
+            <FileArea
+              queryKey={['zug-files', z.id]}
+              load={() => api.zugFiles(z.id)}
+              upload={(file, p) => api.uploadZugFile(z.id, file, p)}
+              canUpload={canUploadZugFiles(me, ref(z.id))}
+            />
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}

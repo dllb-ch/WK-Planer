@@ -1,0 +1,275 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+  letter-spacing: -0.01em;
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 3px solid rgb(var(--c-tint) / 0.5);
+  outline-offset: 1px;
+}
+
+/* Text fields as in iOS: filled, no frame; the tint shows the focus. */
+.input {
+  @apply w-full rounded-lg border border-transparent bg-slate-200/50 px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-zs-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-zs-blue/25 disabled:bg-slate-200/30 disabled:text-slate-500;
+}
+select.input {
+  appearance: none;
+  padding-right: 1.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 14'%3E%3Cpath d='M2 5l3-3 3 3M2 9l3 3 3-3' fill='none' stroke='%238e8e93' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 8px 12px;
+}
+select.input[multiple] {
+  background-image: none;
+  padding-right: 0.625rem;
+}
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: rgb(var(--c-tint));
+}
+
+/* Grouped list (iOS Settings): rounded cell, hairlines between rows starting at the text. */
+.group-list {
+  @apply overflow-hidden rounded-lg bg-white;
+}
+.group-list > * + * {
+  position: relative;
+}
+.group-list > * + *::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1rem;
+  right: 0;
+  border-top: 0.5px solid rgb(var(--c-slate-400) / 0.45);
+  pointer-events: none;
+}
+/* Field without frame inside a list row. */
+.cell-input {
+  @apply w-full min-w-0 flex-1 border-0 bg-transparent py-[11px] text-slate-900 outline-none placeholder:text-slate-400/80;
+}
+@media (max-width: 767px) {
+  .cell-input {
+    font-size: 16px;
+  }
+}
+select.cell-input {
+  appearance: none;
+  cursor: pointer;
+}
+.group-head {
+  @apply mx-4 mb-1.5 flex items-center gap-2 text-[13px] uppercase tracking-[0.02em] text-slate-500;
+}
+.group-foot {
+  @apply mx-4 mt-1.5 text-[13px] text-slate-500;
+}
+/* Frosted bars and menus. */
+.material {
+  background: rgb(var(--c-slate-100) / 0.8);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+.material-menu {
+  background: rgb(var(--c-cell) / 0.86);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  backdrop-filter: saturate(180%) blur(30px);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.08),
+    0 10px 40px rgb(0 0 0 / 0.18);
+}
+.hairline-b {
+  border-bottom: 0.5px solid rgb(var(--c-slate-400) / 0.45);
+}
+.hairline-t {
+  border-top: 0.5px solid rgb(var(--c-slate-400) / 0.45);
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+}
+.anim-pop {
+  animation: pop 0.16s ease-out;
+}
+.anim-sheet {
+  animation: sheet-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-pop,
+  .anim-sheet {
+    animation: none;
+  }
+}
+/* iOS zooms into inputs below 16px. */
+@media (max-width: 767px) {
+  .input {
+    font-size: 16px;
+  }
+}
+.label {
+  @apply mb-1 block text-[13px] font-normal text-slate-500;
+}
+
+/* Bat events: hatched */
+.block-bat {
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.18) 0 6px, transparent 6px 12px);
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  body {
+    background: white;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+.print-only {
+  display: none;
+}
+
+/* Long documents (dossier, Ausbildungsvorbereitung) live in scroll containers; print them in normal flow. */
+@media print {
+  html:has(.print-flow),
+  html:has(.print-flow) body,
+  *:has(.print-flow),
+  .print-flow {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    background: #fff !important;
+  }
+}
+
+/* Dossier: A4 sheets on screen, flowing pages in print (always light, like paper). */
+.dossier {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #000;
+}
+.dos-page {
+  background: #fff;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto 6mm;
+  padding: 12mm 14mm 8mm;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  font-size: 10pt;
+}
+.dos-page.dos-landscape {
+  width: 297mm;
+  min-height: 210mm;
+  padding: 12mm 10mm 8mm;
+}
+.dos-body {
+  flex: 1;
+}
+.dos-sheet-foot {
+  margin-top: 5mm;
+  border-top: 1px solid #000;
+  padding-top: 1.5mm;
+  font-size: 7.5pt;
+  display: flex;
+  justify-content: space-between;
+  color: #333;
+}
+.dos-h2 {
+  font-size: 14pt;
+  font-weight: bold;
+  margin: 0 0 4mm;
+}
+.dos-h3 {
+  font-size: 11pt;
+  font-weight: bold;
+  margin: 4mm 0 2mm;
+}
+.dos-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 3mm;
+  font-size: 9.5pt;
+}
+.dos-table th,
+.dos-table td {
+  border: 1px solid #000;
+  padding: 2pt 4pt;
+  text-align: left;
+  vertical-align: top;
+}
+.dos-table th {
+  background: #d9d9d9;
+}
+.dos-table tr {
+  break-inside: avoid;
+}
+.dos-fixed-foot {
+  display: none;
+}
+@media print {
+  .dossier {
+    padding: 0 !important;
+  }
+  .dos-page {
+    width: auto !important;
+    min-height: 0 !important;
+    margin: 0;
+    padding: 0 !important;
+    box-shadow: none;
+    display: block;
+    break-before: page;
+  }
+  .dos-page:first-of-type {
+    break-before: auto;
+  }
+  .dos-landscape {
+    page: querformat;
+  }
+  .dos-sheet-foot {
+    display: none;
+  }
+  .dos-fixed-foot {
+    display: block !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    font: 7.5pt Arial, sans-serif;
+    border-top: 1px solid #000;
+    padding-top: 1mm;
+  }
+}
+
+/* Planner: column of a Zug without service on that day. */
+.col-off {
+  background-color: rgb(var(--c-slate-200) / 0.5);
+  background-image: repeating-linear-gradient(135deg, rgb(var(--c-slate-500) / 0.16) 0 2px, transparent 2px 9px);
+}
