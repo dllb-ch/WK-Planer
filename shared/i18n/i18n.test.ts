@@ -1,0 +1,30 @@
+import { describe, expect, it } from 'vitest';
+import { LANGS, pickLang, translate, translateMessage, weekdayIn } from '.';
+import { de } from './de';
+import { fr } from './fr';
+import { it as itCat } from './it';
+import { en } from './en';
+
+const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+
+describe('i18n', () => {
+  it('every language has every key, no empty text and the same placeholders', () => {
+    for (const cat of [fr, itCat, en]) {
+      expect(Object.keys(cat).sort()).toEqual(Object.keys(de).sort());
+      for (const [k, v] of Object.entries(cat)) {
+        expect(v.trim(), k).not.toBe('');
+        expect(placeholders(v), k).toEqual(placeholders(de[k as keyof typeof de]));
+      }
+    }
+  });
+
+  it('fills in placeholders and picks the language', () => {
+    expect(translate('fr', 'checkin.thanks', { name: 'Léa' })).toBe('Merci, Léa !');
+    expect(translateMessage('it', 'err.checkin.closed')).toMatch(/non è aperto/);
+    expect(translateMessage('it', 'Freier Text')).toBe('Freier Text');
+    expect(pickLang('fr-CH,fr;q=0.9,de;q=0.8')).toBe('fr');
+    expect(pickLang(['en-US', 'it'])).toBe('en');
+    expect(pickLang('es-ES')).toBe('de');
+    expect(LANGS.map((l) => weekdayIn(l, '2027-04-26'))).toEqual(['Montag', 'lundi', 'lunedì', 'Monday']);
+  });
+});

@@ -143,7 +143,7 @@ export function personalRouter(db: DB) {
 
   const zugIds = async (wk: Wk) => new Set((await zuegeOfKp(db, wk.kpId)).map((z) => z.id));
   const checkZug = async (wk: Wk, zugId: number | null) => {
-    if (zugId !== null && !(await zugIds(wk)).has(zugId)) throw new HttpError(400, 'Unbekannter Zug');
+    if (zugId !== null && !(await zugIds(wk)).has(zugId)) throw new HttpError(400, 'err.checkin.unknownZug');
   };
   const checkDate = (wk: Wk, d: string) => {
     if (!wkDays(wk).includes(d)) throw new HttpError(400, 'Der Tag liegt nicht im WK');
@@ -530,7 +530,7 @@ export function publicRouter(db: DB) {
          WHERE d.token = ?`,
       )
       .get(token)) as any;
-    if (!row) throw new HttpError(404, 'Dieser QR-Code ist nicht (mehr) gültig');
+    if (!row) throw new HttpError(404, 'err.checkin.invalidCode');
     const open = !row.archived && (row.mode === 'OPEN' || (row.mode === 'AUTO' && row.date === todayCh()));
     return { row, open };
   };
@@ -552,7 +552,7 @@ export function publicRouter(db: DB) {
 
   r.post('/checkin/:token', async (req, res) => {
     const { row, open } = await dayOf(req.params.token);
-    if (!open) throw new HttpError(409, 'Der Check-in für diesen Tag ist nicht offen');
+    if (!open) throw new HttpError(409, 'err.checkin.closed');
     const b = parse(checkInInput, req.body);
     if (b.zugId !== null && !(await zuegeOfKp(db, row.kp_id)).some((z) => z.id === b.zugId)) throw new HttpError(400, 'Unbekannter Zug');
     const wkId: number = row.wk_id;
@@ -561,7 +561,7 @@ export function publicRouter(db: DB) {
     // Art. 6: at the start of the service everyone answers the sanitarische Eintrittsbefragung once.
     const earlier = await healthOf(db, wkId, pid, b);
     const same = samePerson(b);
-    if (!earlier && !b.health) throw new HttpError(409, 'Bitte zuerst die sanitarische Eintrittsbefragung ausfüllen', { code: 'HEALTH_REQUIRED' });
+    if (!earlier && !b.health) throw new HttpError(409, 'err.checkin.healthRequired', { code: 'HEALTH_REQUIRED' });
     let health: HealthCheck['status'] | null = earlier ? earlier.status : null;
     await tx(db, async () => {
       // Checking in twice updates the first entry.

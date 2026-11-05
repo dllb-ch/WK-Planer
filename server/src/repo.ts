@@ -1,4 +1,5 @@
 // Row → domain mappers and common loaders.
+import { isLang } from '../../shared/i18n';
 import type { DB } from './db';
 import type {
   Ausbildungsvorbereitung,
@@ -37,7 +38,7 @@ export const toUser = (r: Row): UserRow => ({
 
 export const toSessionUser = (r: Row): SessionUser => {
   const { funktion: _f, ...u } = toUser(r);
-  return u;
+  return { ...u, lang: isLang(r.lang) ? r.lang : null };
 };
 
 export const toBat = (r: Row): Bataillon => ({

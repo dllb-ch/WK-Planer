@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { audit, type DB } from './db';
 import { HttpError, parse, user, asyncRouter } from './http';
 import { toSessionUser } from './repo';
+import { LANGS } from '../../shared/i18n';
 
 const COOKIE = 'zs_session';
 const SESSION_DAYS = 14;
@@ -115,6 +116,14 @@ export function authRouter(db: DB) {
     await db.prepare('DELETE FROM session WHERE user_id = ? AND token != ?').run(u.id, req.cookies?.[COOKIE] ?? '');
     await audit(db, u.id, 'user', u.id, 'password');
     res.json({ ok: true });
+  });
+
+  /** Own language of the interface (null = the browser's). */
+  r.post('/lang', async (req, res) => {
+    const u = user(req);
+    const { lang } = parse(z.object({ lang: z.enum(LANGS).nullable() }), req.body);
+    await db.prepare('UPDATE app_user SET lang = ? WHERE id = ?').run(lang, u.id);
+    res.json(toSessionUser((await db.prepare('SELECT * FROM app_user WHERE id = ?').get(u.id))!));
   });
 
   /** Own e-mail (= login); confirmed with the current password. */

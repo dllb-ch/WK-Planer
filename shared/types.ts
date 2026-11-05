@@ -1,4 +1,5 @@
 // Shared domain types used by server and client.
+import type { Lang } from './i18n';
 
 export type Role = 'ADMIN' | 'BAT' | 'KPKDT' | 'LOGOF' | 'ZFHR' | 'KADER';
 export const ROLES: Role[] = ['ADMIN', 'BAT', 'KPKDT', 'LOGOF', 'ZFHR', 'KADER'];
@@ -61,6 +62,8 @@ export interface SessionUser {
   batId: number;
   kpId: number | null;
   zugId: number | null;
+  /** Chosen language of the interface; null = the browser's. */
+  lang?: Lang | null;
 }
 
 export interface Bataillon {
@@ -545,6 +548,7 @@ export interface Strength {
 }
 
 export type Diet = 'NORMAL' | 'KEIN_SCHWEIN' | 'VEGETARISCH';
+export const DIETS: Diet[] = ['NORMAL', 'KEIN_SCHWEIN', 'VEGETARISCH'];
 export const DIET_LABEL: Record<Diet, string> = { NORMAL: 'Normal', KEIN_SCHWEIN: 'Kein Schwein', VEGETARISCH: 'Vegetarisch' };
 
 /** A person on the participant list of a WK (imported from the personnel system). */
@@ -624,6 +628,7 @@ export const HEALTH_POINTS: Record<HealthPoint, string> = {
   D: 'Ich habe vor dem Dienst eine ansteckende Krankheit durchgemacht oder war möglicherweise mit einer ansteckenden Krankheit in Kontakt.',
   E: 'Ich glaube, den Anforderungen des Dienstes aus medizinischen Gründen nicht gewachsen zu sein.',
 };
+export const HEALTH_POINT_KEYS: HealthPoint[] = ['A', 'B', 'C', 'D', 'E'];
 /** No point applies = healthy. */
 export interface HealthAnswer {
   points: HealthPoint[];

@@ -1,8 +1,10 @@
 // Public check-in form behind the QR code of a day (no login).
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CheckInInput, Diet, HealthPoint, HealthStatus, PublicCheckIn } from '@shared/types';
-import { DIET_LABEL, HEALTH_POINTS } from '@shared/types';
-import { fmtDate, weekday } from '@shared/util';
+import { DIETS, HEALTH_POINT_KEYS } from '@shared/types';
+import { LANGS, LANG_NAME } from '@shared/i18n';
+import { fmtDate } from '@shared/util';
+import { useT } from '../i18n';
 import { api, ApiError } from '../api';
 import { errMsg } from '../components/ui';
 
@@ -42,6 +44,7 @@ const remembered = (): Partial<CheckInInput> => {
 };
 
 export function CheckInPage({ token }: { token: string }) {
+  const { t, weekday } = useT();
   const [info, setInfo] = useState<PublicCheckIn | null>(null);
   const [error, setError] = useState('');
   const [f, setF] = useState<CheckInInput>({ vorname: '', nachname: '', email: '', zugId: null, diet: 'NORMAL', intolerances: '', ...remembered() });
@@ -96,7 +99,7 @@ export function CheckInPage({ token }: { token: string }) {
   /** Sends the check-in; with the Eintrittsbefragung `points` (empty = healthy) when it is due. */
   const send = async (points: HealthPoint[]) => {
     if (formRef.current && !formRef.current.reportValidity()) return;
-    if (f.zugId === null) return setError('Bitte deinen Zug wählen.');
+    if (f.zugId === null) return setError(t('checkin.chooseZug'));
     setBusy(true);
     setError('');
     try {
@@ -152,38 +155,39 @@ export function CheckInPage({ token }: { token: string }) {
             </svg>
           )}
           <div className="min-w-0">
-            <h1 className="text-[28px] font-bold leading-tight tracking-tight">Check-in</h1>
+            <h1 className="text-[28px] font-bold leading-tight tracking-tight">{t('checkin.title')}</h1>
             {info && (
               <p className="truncate text-[15px] text-slate-500">
                 {weekday(info.date)}, {fmtDate(info.date)} · {info.kpName}
               </p>
             )}
           </div>
+          <LangSwitch />
         </header>
 
         {!info ? (
-          <p className="rounded-lg bg-white p-4 text-[15px] text-slate-600">{error || 'Laden …'}</p>
+          <p className="rounded-lg bg-white p-4 text-[15px] text-slate-600">{error || t('common.loading')}</p>
         ) : done ? (
           <div className="space-y-3 rounded-lg bg-white p-6 text-center">
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500 text-4xl text-white">✓</div>
             <p className="text-xl font-semibold">
-              Danke, {f.vorname}!
+              {t('checkin.thanks', { name: f.vorname })}
               <br />
-              {done.matched ? 'Du bist eingecheckt.' : 'Dein Check-in ist eingegangen.'}
+              {done.matched ? t('checkin.matched') : t('checkin.received')}
             </p>
-            {!done.matched && <p className="text-[15px] text-slate-600">Wir konnten dich nicht eindeutig auf der Liste finden – der Kp Kdt ordnet dich zu.</p>}
+            {!done.matched && <p className="text-[15px] text-slate-600">{t('checkin.notMatched')}</p>}
             {done.reported && (
               <p className="rounded-lg bg-orange-50 px-3 py-2 text-left text-[15px] text-orange-900">
-                <b>Sanitarische Eintrittsbefragung:</b> Deine Meldung ist eingegangen. Melde dich bitte beim Kp Kdt – du wirst dem Kursarzt zugeführt.
+                <b>{t('health.title')}:</b> {t('checkin.reported')}
               </p>
             )}
             <button className="text-[15px] text-zs-blue" onClick={edit}>
-              Angaben ändern
+              {t('checkin.edit')}
             </button>
           </div>
         ) : !info.open ? (
           <p className="rounded-lg bg-white p-4 text-[15px] text-slate-700">
-            Der Check-in für {weekday(info.date)}, {fmtDate(info.date)} ist nicht offen. Er ist nur an diesem Tag möglich.
+            {t('checkin.closed', { day: `${weekday(info.date)}, ${fmtDate(info.date)}` })}
           </p>
         ) : quick && zug ? (
           <div className="space-y-4">
@@ -193,31 +197,31 @@ export function CheckInPage({ token }: { token: string }) {
               </div>
               {f.email && <div className="text-[15px] text-slate-500">{f.email}</div>}
               <div className="text-[15px] text-slate-500">
-                {zug.name} · {DIET_LABEL[f.diet]}
+                {zug.name} · {t(`diet.${f.diet}`)}
                 {f.intolerances && ` · ${f.intolerances}`}
               </div>
             </div>
             {error && <ErrorText>{error}</ErrorText>}
-            {actions(`Einchecken als ${f.vorname}`)}
+            {actions(t('checkin.as', { name: f.vorname }))}
             <div className="flex justify-center gap-6 text-[15px]">
               <button type="button" className="text-zs-blue" onClick={edit}>
-                Angaben ändern
+                {t('checkin.edit')}
               </button>
               <button type="button" className="text-zs-blue" onClick={forget}>
-                Nicht {f.vorname}?
+                {t('checkin.notYou', { name: f.vorname })}
               </button>
             </div>
           </div>
         ) : (
           <form ref={formRef} className="space-y-5" onSubmit={(e) => e.preventDefault()}>
             <div className="group-list">
-              <Line label="Vorname">
+              <Line label={t('checkin.firstName')}>
                 <input className="cell-input" required autoFocus={!f.vorname} autoComplete="given-name" enterKeyHint="next" value={f.vorname} onChange={(e) => set({ vorname: e.target.value })} />
               </Line>
-              <Line label="Nachname">
+              <Line label={t('checkin.lastName')}>
                 <input className="cell-input" required autoComplete="family-name" enterKeyHint="next" value={f.nachname} onChange={(e) => set({ nachname: e.target.value })} />
               </Line>
-              <Line label="E-Mail">
+              <Line label={t('checkin.email')}>
                 <input
                   className="cell-input"
                   type="email"
@@ -225,33 +229,33 @@ export function CheckInPage({ token }: { token: string }) {
                   inputMode="email"
                   autoCapitalize="none"
                   enterKeyHint="done"
-                  placeholder="freiwillig"
+                  placeholder={t('checkin.optional')}
                   value={f.email}
                   onChange={(e) => set({ email: e.target.value })}
                 />
               </Line>
             </div>
 
-            <Chips label="Zug" value={f.zugId} options={info.zuege.map((z) => [z.id, z.name] as const)} onChange={(zugId) => set({ zugId })} />
+            <Chips label={t('checkin.zug')} value={f.zugId} options={info.zuege.map((z) => [z.id, z.name] as const)} onChange={(zugId) => set({ zugId })} />
             <div>
-              <Chips label="Essen" value={f.diet} options={(Object.keys(DIET_LABEL) as Diet[]).map((d) => [d, DIET_LABEL[d]] as const)} onChange={(diet) => set({ diet })} />
+              <Chips label={t('checkin.food')} value={f.diet} options={DIETS.map((d: Diet) => [d, t(`diet.${d}`)] as const)} onChange={(diet) => set({ diet })} />
               {showIntol ? (
                 <input
                   className="input mt-2 !bg-white !py-2.5"
                   value={f.intolerances}
-                  placeholder="Unverträglichkeiten, z. B. laktosefrei, Nüsse"
+                  placeholder={t('checkin.intolerances')}
                   autoFocus={!f.intolerances}
                   onChange={(e) => set({ intolerances: e.target.value })}
                 />
               ) : (
                 <button type="button" className="mx-1 mt-2 text-[15px] text-zs-blue" onClick={() => setShowIntol(true)}>
-                  + Unverträglichkeit / Allergie angeben
+                  {t('checkin.addIntolerance')}
                 </button>
               )}
             </div>
 
             {error && <ErrorText>{error}</ErrorText>}
-            {actions('Einchecken')}
+            {actions(t('checkin.submit'))}
           </form>
         )}
       </div>
@@ -327,23 +331,24 @@ function HealthStep({
   onHealthy: () => void;
   onReport: () => void;
 }) {
+  const { t } = useT();
   const toggle = (p: HealthPoint) => setReport({ ...report, points: report.points.includes(p) ? report.points.filter((x) => x !== p) : [...report.points, p].sort() });
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="group-head">Sanitarische Eintrittsbefragung</h2>
+        <h2 className="group-head">{t('health.title')}</h2>
         <div className="rounded-lg bg-white px-4 py-3 text-[15px]">
-          {asked && <p className="mb-1 font-semibold text-orange-700">Bitte noch beantworten.</p>}
+          {asked && <p className="mb-1 font-semibold text-orange-700">{t('checkin.healthAsk')}</p>}
           {again && !report.open && (
-            <p className="mb-1 text-slate-500">Du hast die Befragung schon beantwortet. Hat sich etwas geändert? Eine frühere Meldung bleibt bestehen, bis der Kp Kdt sie mit dir geklärt hat.</p>
+            <p className="mb-1 text-slate-500">{t('checkin.healthAgain')}</p>
           )}
-          <p className="text-slate-600">{report.open ? 'Was trifft auf dich zu?' : 'Trifft einer dieser Punkte auf dich zu?'}</p>
+          <p className="text-slate-600">{report.open ? t('checkin.healthWhich') : t('checkin.healthAny')}</p>
           {report.open ? (
             <div className="-mx-4 mt-1">
-              {(Object.keys(HEALTH_POINTS) as HealthPoint[]).map((p) => (
+              {HEALTH_POINT_KEYS.map((p) => (
                 <label key={p} className="hairline-t flex cursor-pointer items-start gap-3 px-4 py-3 first:border-t-0">
                   <input type="checkbox" className="mt-0.5 h-5 w-5 flex-none" checked={report.points.includes(p)} onChange={() => toggle(p)} />
-                  <span>{HEALTH_POINTS[p]}</span>
+                  <span>{t(`health.${p}`)}</span>
                 </label>
               ))}
               <div className="px-4 pt-1">
@@ -351,7 +356,7 @@ function HealthStep({
                   className="input"
                   rows={2}
                   maxLength={1000}
-                  placeholder="Kurz beschreiben (freiwillig, nur für den Kp Kdt)"
+                  placeholder={t('checkin.healthNote')}
                   value={report.note}
                   onChange={(e) => setReport({ ...report, note: e.target.value })}
                 />
@@ -359,8 +364,8 @@ function HealthStep({
             </div>
           ) : (
             <ul className="mt-1.5 list-disc space-y-1 pl-5 text-slate-700">
-              {(Object.keys(HEALTH_POINTS) as HealthPoint[]).map((p) => (
-                <li key={p}>{HEALTH_POINTS[p]}</li>
+              {HEALTH_POINT_KEYS.map((p) => (
+                <li key={p}>{t(`health.${p}`)}</li>
               ))}
             </ul>
           )}
@@ -369,22 +374,41 @@ function HealthStep({
       {report.open ? (
         <>
           <BigButton disabled={busy || !report.points.length} onClick={onReport}>
-            Melden und einchecken
+            {t('checkin.healthReport')}
           </BigButton>
           <button type="button" className="w-full text-[15px] text-zs-blue" onClick={() => setReport({ ...report, open: false, points: [] })}>
-            Doch nicht – nichts trifft zu
+            {t('checkin.healthCancel')}
           </button>
         </>
       ) : (
         <>
           <BigButton disabled={busy} onClick={onHealthy}>
-            Nichts davon – gesund einchecken
+            {t('checkin.healthy')}
           </BigButton>
           <BigButton secondary disabled={busy} onClick={() => setReport({ ...report, open: true })}>
-            Etwas trifft zu …
+            {t('checkin.healthSomething')}
           </BigButton>
         </>
       )}
     </section>
+  );
+}
+
+/** Language of the page (people check in without an account; the choice stays on the phone). */
+function LangSwitch() {
+  const { lang, setLang } = useT();
+  return (
+    <select
+      className="ml-auto rounded-lg bg-transparent py-1 text-[15px] text-zs-blue"
+      aria-label="Sprache · Langue · Lingua · Language"
+      value={lang}
+      onChange={(e) => setLang(e.target.value as (typeof LANGS)[number])}
+    >
+      {LANGS.map((l) => (
+        <option key={l} value={l}>
+          {LANG_NAME[l]}
+        </option>
+      ))}
+    </select>
   );
 }

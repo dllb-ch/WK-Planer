@@ -793,6 +793,15 @@ describe('Personal: Sollbestand, Teilnehmerliste, Check-in', () => {
     expect(created.body.participantId).toBeGreaterThan(0);
   });
 
+  it('saves the language of the account and answers in it', async () => {
+    const kdt = await login('kpkdt@demo.ch');
+    expect((await kdt.get('/api/auth/me')).body.lang).toBeNull();
+    expect((await kdt.post('/api/auth/lang').send({ lang: 'es' })).status).toBe(400);
+    expect((await kdt.post('/api/auth/lang').send({ lang: 'it' })).body.lang).toBe('it');
+    expect((await kdt.get('/api/auth/me')).body.lang).toBe('it');
+    expect((await kdt.post('/api/auth/lang').send({ lang: 42 })).body.error).toMatch(/^Immissione non valida/);
+  });
+
   it('sanitarische Eintrittsbefragung: required once per person, reports go to the Kp Kdt, Zfhr see restrictions only', async () => {
     const id = await piWkId();
     const kdt = await login('kpkdt@demo.ch');
@@ -806,6 +815,10 @@ describe('Personal: Sollbestand, Teilnehmerliste, Check-in', () => {
     const missing = await anon.post(`/api/public/checkin/${token}`).send(hans);
     expect(missing.status).toBe(409);
     expect(missing.body.code).toBe('HEALTH_REQUIRED');
+    expect(missing.body.error).toBe('Bitte zuerst die sanitarische Eintrittsbefragung ausfüllen');
+    // The message in the language of the phone (Accept-Language) or of the page (X-Lang).
+    expect((await anon.post(`/api/public/checkin/${token}`).set('Accept-Language', 'fr-CH,fr;q=0.9').send(hans)).body.error).toBe('Veuillez d’abord remplir le questionnaire sanitaire d’entrée');
+    expect((await anon.post(`/api/public/checkin/${token}`).set('Accept-Language', 'fr-CH').set('X-Lang', 'it').send(hans)).body.error).toMatch(/interrogazione sanitaria/);
     expect((await kdt.get(`/api/wks/${id}/checkins`)).body).toHaveLength(0);
     // Reports point C: a report for the Kursarzt.
     const sick = await anon.post(`/api/public/checkin/${token}`).send({ ...hans, health: { points: ['C', 'C'], note: 'Knie' } });

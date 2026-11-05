@@ -433,3 +433,5 @@ CREATE TABLE IF NOT EXISTS gruppe (
 CREATE INDEX IF NOT EXISTS gruppe_zug ON gruppe(zug_id);
 -- Archived WKs (Bat Kdo): out of the lists and read only.
 ALTER TABLE wk ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false;
+-- Language of the interface per user (de, fr, it, en); NULL = the browser's.
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS lang TEXT;

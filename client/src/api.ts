@@ -1,3 +1,5 @@
+import type { Lang } from '@shared/i18n';
+import { currentLang } from './lib/lang';
 import type {
   Ausbildungsbefehl,
   Ausbildungsvorbereitung,
@@ -135,7 +137,8 @@ export class ApiError extends Error {
 async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch('/api' + url, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    // Messages of the server in the language of the interface.
+    headers: body !== undefined ? { 'Content-Type': 'application/json', 'X-Lang': currentLang() } : { 'X-Lang': currentLang() },
     body: body !== undefined ? JSON.stringify(body) : undefined,
     credentials: 'same-origin',
   });
@@ -181,6 +184,7 @@ export const api = {
   demoSwitch: (email: string) => req<SessionUser>('POST', '/auth/demo-switch', { email }),
   changePassword: (oldPassword: string, newPassword: string) => req('POST', '/auth/password', { oldPassword, newPassword }),
   changeEmail: (email: string, password: string) => req<SessionUser>('POST', '/auth/email', { email, password }),
+  setLang: (lang: Lang | null) => req<SessionUser>('POST', '/auth/lang', { lang }),
 
   org: () => req<Org>('GET', '/org'),
   saveBatSettings: (id: number, s: Omit<Bataillon, 'id'>) => req<Bataillon>('PUT', `/bataillone/${id}/settings`, s),

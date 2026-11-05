@@ -1,6 +1,7 @@
 import { Router, type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import { ZodError, type ZodTypeAny, type z } from 'zod';
 import type { SessionUser } from '../../shared/types';
+import { isLang, pickLang, translateMessage, type Lang, type Vars } from '../../shared/i18n';
 
 /** Express 4 does not catch rejected promises; pass them on to the error handler. */
 const wrap = (h: unknown) =>
@@ -25,14 +26,24 @@ export function asyncRouter() {
   return r;
 }
 
+/** A message for the client: German text, or a key of shared/i18n with its placeholders (translated on the way out). */
 export class HttpError extends Error {
   constructor(
     public status: number,
     message: string,
     public extra?: Record<string, unknown>,
+    public vars?: Vars,
   ) {
     super(message);
   }
+}
+
+/** Language of a request: the client's choice (X-Lang), the user's, then the browser's (Accept-Language). */
+export function langOf(req: Request): Lang {
+  const x = req.get?.('x-lang');
+  if (isLang(x)) return x;
+  if (isLang(req.user?.lang)) return req.user.lang;
+  return pickLang(req.get?.('accept-language'));
 }
 
 export const forbidden = () => new HttpError(403, 'Keine Berechtigung für diese Aktion');
@@ -57,16 +68,17 @@ export const user = (req: Request): SessionUser => {
   return req.user;
 };
 
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
+  const lang = langOf(req);
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message, ...err.extra });
+    res.status(err.status).json({ error: translateMessage(lang, err.message, err.vars), ...err.extra });
   } else if ((err as { type?: string })?.type === 'entity.too.large') {
-    res.status(413).json({ error: 'Die Datei ist zu gross' });
+    res.status(413).json({ error: translateMessage(lang, 'err.tooLarge') });
   } else if (err instanceof ZodError) {
-    res.status(400).json({ error: 'Ungültige Eingabe', issues: err.issues });
+    res.status(400).json({ error: translateMessage(lang, 'err.invalidInput'), issues: err.issues });
   } else {
     console.error(err);
-    res.status(500).json({ error: 'Interner Fehler' });
+    res.status(500).json({ error: translateMessage(lang, 'err.internal') });
   }
 }
 

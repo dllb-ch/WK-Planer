@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './auth';
+import { I18nProvider } from './i18n';
 import { ToastProvider } from './components/ui';
 import { App } from './App';
 import './index.css';
@@ -33,9 +34,11 @@ const render = (extra?: React.ReactNode) =>
       <QueryClientProvider client={qc}>
         <ToastProvider>
           <AuthProvider>
-            <BrowserRouter basename={BASE || '/'}>
-              <App />
-            </BrowserRouter>
+            <I18nProvider>
+              <BrowserRouter basename={BASE || '/'}>
+                <App />
+              </BrowserRouter>
+            </I18nProvider>
           </AuthProvider>
         </ToastProvider>
       </QueryClientProvider>

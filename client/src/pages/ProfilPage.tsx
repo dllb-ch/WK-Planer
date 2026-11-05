@@ -5,6 +5,8 @@ import { ROLE_LABEL } from '@shared/types';
 import { api } from '../api';
 import { useUser } from '../auth';
 import { Button, Card, errMsg, Field, useToast } from '../components/ui';
+import { LANGS, LANG_NAME, translate, type Lang } from '@shared/i18n';
+import { useT } from '../i18n';
 
 export function ProfilPage() {
   const me = useUser();
@@ -34,6 +36,7 @@ export function ProfilPage() {
         </dl>
         <p className="mt-2 text-xs text-slate-500">Name, Rolle und Einteilung ändern Kp Kdt bzw. Bat Kommando unter «Organisation › Kompanien & Personal».</p>
       </Card>
+      <LanguageCard />
       <EmailForm />
       <PasswordForm />
     </div>
@@ -122,6 +125,39 @@ function PasswordForm() {
           </Button>
         </div>
       </form>
+    </Card>
+  );
+}
+
+function LanguageCard() {
+  const { t, lang, setLang } = useT();
+  const toast = useToast();
+  const choose = async (l: Lang) => {
+    try {
+      await setLang(l);
+      // The confirmation already in the new language.
+      toast(translate(l, 'profile.languageSaved'));
+    } catch (err) {
+      toast(errMsg(err), 'error');
+    }
+  };
+  return (
+    <Card title={t('profile.language')}>
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('profile.language')}>
+        {LANGS.map((l) => (
+          <button
+            key={l}
+            type="button"
+            role="radio"
+            aria-checked={lang === l}
+            onClick={() => choose(l)}
+            className={`rounded-full px-4 py-1.5 text-sm transition ${lang === l ? 'bg-zs-blue font-medium text-white' : 'bg-slate-500/10 text-slate-700 hover:bg-slate-500/15'}`}
+          >
+            {LANG_NAME[l]}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{t('profile.languageHint')}</p>
     </Card>
   );
 }
