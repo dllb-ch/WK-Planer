@@ -10,6 +10,7 @@ import { Button, Card, Empty, errMsg, Modal, Field, TextArea, useToast } from '.
 import { ImportExportMenu } from '../components/ImportExport';
 import { exportTable, importTable, parseDateCell } from '../lib/tableFile';
 import { roleOf, STEP_COLUMNS } from '../lib/vorbereitungFile';
+import { useT } from '../i18n';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const doneByMe = (m: Milestone, userId: number) => m.doneBy.some((d) => d.userId === userId);
@@ -18,6 +19,7 @@ const complete = (m: Milestone) => m.responsible.length > 0 && m.responsible.eve
 /** Vorbereitung: each person works through the items of their role; Bat and Kp Kdt follow everybody's progress. */
 /** `embedded`: part of the Pendenzen view (no own scroll area). */
 export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedded?: boolean }) {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -79,20 +81,20 @@ export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedde
       added++;
     }
     refresh();
-    return `${added} Schritte ergänzt${skipped.length ? `, ${skipped.length} ohne gültige Rolle/Termin übersprungen` : ''}`;
+    return t('ms.added', { n: added }) + (skipped.length ? t('ms.skipped', { n: skipped.length }) : '');
   };
 
   const myDone = mine.filter((m) => doneByMe(m, me.id)).length;
   const allDone = all.filter(complete).length;
-  const progress = seesAll && roleFilter !== 'MINE' ? { done: allDone, total: all.length, label: 'vollständig erledigt' } : { done: myDone, total: mine.length, label: 'von mir erledigt' };
+  const progress = seesAll && roleFilter !== 'MINE' ? { done: allDone, total: all.length, label: t('ms.allDone') } : { done: myDone, total: mine.length, label: t('ms.myDone') };
 
   return (
     <div className={embedded ? '' : 'min-h-0 flex-1 overflow-y-auto'}>
       <div className={embedded ? 'space-y-4' : 'mx-auto max-w-4xl space-y-4 p-3 sm:p-6'}>
         <div>
-          <h2 className="text-lg font-semibold">Vorbereitung</h2>
+          <h2 className="text-lg font-semibold">{t('ms.title')}</h2>
           <p className="text-sm text-slate-500">
-            {progress.done} von {progress.total} {progress.label} · WK-Beginn {fmtDate(wk.startDate)}
+            {t('ms.progress', { done: progress.done, total: progress.total, label: progress.label, date: fmtDate(wk.startDate) })}
           </p>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
@@ -106,7 +108,7 @@ export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedde
               className={`rounded-full border px-3 py-1 text-xs font-medium ${roleFilter === r ? 'border-zs-blue bg-zs-blue text-white' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`}
               onClick={() => setRoleFilter(r as typeof roleFilter)}
             >
-              {r === 'ALL' ? 'Alle' : r === 'MINE' ? `Meine (${ROLE_LABEL[me.role]})` : ROLE_LABEL[r as Role]}
+              {r === 'ALL' ? t('ms.all') : r === 'MINE' ? t('ms.mine', { role: t(`role.${me.role}`) }) : t(`role.${r as Role}`)}
               {r !== 'ALL' && r !== 'MINE' && ` ${all.filter((m) => m.ownerRole === r).length}`}
             </button>
           ))}
@@ -114,11 +116,11 @@ export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedde
           <ImportExportMenu label="Excel / JSON" onExport={exportFile} onImport={editable ? importFile : undefined} />
           {editable && (
             <>
-              <Button variant="ghost" className="text-xs" onClick={() => run(async () => toast(`${(await api.applyTemplate(wk.id)).added} Schritte aus der Vorlage ergänzt`))}>
-                Vorlage übernehmen
+              <Button variant="ghost" className="text-xs" onClick={() => run(async () => toast(t('ms.fromTemplate', { n: (await api.applyTemplate(wk.id)).added })))}>
+                {t('ms.applyTemplate')}
               </Button>
               <Button variant="primary" className="text-xs" onClick={() => setEdit({ title: '', description: '', dueDate: '', ownerRole: 'ZFHR' })}>
-                + Schritt
+                {t('tpl.addStep')}
               </Button>
             </>
           )}
@@ -126,7 +128,7 @@ export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedde
 
         <Card>
           {list.length === 0 ? (
-            <Empty>{q.isLoading ? 'Laden …' : 'Keine Vorbereitungsschritte.'}</Empty>
+            <Empty>{q.isLoading ? t('common.loading') : t('ms.none')}</Empty>
           ) : (
             <ol className="divide-y divide-slate-100">
               {list.map((m) => {
@@ -143,7 +145,7 @@ export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedde
                           className="mt-0.5 h-5 w-5 shrink-0 accent-emerald-600"
                           checked={mineDone}
                           onChange={(e) => run(() => api.tickMilestone(wk.id, m.id, e.target.checked))}
-                          aria-label={`${m.title} erledigt`}
+                          aria-label={t('ms.done', { title: m.title })}
                         />
                       ) : (
                         <span className={`mt-1 h-3.5 w-3.5 shrink-0 rounded-full ${isDone ? 'bg-emerald-500' : overdue ? 'bg-red-500' : 'bg-slate-300'}`} />
@@ -153,20 +155,20 @@ export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedde
                         <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-slate-500">
                           <span className={overdue ? 'font-semibold text-red-600' : ''}>
                             {fmtDate(m.dueDate)}
-                            {overdue && ' · überfällig'}
+                            {overdue && t('ms.overdue')}
                           </span>
-                          {seesAll && <span>{ROLE_LABEL[m.ownerRole]}</span>}
+                          {seesAll && <span>{t(`role.${m.ownerRole}`)}</span>}
                           {m.responsible.length > 1 && (
                             <span>
-                              {m.doneBy.length}/{m.responsible.length} erledigt
+                              {t('ms.nDone', { done: m.doneBy.length, total: m.responsible.length })}
                             </span>
                           )}
-                          {m.responsible.length === 0 && <span className="text-amber-700">keine Person mit dieser Rolle</span>}
+                          {m.responsible.length === 0 && <span className="text-amber-700">{t('ms.noPerson')}</span>}
                         </div>
                       </button>
                       {editable && (
                         <button className="text-xs text-slate-400 hover:text-zs-blue" onClick={() => setEdit(m)}>
-                          Bearbeiten
+                          {t('common.edit')}
                         </button>
                       )}
                     </div>
@@ -210,7 +212,7 @@ export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedde
           onDelete={
             edit.id
               ? () =>
-                  confirm('Vorbereitungsschritt löschen?') &&
+                  confirm(t('ms.confirmDelete')) &&
                   run(async () => {
                     await api.deleteMilestone(wk.id, edit.id!);
                     setEdit(null);
@@ -224,6 +226,7 @@ export function MilestonesPage({ detail, embedded }: { detail: WkDetail; embedde
 }
 
 function MilestoneDialog({ initial, onClose, onSave, onDelete }: { initial: Partial<Milestone>; onClose: () => void; onSave: (m: MilestoneInput) => void; onDelete?: () => void }) {
+  const { t } = useT();
   const [f, setF] = useState<MilestoneInput>({
     title: initial.title ?? '',
     description: initial.description ?? '',
@@ -232,44 +235,44 @@ function MilestoneDialog({ initial, onClose, onSave, onDelete }: { initial: Part
   });
   return (
     <Modal
-      title={initial.id ? 'Vorbereitungsschritt bearbeiten' : 'Neuer Vorbereitungsschritt'}
+      title={initial.id ? t('ms.edit') : t('ms.new')}
       onClose={onClose}
       footer={
         <>
           {onDelete && (
             <Button variant="danger" className="mr-auto" onClick={onDelete}>
-              Löschen
+              {t('common.delete')}
             </Button>
           )}
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!f.title.trim() || !f.dueDate} onClick={() => onSave(f)}>
-            Speichern
+            {t('common.save')}
           </Button>
         </>
       }
     >
-      <Field label="Titel">
+      <Field label={t('common.title')}>
         <input className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} autoFocus />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Termin">
+        <Field label={t('ms.due')}>
           <input type="date" className="input" value={f.dueDate} onChange={(e) => setF({ ...f, dueDate: e.target.value })} />
         </Field>
-        <Field label="Rolle">
+        <Field label={t('profile.role')}>
           <select className="input" value={f.ownerRole} onChange={(e) => setF({ ...f, ownerRole: e.target.value as Role })}>
             {PLANNING_ROLES.map((r) => (
               <option key={r} value={r}>
-                {ROLE_LABEL[r]}
+                {t(`role.${r}`)}
               </option>
             ))}
           </select>
         </Field>
       </div>
-      <Field label="Beschreibung">
+      <Field label={t('tpl.description')}>
         <TextArea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
       </Field>
       {initial.id && initial.ownerRole !== f.ownerRole && (
-        <p className="text-xs text-amber-700">Bei einem Rollenwechsel werden die bisherigen Erledigt-Markierungen zurückgesetzt.</p>
+        <p className="text-xs text-amber-700">{t('ms.roleChange')}</p>
       )}
     </Modal>
   );

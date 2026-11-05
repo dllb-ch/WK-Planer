@@ -3,10 +3,8 @@ import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DrehbuchEintrag, Uebung, UebungInput, Zielerreichung } from '@shared/types';
-import { ROLE_LABEL, ZIELERREICHUNG_LABEL } from '@shared/types';
 import { canCreateUebung, canEditUebung } from '@shared/permissions';
-import { UEBUNG_ARTEN } from '@shared/einsatz';
-import { fmtDate, fmtTime, weekday } from '@shared/util';
+import { fmtDate, fmtTime } from '@shared/util';
 import { api, ApiError, type WkDetail } from '../../api';
 import { Briefkopf, usePrintPage } from '../../components/Briefkopf';
 import { useUser } from '../../auth';
@@ -14,12 +12,14 @@ import { Button, Card, Empty, errMsg, Field, TextArea, useToast } from '../../co
 import { FileArea } from '../../components/FileArea';
 import { RowsEditor } from '../../components/RowsEditor';
 import { SwissMap } from '../../components/SwissMap';
-import { SAVE_LABEL, useAutosave } from '../../components/useAutosave';
+import { useAutosave } from '../../components/useAutosave';
 import { useKpPeople } from '../rapporte/Pendenzen';
+import { useT } from '../../i18n';
 
 const strip = ({ id: _i, wkId: _w, createdBy: _c, createdByName: _n, updatedAt: _u, attachmentCount: _a, drehbuchHidden: _h, ...rest }: Uebung): UebungInput => rest;
 
 export function UebungenPage({ detail }: { detail: WkDetail }) {
+  const { t, weekdayShort } = useT();
   const me = useUser();
   const nav = useNavigate();
   const toast = useToast();
@@ -44,23 +44,22 @@ export function UebungenPage({ detail }: { detail: WkDetail }) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-4xl space-y-4 p-3 sm:p-6">
         <Card
-          title="Übungen"
+          title={t('ueb.title')}
           actions={
             canNew && (
-              <Button variant="primary" onClick={() => create({ title: 'Neue Übung' })}>
-                + Übung
+              <Button variant="primary" onClick={() => create({ title: t('ueb.new') })}>
+                {t('ueb.add')}
               </Button>
             )
           }
         >
           <p className="mb-3 text-sm text-slate-600">
-            Einsatzübungen schulen die Kader in Lagebeurteilung und Entschlussfassung und die Mannschaft im auftrags- und lagegerechten Einsatz der
-            Mittel (Handbuch S. 44). Vorbereitung: Übungskonzept → Drehbuch → Übungsunterlagen; danach die Übungsbesprechung.
+            {t('ueb.intro')}
           </p>
           {q.isLoading ? (
-            <Empty>Laden …</Empty>
+            <Empty>{t('common.loading')}</Empty>
           ) : list.length === 0 ? (
-            <Empty>Noch keine Übungen.</Empty>
+            <Empty>{t('ueb.none')}</Empty>
           ) : (
             <ul className="divide-y divide-slate-100">
               {list.map((x) => {
@@ -84,15 +83,15 @@ export function UebungenPage({ detail }: { detail: WkDetail }) {
           )}
           {canNew && planned.length > 0 && (
             <div className="mt-3 border-t border-slate-100 pt-3">
-              <div className="label">Im Arbeitsprogramm geplant, noch nicht vorbereitet</div>
+              <div className="label">{t('ueb.plannedNotPrepared')}</div>
               <ul className="space-y-1 text-sm">
                 {planned.map((b) => (
                   <li key={b.id} className="flex flex-wrap items-center gap-x-3">
                     <span className="w-32 shrink-0 tabular-nums text-slate-500">
-                      {weekday(b.date).slice(0, 2)} {fmtDate(b.date)} {fmtTime(b.startMin)}
+                      {weekdayShort(b.date)} {fmtDate(b.date)} {fmtTime(b.startMin)}
                     </span>
                     <span className="flex-1">
-                      {b.title} <span className="text-xs text-slate-400">({names(b.zugIds) || 'Kdo'})</span>
+                      {b.title} <span className="text-xs text-slate-400">({names(b.zugIds) || t('kdo')})</span>
                     </span>
                     <Button
                       className="py-0.5 text-xs"
@@ -108,7 +107,7 @@ export function UebungenPage({ detail }: { detail: WkDetail }) {
                         })
                       }
                     >
-                      Übung vorbereiten
+                      {t('ueb.prepare')}
                     </Button>
                   </li>
                 ))}
@@ -122,12 +121,7 @@ export function UebungenPage({ detail }: { detail: WkDetail }) {
 }
 
 type Part = 'konzept' | 'drehbuch' | 'unterlagen' | 'besprechung';
-const PARTS: [Part, string][] = [
-  ['konzept', 'Übungskonzept'],
-  ['drehbuch', 'Drehbuch'],
-  ['unterlagen', 'Übungsunterlagen'],
-  ['besprechung', 'Übungsbesprechung'],
-];
+const PARTS: Part[] = ['konzept', 'drehbuch', 'unterlagen', 'besprechung'];
 
 function Block({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -140,6 +134,7 @@ function Block({ title, hint, children }: { title: string; hint?: string; childr
 }
 
 export function UebungPage({ detail }: { detail: WkDetail }) {
+  const { t, weekday } = useT();
   const { uid } = useParams();
   const me = useUser();
   const nav = useNavigate();
@@ -159,14 +154,14 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
   const [part, setPart] = useState<Part>('konzept');
   usePrintPage([PARTS.find(([p]) => p === part)?.[1], q.data?.title, wk.title].filter(Boolean).join(' · '));
 
-  if (q.error) return <div className="p-6 text-slate-600">{q.error instanceof ApiError && q.error.status === 404 ? 'Übung nicht gefunden.' : errMsg(q.error)}</div>;
-  if (!f || !q.data) return <div className="p-6 text-slate-500">Laden …</div>;
+  if (q.error) return <div className="p-6 text-slate-600">{q.error instanceof ApiError && q.error.status === 404 ? t('ueb.notFound') : errMsg(q.error)}</div>;
+  if (!f || !q.data) return <div className="p-6 text-slate-500">{t('common.loading')}</div>;
   const editable = canEditUebung(me, wk, q.data);
   const ro = !editable;
   const hidden = !!q.data.drehbuchHidden;
   const set = (patch: Partial<UebungInput>) => update({ ...f, ...patch });
-  const parts = PARTS.filter(([p]) => p !== 'drehbuch' || !hidden);
-  const current = parts.some(([p]) => p === part) ? part : 'konzept';
+  const parts = PARTS.filter((p) => p !== 'drehbuch' || !hidden);
+  const current = parts.includes(part) ? part : 'konzept';
   const beuebte = zuege.filter((z) => f.beuebteZugIds.includes(z.id)).map((z) => z.name).join(', ');
   const when = [f.datum && `${weekday(f.datum)}, ${fmtDate(f.datum)}`, f.zeitVon && `${f.zeitVon}–${f.zeitBis}`].filter(Boolean).join(', ');
   const text = (key: keyof UebungInput & string, label: string, placeholder = '', rows = 3) => (
@@ -175,7 +170,7 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
     </Field>
   );
   const remove = async () => {
-    if (!confirm('Übung mit allen Unterlagen löschen?')) return;
+    if (!confirm(t('ueb.confirmDelete'))) return;
     try {
       discard();
       await api.deleteUebung(wk.id, id);
@@ -191,7 +186,7 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
       <h1 className="text-2xl font-semibold">
         {subtitle} <span className="text-slate-500 print:text-black">– {f.title}</span>
       </h1>
-      <p className="text-sm text-slate-600">{[f.art, when, f.ort, beuebte && `Beübte: ${beuebte}`].filter(Boolean).join(' · ')}</p>
+      <p className="text-sm text-slate-600">{[f.art, when, f.ort, beuebte && t('ueb.beuebte', { names: beuebte })].filter(Boolean).join(' · ')}</p>
     </header>
   );
 
@@ -203,58 +198,58 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
             ← Übungen
           </Link>
           <div className="flex flex-wrap gap-1">
-            {parts.map(([p, label]) => (
+            {parts.map((p) => (
               <button
                 key={p}
                 onClick={() => setPart(p)}
                 className={`rounded-full border px-3 py-1 text-sm ${current === p ? 'border-zs-blue bg-blue-50 font-medium text-zs-blue' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`}
               >
-                {label}
+                {t(`ueb.part.${p}`)}
               </button>
             ))}
           </div>
           <span className="flex-1" />
-          <span className="text-xs text-slate-500">{editable ? SAVE_LABEL[state] : 'nur lesen'}</span>
-          <Button onClick={() => window.print()}>Drucken / PDF</Button>
+          <span className="text-xs text-slate-500">{editable ? t(`save.${state}`) : t('ueb.readOnly')}</span>
+          <Button onClick={() => window.print()}>{t('av.printPdf')}</Button>
           {editable && (
             <Button variant="ghost" className="text-red-700" onClick={remove}>
-              Löschen
+              {t('common.delete')}
             </Button>
           )}
         </div>
         {hidden && (
-          <p className="no-print rounded-md bg-blue-50 px-3 py-2 text-xs text-slate-600">Das Drehbuch ist nur für die Übungsleitung sichtbar.</p>
+          <p className="no-print rounded-md bg-blue-50 px-3 py-2 text-xs text-slate-600">{t('ueb.drehbuchHint')}</p>
         )}
 
         {current === 'konzept' && (
           <>
-            {header('Übungskonzept')}
-            <Block title="Eckdaten">
+            {header(t('ueb.part.konzept'))}
+            <Block title={t('av.eckdaten')}>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Bezeichnung">
+                <Field label={t('dash.designation')}>
                   <input className="input" disabled={ro} value={f.title} onChange={(e) => set({ title: e.target.value })} />
                 </Field>
-                <Field label="Art der Übung">
+                <Field label={t('ueb.artLabel')}>
                   <input className="input" list="uebung-arten" disabled={ro} value={f.art} onChange={(e) => set({ art: e.target.value })} />
                   <datalist id="uebung-arten">
-                    {UEBUNG_ARTEN.map((a) => (
+                    {([0, 1, 2, 3, 4, 5] as const).map((i) => t(`ueb.art.${i}`)).map((a) => (
                       <option key={a} value={a} />
                     ))}
                   </datalist>
                 </Field>
-                <Field label="Datum, Zeit">
+                <Field label={t('ueb.dateTime')}>
                   <div className="flex items-center gap-2">
                     <input type="date" className="input" disabled={ro} value={f.datum} onChange={(e) => set({ datum: e.target.value })} />
-                    <input type="time" className="input !w-28" disabled={ro} value={f.zeitVon} onChange={(e) => set({ zeitVon: e.target.value })} aria-label="von" />
-                    <input type="time" className="input !w-28" disabled={ro} value={f.zeitBis} onChange={(e) => set({ zeitBis: e.target.value })} aria-label="bis" />
+                    <input type="time" className="input !w-28" disabled={ro} value={f.zeitVon} onChange={(e) => set({ zeitVon: e.target.value })} aria-label={t('ueb.from')} />
+                    <input type="time" className="input !w-28" disabled={ro} value={f.zeitBis} onChange={(e) => set({ zeitBis: e.target.value })} aria-label={t('ueb.to')} />
                   </div>
                 </Field>
-                <Field label="Übungsraum / Ort">
+                <Field label={t('ueb.ort')}>
                   <input className="input" disabled={ro} value={f.ort} onChange={(e) => set({ ort: e.target.value })} />
                 </Field>
               </div>
               <div>
-                <span className="label">Beübte</span>
+                <span className="label">{t('ueb.beuebteLabel')}</span>
                 <Chips
                   items={zuege.map((z) => ({ id: z.id, label: z.name }))}
                   value={f.beuebteZugIds}
@@ -263,40 +258,40 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
                 />
               </div>
               <div>
-                <span className="label">Übungsleitung (sieht und bearbeitet das Drehbuch)</span>
+                <span className="label">{t('ueb.leitungLabel')}</span>
                 <Chips
-                  items={people.map((p) => ({ id: p.id, label: `${p.name} · ${p.funktion || ROLE_LABEL[p.role]}` }))}
+                  items={people.map((p) => ({ id: p.id, label: `${p.name} · ${p.funktion || t(`role.${p.role}`)}` }))}
                   value={f.leitungUserIds}
                   disabled={ro}
                   onChange={(leitungUserIds) => set({ leitungUserIds, leitung: people.filter((p) => leitungUserIds.includes(p.id)).map((p) => p.name).join(', ') })}
                 />
               </div>
             </Block>
-            <Block title="Übungszweck und Übungsziele" hint="Was soll geschult oder überprüft werden? Ziele beobachtbar formulieren – sie werden in der Besprechung beurteilt.">
-              {text('zweck', 'Übungszweck', 'z. B. Überprüfen der Einsatzbereitschaft bei Hochwasser', 2)}
+            <Block title={t('ueb.zweckBlock')} hint={t('ueb.zweckHint')}>
+              {text('zweck', t('ueb.zweck'), t('ueb.zweckPh'), 2)}
               <RowsEditor
                 rows={f.ziele}
                 readOnly={ro}
                 onChange={(ziele) => set({ ziele })}
                 empty={() => ({ text: '', erreicht: '' as Zielerreichung, bemerkung: '' })}
-                addLabel="+ Übungsziel"
-                columns={[{ key: 'text', label: 'Übungsziel', multiline: true, placeholder: 'Der Zug kann innert 2 h …' }]}
+                addLabel={t('ueb.addZiel')}
+                columns={[{ key: 'text', label: t('ueb.ziel'), multiline: true, placeholder: t('ueb.zielPh') }]}
               />
             </Block>
-            <Block title="Ausgangslage und Übungsanlage">
-              {text('ausgangslage', 'Ausgangslage / Szenario (Grundidee)', 'Ereignis, Ausmass, Lage zu Beginn', 4)}
-              {text('anlage', 'Übungsanlage / Phasen', 'Phase 1: Alarmierung … Phase 2: …', 4)}
+            <Block title={t('ueb.lageBlock')}>
+              {text('ausgangslage', t('ueb.ausgangslage'), t('ueb.ausgangslagePh'), 4)}
+              {text('anlage', t('ueb.anlage'), t('ueb.anlagePh'), 4)}
             </Block>
-            <Block title="Mittel, Sicherheit, Organisation">
+            <Block title={t('ueb.mittelBlock')}>
               <div className="grid gap-3 sm:grid-cols-2">
-                {text('mittel', 'Mittel', 'Personal, Figuranten, Material, Fahrzeuge')}
-                {text('sicherheit', 'Sicherheit', 'Sicherheitsverantwortliche/r, Notfallorganisation, Abbruchkriterium')}
-                {text('beobachter', 'Beobachter / Schiedsrichter', 'Wer beobachtet was?')}
-                {text('verbindungen', 'Verbindungen', 'Funk, Telefon, Meldewege')}
+                {text('mittel', t('av.mittel'), t('ueb.mittelPh'))}
+                {text('sicherheit', t('ueb.sicherheit'), t('ueb.sicherheitPh'))}
+                {text('beobachter', t('ueb.beobachter'), t('ueb.beobachterPh'))}
+                {text('verbindungen', t('ueb.verbindungen'), t('ueb.verbindungenPh'))}
               </div>
-              {text('besonderes', 'Besonderes', '', 2)}
+              {text('besonderes', t('ueb.besonderes'), '', 2)}
             </Block>
-            <Block title="Übungsraum auf der Karte">
+            <Block title={t('ueb.mapBlock')}>
               <div className="no-print">
                 <SwissMap value={f.area} onChange={ro ? undefined : (area) => set({ area })} height={280} />
               </div>
@@ -306,38 +301,38 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
 
         {current === 'drehbuch' && !hidden && (
           <>
-            {header('Drehbuch')}
-            <Block title="Einspielungen" hint="Zeitlicher Ablauf der Übung: wer spielt wann was ein, und welche Reaktion wird erwartet? Während der Übung abhaken.">
+            {header(t('ueb.part.drehbuch'))}
+            <Block title={t('ueb.einspielungen')} hint={t('ueb.einspielungenHint')}>
               <RowsEditor<DrehbuchEintrag>
                 rows={f.drehbuch}
                 readOnly={ro}
                 onChange={(drehbuch) => set({ drehbuch })}
-                empty={() => ({ zeit: '', von: 'Übungsleitung', an: '', einspielung: '', erwartet: '', mittel: '', erledigt: false })}
+                empty={() => ({ zeit: '', von: t('ueb.leitung'), an: '', einspielung: '', erwartet: '', mittel: '', erledigt: false })}
                 addLabel="+ Einspielung"
                 columns={[
                   {
                     key: 'erledigt',
                     label: '✓',
                     width: '1.5rem',
-                    render: (r, s) => <input type="checkbox" className="mt-2" checked={r.erledigt} disabled={ro} onChange={(e) => s({ erledigt: e.target.checked })} aria-label="erledigt" />,
+                    render: (r, s) => <input type="checkbox" className="mt-2" checked={r.erledigt} disabled={ro} onChange={(e) => s({ erledigt: e.target.checked })} aria-label={t('ueb.done')} />,
                   },
                   {
                     key: 'zeit',
-                    label: 'Zeit',
+                    label: t('common.time'),
                     width: '6rem',
                     render: (r, s, readOnly) =>
                       readOnly ? <div className="px-2 py-1 text-sm tabular-nums">{r.zeit}</div> : <input type="time" className="input text-sm" value={r.zeit} onChange={(e) => s({ zeit: e.target.value })} />,
                   },
-                  { key: 'von', label: 'Von', width: '7rem' },
-                  { key: 'an', label: 'An', width: '7rem' },
-                  { key: 'einspielung', label: 'Einspielung (Meldung, Ereignis)', width: '2fr', multiline: true },
-                  { key: 'erwartet', label: 'Erwartete Reaktion', width: '2fr', multiline: true },
-                  { key: 'mittel', label: 'Mittel', width: '6rem', placeholder: 'Funk, Figurant …' },
+                  { key: 'von', label: t('bd.from'), width: '7rem' },
+                  { key: 'an', label: t('ueb.an'), width: '7rem' },
+                  { key: 'einspielung', label: t('ueb.einspielung'), width: '2fr', multiline: true },
+                  { key: 'erwartet', label: t('ueb.erwartet'), width: '2fr', multiline: true },
+                  { key: 'mittel', label: t('av.mittel'), width: '6rem', placeholder: t('ueb.mittelColPh') },
                 ]}
               />
               {!ro && f.drehbuch.length > 1 && (
                 <Button className="no-print text-xs" onClick={() => set({ drehbuch: [...f.drehbuch].sort((a, b) => (a.zeit || '99').localeCompare(b.zeit || '99')) })}>
-                  Nach Zeit sortieren
+                  {t('ueb.sortByTime')}
                 </Button>
               )}
             </Block>
@@ -346,19 +341,19 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
 
         {current === 'unterlagen' && (
           <>
-            {header('Übungsunterlagen')}
-            <Block title="Für die Beübten" hint="Was die Beübten zu Beginn erhalten. Ohne Inhalte des Drehbuchs.">
-              {text('unterlagenLage', 'Lage', 'Ausgangslage, wie sie die Beübten kennen', 5)}
-              {text('unterlagenAuftrag', 'Auftrag', 'Erhaltener Auftrag', 4)}
-              {text('unterlagenHinweise', 'Hinweise', 'Verbindungen, Sicherheit, Meldungen, Besonderes', 3)}
+            {header(t('ueb.part.unterlagen'))}
+            <Block title={t('ueb.forTrainees')} hint={t('ueb.forTraineesHint')}>
+              {text('unterlagenLage', t('ueb.lage'), t('ueb.lagePh'), 5)}
+              {text('unterlagenAuftrag', t('ueb.auftrag'), t('ueb.auftragPh'), 4)}
+              {text('unterlagenHinweise', t('ueb.hinweise'), t('ueb.hinweisePh'), 3)}
             </Block>
-            <Block title="Dokumente" hint="Lagekarten, Meldeformulare, Pläne … (für alle des WK sichtbar).">
+            <Block title={t('bef.documents')} hint={t('ueb.docsHint')}>
               <FileArea
                 queryKey={['uebung-files', id]}
                 load={() => api.uebungAttachments(id)}
                 upload={(file, pr) => api.uploadUebungAttachment(id, file, pr)}
                 canUpload={editable}
-                emptyText="Keine Dokumente."
+                emptyText={t('ueb.noDocs')}
                 gallery
               />
             </Block>
@@ -367,9 +362,9 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
 
         {current === 'besprechung' && (
           <>
-            {header('Übungsbesprechung')}
-            <Block title="Zielerreichung" hint="Pro Übungsziel: erreicht, teilweise erreicht oder nicht erreicht – mit Begründung.">
-              {f.ziele.length === 0 && <Empty>Im Übungskonzept sind keine Übungsziele erfasst.</Empty>}
+            {header(t('ueb.part.besprechung'))}
+            <Block title={t('ueb.zielerreichung')} hint={t('ueb.zielerreichungHint')}>
+              {f.ziele.length === 0 && <Empty>{t('ueb.noZiele')}</Empty>}
               <ul className="space-y-2">
                 {f.ziele.map((z, i) => (
                   <li key={i} className="break-inside-avoid rounded-md border border-slate-200 p-2">
@@ -377,7 +372,7 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
                       {i + 1}. {z.text || '–'}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      {(Object.keys(ZIELERREICHUNG_LABEL) as Exclude<Zielerreichung, ''>[]).map((k) => (
+                      {(['JA', 'TEILWEISE', 'NEIN'] as Exclude<Zielerreichung, ''>[]).map((k) => (
                         <button
                           key={k}
                           type="button"
@@ -394,14 +389,14 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
                               : 'border-slate-200 text-slate-500 print:hidden'
                           }`}
                         >
-                          {ZIELERREICHUNG_LABEL[k]}
+                          {t(`ueb.ziel.${k}`)}
                         </button>
                       ))}
                       <input
                         className="input min-w-[12rem] flex-1 py-0.5 text-sm"
                         disabled={ro}
                         value={z.bemerkung}
-                        placeholder={ro ? '' : 'Begründung / Beobachtung'}
+                        placeholder={ro ? '' : t('ueb.begruendung')}
                         onChange={(e) => set({ ziele: f.ziele.map((x, j) => (j === i ? { ...x, bemerkung: e.target.value } : x)) })}
                       />
                     </div>
@@ -409,16 +404,16 @@ export function UebungPage({ detail }: { detail: WkDetail }) {
                 ))}
               </ul>
             </Block>
-            <Block title="After Action Review" hint="Was war geplant? Was ist passiert? Warum? Was nehmen wir mit?">
-              <Field label="Datum der Besprechung">
+            <Block title={t('ueb.aar')} hint={t('ueb.aarHint')}>
+              <Field label={t('ueb.besprechungDate')}>
                 <input type="date" className="input !w-48" disabled={ro} value={f.besprechung.datum} onChange={(e) => set({ besprechung: { ...f.besprechung, datum: e.target.value } })} />
               </Field>
               {(
                 [
-                  ['verlauf', 'Verlauf (was ist passiert, warum?)'],
-                  ['positiv', 'Was ist gut gelaufen (beibehalten)?'],
-                  ['verbessern', 'Was ist zu verbessern?'],
-                  ['massnahmen', 'Massnahmen (wer, was, bis wann) – auch für die Ausbildungskontrolle'],
+                  ['verlauf', t('ueb.verlauf')],
+                  ['positiv', t('ueb.positiv')],
+                  ['verbessern', t('ueb.verbessern')],
+                  ['massnahmen', t('ueb.massnahmen')],
                 ] as const
               ).map(([k, label]) => (
                 <Field key={k} label={label}>

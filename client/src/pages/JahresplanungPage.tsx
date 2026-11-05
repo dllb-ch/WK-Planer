@@ -4,30 +4,40 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Bestand, Duty, Kompanie, Zug } from '@shared/types';
-import { BESTAND_KEYS, BESTAND_LABEL, bestandTotal, KDO_ID, STATUS_LABEL, sumBestand } from '@shared/types';
+import { BESTAND_KEYS, bestandTotal, KDO_ID, sumBestand } from '@shared/types';
 import { canArchiveWk, canPlanYear, canViewYearPlan } from '@shared/permissions';
-import { addDays, dateRange, dutyOf, fmtDate, weekday, wkDays } from '@shared/util';
-import { applyDuty, gruppePart, partDutyOf, RANK_LABEL, RANKS, wkForDay, type Cell, type Part } from '@shared/ranks';
+import { addDays, dateRange, dutyOf, fmtDate, wkDays } from '@shared/util';
+import { applyDuty, gruppePart, partDutyOf, RANKS, wkForDay, type Cell, type Part } from '@shared/ranks';
 import { ContextMenu, type MenuItem, type MenuState } from '../components/ContextMenu';
 import { api, type WkSummary } from '../api';
 import { useUser } from '../auth';
 import { Briefkopf, usePrintPage } from '../components/Briefkopf';
 import { DatesEditor } from '../components/DatesEditor';
 import { Button, Card, Empty, errMsg, Field, Modal, StatusBadge, useToast } from '../components/ui';
+import { useT } from '../i18n';
+import { currentLang, currentT } from '../lib/lang';
+import { LOCALE, weekdayShortIn } from '@shared/i18n';
 
 type Kind = 'AVOR' | 'KVK' | 'WK';
-const KIND: Record<Kind, { label: string; letter: string; cls: string; chip: string }> = {
-  AVOR: { label: 'AVOR (Kp Kdo)', letter: 'A', cls: 'bg-amber-300 text-amber-950', chip: 'bg-amber-100 text-amber-900' },
-  KVK: { label: 'KVK (Kadervorkurs)', letter: 'K', cls: 'bg-sky-400 text-sky-950', chip: 'bg-sky-100 text-sky-900' },
-  WK: { label: 'WK', letter: 'W', cls: 'bg-zs-blue text-white', chip: 'bg-blue-100 text-blue-900' },
+const KIND: Record<Kind, { cls: string; chip: string }> = {
+  AVOR: { cls: 'bg-amber-300 text-amber-950', chip: 'bg-amber-100 text-amber-900' },
+  KVK: { cls: 'bg-sky-400 text-sky-950', chip: 'bg-sky-100 text-sky-900' },
+  WK: { cls: 'bg-zs-blue text-white', chip: 'bg-blue-100 text-blue-900' },
 };
-const BESTAND_SHORT: Record<keyof Bestand, string> = { zfhr: 'Zfhr', kader: 'Kader', sdt: 'Sdt' };
-const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+/** One letter per kind in the grid; label for the legend (in the language of the interface). */
+const letter = (k: Kind) => currentT(`yp.letter.${k}`);
+const kindLabel = (k: Kind) => currentT(`yp.kind.${k}`);
+const bestandShort = (k: keyof Bestand) => currentT(k === 'zfhr' ? 'setup.zfhrShort' : k === 'kader' ? 'setup.kaderShort' : 'setup.sdtShort');
+const monthName = (m: number) => {
+  const s = new Intl.DateTimeFormat(LOCALE[currentLang()], { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, m, 1)));
+  return s[0].toUpperCase() + s.slice(1);
+};
+const MONTH_NUMBERS = Array.from({ length: 12 }, (_, i) => i);
 
 const iso = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
 const isWeekend = (d: string) => [0, 6].includes(new Date(d + 'T00:00:00Z').getUTCDay());
-const wd = (d: string) => weekday(d).slice(0, 2);
+const wd = (d: string) => weekdayShortIn(currentLang(), d);
 
 interface Entry {
   kind: Kind;
@@ -52,6 +62,7 @@ function entriesOf(wks: WkSummary[]) {
 type Dialog = { kind: 'day'; date: string; kpId: number | null } | { kind: 'plan'; wk?: WkSummary; kpId?: number; startDate?: string };
 
 export function JahresplanungPage() {
+  const { t } = useT();
   const me = useUser();
   const wks = useQuery({ queryKey: ['wks'], queryFn: api.wks });
   const org = useQuery({ queryKey: ['org'], queryFn: api.org });
@@ -109,7 +120,7 @@ export function JahresplanungPage() {
   const entries = useMemo(() => entriesOf(inYear), [inYear]);
   const at = (kpId: number, d: string) => entries.get(`${kpId}|${d}`);
 
-  if (!canViewYearPlan(me)) return <div className="p-6 text-slate-600">Kein Zugriff.</div>;
+  if (!canViewYearPlan(me)) return <div className="p-6 text-slate-600">{t('yp.noAccess')}</div>;
 
   /** Selected days in the month view: pick the duty; the WK of each Kp gets the days (or is extended). */
   const onSelect = (cells: (Cell & { kpId: number })[], x: number, y: number) => {
@@ -135,23 +146,23 @@ export function JahresplanungPage() {
     const rowsCount = new Set(cells.map((c) => `${c.zugId}.${c.part}`)).size;
     const single = byKp.length === 1 ? byKp[0] : null;
     const items: MenuItem[] = [
-      { label: 'WK', icon: 'W', onClick: () => apply('WK') },
-      { label: 'KVK (Kadervorkurs)', icon: 'K', onClick: () => apply('KVK') },
-      { label: 'AVOR', icon: 'A', onClick: () => apply('AVOR') },
-      { label: 'Kein Dienst', icon: '–', onClick: () => apply('NONE') },
+      { label: t('yp.kind.WK'), icon: letter('WK'), onClick: () => apply('WK') },
+      { label: t('yp.kind.KVK'), icon: letter('KVK'), onClick: () => apply('KVK') },
+      { label: t('duty.AVOR'), icon: letter('AVOR'), onClick: () => apply('AVOR') },
+      { label: t('yp.noService'), icon: '–', onClick: () => apply('NONE') },
       ...(single
         ? ([
             'separator',
             single.wk
-              ? { label: `«${single.wk.title}» bearbeiten …`, icon: '✎', onClick: () => setDialog({ kind: 'plan', wk: single.wk }) }
-              : { label: `Neuer WK ab ${fmtDate(dates[0])} …`, icon: '+', onClick: () => setDialog({ kind: 'plan', kpId: single.kpId, startDate: dates[0] }) },
+              ? { label: t('yp.editWk', { title: single.wk.title }), icon: '✎', onClick: () => setDialog({ kind: 'plan', wk: single.wk }) }
+              : { label: t('yp.newWkFrom', { date: fmtDate(dates[0]) }), icon: '+', onClick: () => setDialog({ kind: 'plan', kpId: single.kpId, startDate: dates[0] }) },
           ] as MenuItem[])
         : []),
     ];
     setMenu({
       x,
       y,
-      title: `${dates.length === 1 ? fmtDate(dates[0]) : `${fmtDate(dates[0]).slice(0, 6)} – ${fmtDate(dates[dates.length - 1]).slice(0, 6)}`} · ${rowsCount} ${rowsCount === 1 ? 'Zeile' : 'Zeilen'}`,
+      title: `${dates.length === 1 ? fmtDate(dates[0]) : `${fmtDate(dates[0]).slice(0, 6)} – ${fmtDate(dates[dates.length - 1]).slice(0, 6)}`} · ${rowsCount === 1 ? t('yp.row') : t('yp.rows', { n: rowsCount })}`,
       items,
     });
   };
@@ -165,15 +176,15 @@ export function JahresplanungPage() {
   return (
     <div className="print-flow min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-7xl space-y-4 p-3 sm:p-6 print:max-w-none print:p-0">
-        <Briefkopf printOnly compact title={`Jahresplanung ${year}`} subtitle={view === 'monat' ? `${MONTHS[month]} ${year}` : org.data?.bataillon.name} />
+        <Briefkopf printOnly compact title={t('yp.printTitle', { year })} subtitle={view === 'monat' ? `${monthName(month)} ${year}` : org.data?.bataillon.name} />
         <div className="no-print flex flex-wrap items-center gap-2">
           <h1 className="mr-2 text-xl font-semibold">Jahresplanung</h1>
           <div className="flex items-center gap-1">
-            <Button className="!px-2.5" aria-label="Vorheriges Jahr" onClick={() => setYear(year - 1)}>
+            <Button className="!px-2.5" aria-label={t('yp.prevYear')} onClick={() => setYear(year - 1)}>
               ‹
             </Button>
             <span className="w-14 text-center font-semibold tabular-nums">{year}</span>
-            <Button className="!px-2.5" aria-label="Nächstes Jahr" onClick={() => setYear(year + 1)}>
+            <Button className="!px-2.5" aria-label={t('yp.nextYear')} onClick={() => setYear(year + 1)}>
               ›
             </Button>
           </div>
@@ -184,60 +195,60 @@ export function JahresplanungPage() {
                 onClick={() => setView(v)}
                 className={`rounded-full px-3 py-1 ${view === v ? 'bg-blue-50 font-medium text-zs-blue' : 'text-slate-600 hover:bg-slate-50'}`}
               >
-                {v === 'jahr' ? 'Jahr' : 'Monat'}
+                {v === 'jahr' ? t('yp.year') : t('yp.month')}
               </button>
             ))}
           </div>
           {view === 'monat' && (
             <div className="flex items-center gap-1">
-              <Button className="!px-2.5" aria-label="Vorheriger Monat" onClick={() => (month === 0 ? (setMonth(11), setYear(year - 1)) : setMonth(month - 1))}>
+              <Button className="!px-2.5" aria-label={t('yp.prevMonth')} onClick={() => (month === 0 ? (setMonth(11), setYear(year - 1)) : setMonth(month - 1))}>
                 ‹
               </Button>
-              <select className="input !w-auto" value={month} onChange={(e) => setMonth(Number(e.target.value))} aria-label="Monat">
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i}>
-                    {m}
+              <select className="input !w-auto" value={month} onChange={(e) => setMonth(Number(e.target.value))} aria-label={t('yp.month')}>
+                {MONTH_NUMBERS.map((i) => (
+                  <option key={i} value={i}>
+                    {monthName(i)}
                   </option>
                 ))}
               </select>
-              <Button className="!px-2.5" aria-label="Nächster Monat" onClick={() => (month === 11 ? (setMonth(0), setYear(year + 1)) : setMonth(month + 1))}>
+              <Button className="!px-2.5" aria-label={t('yp.nextMonth')} onClick={() => (month === 11 ? (setMonth(0), setYear(year + 1)) : setMonth(month + 1))}>
                 ›
               </Button>
             </div>
           )}
           {view === 'monat' && (
-            <label className="flex items-center gap-1.5 text-sm" title="Unter jedem Zug je eine Zeile für Zugführer, Kader und Soldaten">
+            <label className="flex items-center gap-1.5 text-sm" title={t('yp.byRankHint')}>
               <input type="checkbox" checked={byRank} onChange={(e) => toggleRank(e.target.checked)} />
-              Nach Funktion (Zfhr · Kader · Sdt)
+              {t('yp.byRank')}
             </label>
           )}
           {view === 'monat' && (
-            <label className="flex items-center gap-1.5 text-sm" title="Unter jedem Zug je eine Zeile pro Gruppe (Organisation)">
+            <label className="flex items-center gap-1.5 text-sm" title={t('yp.byGroupHint')}>
               <input type="checkbox" checked={byGruppe} onChange={(e) => toggleGruppe(e.target.checked)} />
-              Nach Gruppen
+              {t('yp.byGroup')}
             </label>
           )}
           <span className="flex-1" />
-          <Button onClick={() => window.print()}>Drucken</Button>
+          <Button onClick={() => window.print()}>{t('common.print')}</Button>
           {plan && (
             <Button variant="primary" onClick={() => setDialog({ kind: 'plan' })}>
-              + WK planen
+              {t('yp.planWk')}
             </Button>
           )}
         </div>
         <p className="no-print text-sm text-slate-600">
           {plan
             ? view === 'monat'
-              ? 'Tage in den Zeilen der Züge (oder ihrer Funktionen) anklicken oder mit der Maus darüberziehen – auch über mehrere Zeilen – und im Menü WK, KVK, AVOR oder «Kein Dienst» wählen. Die Zeile der Kompanie öffnet den WK.'
-              : 'Tag anklicken, um AVOR-, KVK- oder WK-Tage einer Kompanie zu planen. Jeder geplante WK wird mit seinem Vorbereitungs-Zeitplan angelegt; mehrere WKs pro Jahr und Kompanie sind möglich.'
-            : 'Vom Bat Kommando geplant.'}
+              ? t('yp.hintMonth')
+              : t('yp.hintYear')
+            : t('yp.byBat')}
         </p>
 
         <Legend kps={kps} showOrder={view === 'jahr' && kps.length > 1} />
 
         {kps.length === 0 ? (
           <Card>
-            <Empty>Keine Kompanien.</Empty>
+            <Empty>{t('admin.noKp')}</Empty>
           </Card>
         ) : view === 'jahr' ? (
           <YearGrid year={year} kps={kps} at={at} onDay={(d) => openDay(d, kps.length === 1 ? kps[0].id : null)} clickable={plan} />
@@ -277,20 +288,21 @@ export function JahresplanungPage() {
 }
 
 function Legend({ kps, showOrder }: { kps: Kompanie[]; showOrder: boolean }) {
+  const { t } = useT();
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
       {(Object.keys(KIND) as Kind[]).map((k) => (
         <span key={k} className="inline-flex items-center gap-1.5">
-          <span className={`inline-block h-3.5 w-3.5 rounded-sm text-center text-[9px] font-semibold leading-[14px] ${KIND[k].cls}`}>{KIND[k].letter}</span>
-          {KIND[k].label}
+          <span className={`inline-block h-3.5 w-3.5 rounded-sm text-center text-[9px] font-semibold leading-[14px] ${KIND[k].cls}`}>{letter(k)}</span>
+          {kindLabel(k)}
         </span>
       ))}
       <span className="inline-flex items-center gap-1.5">
-        <span className="text-slate-300">–</span> Zug ohne Dienst
+        <span className="text-slate-300">–</span> {t('yp.zugNoService')}
       </span>
       {showOrder && (
         <span>
-          Kästchen pro Tag von links: {kps.map((k, i) => `${i + 1} ${k.name}`).join(' · ')}
+          {t('yp.boxOrder', { list: kps.map((k, i) => `${i + 1} ${k.name}`).join(' · ') })}
         </span>
       )}
     </div>
@@ -317,9 +329,9 @@ function YearGrid({
       <table className="w-full min-w-[900px] table-fixed border-collapse text-[10px] print:min-w-0">
         <thead>
           <tr>
-            {MONTHS.map((m) => (
+            {MONTH_NUMBERS.map((m) => (
               <th key={m} className="border border-slate-200 bg-slate-50 px-1 py-1 text-center text-[11px] font-semibold">
-                {m}
+                {monthName(m)}
               </th>
             ))}
           </tr>
@@ -327,7 +339,7 @@ function YearGrid({
         <tbody>
           {days.map((day) => (
             <tr key={day}>
-              {MONTHS.map((_, m) => {
+              {MONTH_NUMBERS.map((m) => {
                 if (day > daysInMonth(year, m)) return <td key={m} className="border border-slate-200 bg-slate-200/60" />;
                 const d = iso(year, m, day);
                 const hits = kps.map((k) => at(k.id, d));
@@ -348,7 +360,7 @@ function YearGrid({
                           key={kps[i].id}
                           className={`h-3 min-w-0 flex-1 rounded-sm text-center text-[8px] font-semibold leading-3 ${e ? KIND[e.kind].cls : ''} ${e?.wk.archived ? 'opacity-50' : ''}`}
                         >
-                          {e ? KIND[e.kind].letter : ''}
+                          {e ? letter(e.kind) : ''}
                         </span>
                       ))}
                     </div>
@@ -399,6 +411,7 @@ function MonthGrid({
   byRank: boolean;
   byGruppe: boolean;
 }) {
+  const { t } = useT();
   const days = Array.from({ length: daysInMonth(year, month) }, (_, i) => iso(year, month, i + 1));
   const cols = [...BESTAND_KEYS, 'total'] as const;
   const head = 'border border-slate-200 bg-slate-50 px-1 py-1 text-center text-[10px] font-medium';
@@ -408,7 +421,7 @@ function MonthGrid({
     zuege.filter((z) => z.kpId === k.id).flatMap((z) => [{ kpId: k.id, zugId: z.id, part: null }, ...subParts(z).map((part) => ({ kpId: k.id, zugId: z.id, part }))]),
   );
   const rowIndex = (zugId: number, part: Part | null) => rows.findIndex((r) => r.zugId === zugId && r.part === part);
-  const partLabel = (z: Zug, part: Part) => (part.startsWith('g') ? (z.gruppen.find((g) => gruppePart(g.id) === part)?.name ?? 'Gruppe') : RANK_LABEL[part as keyof Bestand]);
+  const partLabel = (z: Zug, part: Part) => (part.startsWith('g') ? (z.gruppen.find((g) => gruppePart(g.id) === part)?.name ?? t('yp.group')) : t(`rank.${part as keyof Bestand}`));
   const [sel, setSel] = useState<{ a: Pos; b: Pos } | null>(null);
   const dragging = useRef(false);
   const inSel = (r: number, c: number) =>
@@ -483,7 +496,7 @@ function MonthGrid({
           }
           onPointerUp={selectable ? finish : undefined}
           onClick={selectable ? undefined : () => (clickable || e) && onCell(d, k.id)}
-          title={e ? `${name}: ${duty === 'NONE' ? 'kein Dienst' : duty} – ${e.wk.title}` : undefined}
+          title={e ? t('yp.cellTitle', { name, duty: t(`duty.${duty ?? 'NONE'}`), wk: e.wk.title }) : undefined}
           className={`${size} select-none border border-slate-200 p-0 ${isWeekend(d) && !kind ? 'bg-slate-100' : ''} ${
             selectable ? 'cursor-cell' : clickable || e ? 'cursor-pointer hover:outline hover:outline-2 hover:outline-zs-blue/40' : ''
           } ${selected ? 'relative outline outline-2 -outline-offset-2 outline-zs-blue' : ''}`}
@@ -493,7 +506,7 @@ function MonthGrid({
               className={`flex h-full w-full items-center justify-center text-[10px] font-semibold ${KIND[kind].cls} ${e!.wk.archived ? 'opacity-50' : ''} ${part ? 'opacity-90' : ''}`}
               aria-label={`${fmtDate(d)} ${kind}`}
             >
-              {first ? KIND[kind].letter : ''}
+              {first ? letter(kind) : ''}
             </div>
           ) : (
             duty === 'NONE' && <div className="flex h-full items-center justify-center text-[10px] text-slate-300">–</div>
@@ -528,10 +541,10 @@ function MonthGrid({
         <thead>
           <tr>
             <th rowSpan={2} className="border border-slate-200 bg-slate-50 px-2 py-1 text-left font-semibold">
-              {MONTHS[month]} {year}
+              {monthName(month)} {year}
             </th>
             <th colSpan={cols.length} className={head}>
-              Bestand Ist / Soll
+              {t('yp.bestandIstSoll')}
             </th>
             {days.map((d) => (
               <th key={d} rowSpan={2} className={`border border-slate-200 px-0 py-1 text-center text-[10px] font-medium ${isWeekend(d) ? 'bg-slate-100 text-slate-400' : 'bg-slate-50'}`}>
@@ -543,8 +556,8 @@ function MonthGrid({
           </tr>
           <tr>
             {cols.map((k) => (
-              <th key={k} className={head} title={k === 'total' ? 'Total' : BESTAND_LABEL[k]}>
-                {k === 'total' ? 'Total' : BESTAND_SHORT[k]}
+              <th key={k} className={head} title={k === 'total' ? t('yp.total') : t(`bestand.${k}`)}>
+                {k === 'total' ? t('yp.total') : bestandShort(k)}
               </th>
             ))}
           </tr>
@@ -589,6 +602,7 @@ function MonthGrid({
 
 /** All Dienstleistungen of the year as a list (printed after the plan). */
 function Summary({ year, kps, zuege, wks, onEdit }: { year: number; kps: Kompanie[]; zuege: Zug[]; wks: WkSummary[]; onEdit?: (wk: WkSummary) => void }) {
+  const { t } = useT();
   const dates = (list: string[]) => (list.length ? list.map((d) => fmtDate(d).slice(0, 6)).join(', ') : '–');
   return (
     <Card title={`Dienstleistungen ${year}`} className="break-inside-avoid print:break-before-page">
@@ -599,14 +613,14 @@ function Summary({ year, kps, zuege, wks, onEdit }: { year: number; kps: Kompani
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-500">
-                <th className="py-1 pr-3">Kompanie</th>
-                <th className="py-1 pr-3">Bezeichnung</th>
-                <th className="py-1 pr-3">AVOR</th>
-                <th className="py-1 pr-3">KVK</th>
-                <th className="py-1 pr-3">WK</th>
-                <th className="py-1 pr-3 text-right">Tage</th>
-                <th className="py-1 pr-3 text-right">Ist / Soll</th>
-                <th className="py-1">Status</th>
+                <th className="py-1 pr-3">{t('common.kompanie')}</th>
+                <th className="py-1 pr-3">{t('dash.designation')}</th>
+                <th className="py-1 pr-3">{t('duty.AVOR')}</th>
+                <th className="py-1 pr-3">{t('duty.KVK')}</th>
+                <th className="py-1 pr-3">{t('duty.WK')}</th>
+                <th className="py-1 pr-3 text-right">{t('yp.days')}</th>
+                <th className="py-1 pr-3 text-right">{t('yp.istSoll')}</th>
+                <th className="py-1">{t('common.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -639,8 +653,8 @@ function Summary({ year, kps, zuege, wks, onEdit }: { year: number; kps: Kompani
                       <span className="no-print">
                         <StatusBadge status={w.status} />
                       </span>
-                      <span className="print-only">{STATUS_LABEL[w.status]}</span>
-                      {w.archived && <span className="ml-1 text-xs">(archiviert)</span>}
+                      <span className="print-only">{t(`status.${w.status}`)}</span>
+                      {w.archived && <span className="ml-1 text-xs">{t('yp.archived')}</span>}
                     </td>
                   </tr>
                 );
@@ -673,6 +687,7 @@ function DayDialog({
   onPlan: (p: { wk?: WkSummary; kpId?: number; startDate?: string }) => void;
   onClose: () => void;
 }) {
+  const { t, weekday: weekdayLong } = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const free = kps.filter((k) => !at(k.id, date));
@@ -693,7 +708,7 @@ function DayDialog({
       );
       await qc.invalidateQueries({ queryKey: ['wks'] });
       qc.invalidateQueries({ queryKey: ['wk', target.id] });
-      toast(`${kind}-Tag ${fmtDate(date)} zu «${target.title}» hinzugefügt`);
+      toast(t('yp.dayAdded', { kind: t(`duty.${kind}`), date: fmtDate(date), title: target.title }));
       onClose();
     } catch (e) {
       toast(errMsg(e), 'error');
@@ -701,7 +716,7 @@ function DayDialog({
   };
 
   return (
-    <Modal title={`${weekday(date)}, ${fmtDate(date)}`} onClose={onClose} footer={<Button onClick={onClose}>Schliessen</Button>}>
+    <Modal title={`${weekdayLong(date)}, ${fmtDate(date)}`} onClose={onClose} footer={<Button onClick={onClose}>{t('common.close')}</Button>}>
       <ul className="space-y-1 text-sm">
         {shown.map((k) => {
           const e = at(k.id, date);
@@ -710,7 +725,7 @@ function DayDialog({
               <span className="w-32 shrink-0 font-medium">{k.name}</span>
               {e ? (
                 <>
-                  <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${KIND[e.kind].chip}`}>{e.kind}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${KIND[e.kind].chip}`}>{t(`duty.${e.kind}`)}</span>
                   {plan ? (
                     <button className="truncate text-zs-blue hover:underline" onClick={() => onPlan({ wk: e.wk })}>
                       {e.wk.title}
@@ -732,7 +747,7 @@ function DayDialog({
         <section className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
           <h3 className="label !mb-0">Planen</h3>
           {kpId === null && (
-            <Field label="Kompanie">
+            <Field label={t('common.kompanie')}>
               <select
                 className="input"
                 value={kp}
@@ -750,11 +765,11 @@ function DayDialog({
             </Field>
           )}
           <Button variant="primary" onClick={() => onPlan({ kpId: kp, startDate: date })}>
-            Neuer WK ab {fmtDate(date)}
+            {t('yp.newWkAt', { date: fmtDate(date) })}
           </Button>
           {own.length > 0 ? (
             <div className="space-y-2 border-t pt-3">
-              <Field label="Oder als Tag zu einem WK der Kompanie">
+              <Field label={t('yp.orAsDay')}>
                 <select className="input" value={target?.id ?? ''} onChange={(e) => setWkId(Number(e.target.value))}>
                   {own.map((w) => (
                     <option key={w.id} value={w.id}>
@@ -764,12 +779,12 @@ function DayDialog({
                 </select>
               </Field>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => addDay('AVOR')}>+ AVOR-Tag</Button>
-                <Button onClick={() => addDay('KVK')}>+ KVK-Tag</Button>
+                <Button onClick={() => addDay('AVOR')}>{t('ap.addAvorDay')}</Button>
+                <Button onClick={() => addDay('KVK')}>{t('ap.addKvkDay')}</Button>
               </div>
             </div>
           ) : (
-            <p className="text-xs text-slate-500">AVOR- und KVK-Tage gehören zu einem WK: zuerst einen WK der Kompanie planen.</p>
+            <p className="text-xs text-slate-500">{t('yp.avorKvkNeedWk')}</p>
           )}
         </section>
       )}
@@ -793,6 +808,7 @@ function PlanDialog({
   startDate?: string;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -831,7 +847,7 @@ function PlanDialog({
         await done(`«${title}» gespeichert`, wk.id);
       } else {
         await api.createWk({ ...body, kpId: f.kpId, dayStart: 7 * 60 + 30, dayEnd: 17 * 60, snapMin: 15 });
-        await done(`«${title}» geplant – der WK ist angelegt`);
+        await done(t('yp.planned', { title }));
       }
     } catch (e) {
       toast(errMsg(e), 'error');
@@ -840,10 +856,10 @@ function PlanDialog({
     }
   };
   const remove = async () => {
-    if (!wk || !confirm(`«${wk.title}» mit Arbeitsprogramm, Personal und allen Unterlagen endgültig löschen?`)) return;
+    if (!wk || !confirm(t('dash.confirmDelete', { title: wk.title, kp: '' }).replace(' ()', ''))) return;
     try {
       await api.deleteWk(wk.id);
-      await done(`«${wk.title}» gelöscht`);
+      await done(t('dash.deleted', { title: wk.title }));
     } catch (e) {
       toast(errMsg(e), 'error');
     }
@@ -857,7 +873,7 @@ function PlanDialog({
         <>
           {wk && canArchiveWk(me, wk) && (
             <Button variant="danger" className="mr-auto" onClick={remove}>
-              Löschen
+              {t('common.delete')}
             </Button>
           )}
           {wk && (
@@ -865,10 +881,10 @@ function PlanDialog({
               WK öffnen →
             </Link>
           )}
-          <Button onClick={onClose}>{ro ? 'Schliessen' : 'Abbrechen'}</Button>
+          <Button onClick={onClose}>{ro ? t('common.close') : t('common.cancel')}</Button>
           {!ro && (
             <Button variant="primary" disabled={!valid || busy} onClick={save}>
-              {wk ? 'Speichern' : 'Planen'}
+              {wk ? t('common.save') : t('yp.plan')}
             </Button>
           )}
         </>
@@ -876,11 +892,11 @@ function PlanDialog({
     >
       {locked && (
         <p className="rounded bg-slate-100 px-3 py-2 text-sm text-slate-700">
-          {wk!.archived ? 'Archiviert – zuerst in der Übersicht wiederherstellen.' : 'Das Arbeitsprogramm ist freigegeben – die Daten sind fest.'}
+          {wk!.archived ? t('yp.archivedRo') : t('yp.approvedRo')}
         </p>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Kompanie">
+        <Field label={t('common.kompanie')}>
           <select className="input" disabled={!!wk || ro} value={f.kpId} onChange={(e) => setF({ ...f, kpId: Number(e.target.value) })}>
             {kps.map((k) => (
               <option key={k.id} value={k.id}>
@@ -889,10 +905,10 @@ function PlanDialog({
             ))}
           </select>
         </Field>
-        <Field label="Bezeichnung">
+        <Field label={t('dash.designation')}>
           <input className="input" disabled={ro} value={f.title} placeholder={title} onChange={(e) => setF({ ...f, title: e.target.value })} />
         </Field>
-        <Field label="WK von">
+        <Field label={t('yp.wkFrom')}>
           <input
             type="date"
             className="input"
@@ -901,29 +917,29 @@ function PlanDialog({
             onChange={(e) => setF({ ...f, startDate: e.target.value, endDate: f.endDate && f.endDate >= e.target.value ? f.endDate : e.target.value })}
           />
         </Field>
-        <Field label="WK bis">
+        <Field label={t('yp.wkTo')}>
           <input type="date" className="input" disabled={ro} value={f.endDate} min={f.startDate} onChange={(e) => setF({ ...f, endDate: e.target.value })} />
         </Field>
       </div>
-      {length > 21 && <p className="text-xs text-red-600">Ein WK dauert höchstens 21 Tage.</p>}
+      {length > 21 && <p className="text-xs text-red-600">{t('yp.max21')}</p>}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="AVOR-Tage (Kp Kdo)">
+        <Field label={t('yp.avorDays')}>
           {ro ? (
             <p className="text-sm">{f.avorDays.map(fmtDate).join(', ') || '–'}</p>
           ) : (
-            <DatesEditor value={f.avorDays} onChange={(avorDays) => setF({ ...f, avorDays })} label="AVOR-Tag" tone={KIND.AVOR.chip} />
+            <DatesEditor value={f.avorDays} onChange={(avorDays) => setF({ ...f, avorDays })} label={t('yp.avorDay')} tone={KIND.AVOR.chip} />
           )}
         </Field>
-        <Field label="KVK-Tage (Kader)">
+        <Field label={t('yp.kvkDays')}>
           {ro ? (
             <p className="text-sm">{f.kvkDays.map(fmtDate).join(', ') || '–'}</p>
           ) : (
-            <DatesEditor value={f.kvkDays} onChange={(kvkDays) => setF({ ...f, kvkDays })} label="KVK-Tag" tone={KIND.KVK.chip} />
+            <DatesEditor value={f.kvkDays} onChange={(kvkDays) => setF({ ...f, kvkDays })} label={t('yp.kvkDay')} tone={KIND.KVK.chip} />
           )}
         </Field>
       </div>
-      {!wk && <p className="text-xs text-slate-500">Der WK wird mit dem Vorbereitungs-Zeitplan der Kompanie angelegt; der Kp Kdt plant darin das Arbeitsprogramm.</p>}
-      {wk && !ro && <p className="text-xs text-slate-500">Liegen schon Blöcke des Arbeitsprogramms an einem entfernten Tag, wird die Änderung abgelehnt.</p>}
+      {!wk && <p className="text-xs text-slate-500">{t('yp.createdWith')}</p>}
+      {wk && !ro && <p className="text-xs text-slate-500">{t('yp.rejectedIfBlocks')}</p>}
     </Modal>
   );
 }

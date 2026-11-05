@@ -1,13 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Bestand, GruppeInput, Kompanie, Role, UserRow, Zug } from '@shared/types';
-import { BESTAND_KEYS, BESTAND_LABEL, bestandTotal, ROLE_LABEL, sumBestand } from '@shared/types';
+import { BESTAND_KEYS, bestandTotal, sumBestand } from '@shared/types';
 import { canEditZugAssignment, canManageOrg, canManageUser } from '@shared/permissions';
 import { api } from '../api';
 import { useUser } from '../auth';
 import { Button, Card, Empty, errMsg, Field, Modal, useToast } from '../components/ui';
+import { useT } from '../i18n';
 
 export function AdminPage() {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -15,7 +17,7 @@ export function AdminPage() {
   const [editUser, setEditUser] = useState<Partial<UserRow> | null>(null);
   const [newKp, setNewKp] = useState('');
 
-  if (!org.data) return <div className="p-6 text-slate-500">Laden …</div>;
+  if (!org.data) return <div className="p-6 text-slate-500">{t('common.loading')}</div>;
   const { kompanien, zuege, users } = org.data;
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -33,7 +35,7 @@ export function AdminPage() {
         <h1 className="text-xl font-semibold">Kompanien & Personal – {org.data.bataillon.name}</h1>
 
         <Card
-          title="Kompanien und Züge"
+          title={t('admin.kpZuege')}
           actions={
             canManageOrg(me) && (
               <form
@@ -43,8 +45,8 @@ export function AdminPage() {
                   if (newKp.trim()) run(() => api.createKp(newKp.trim())).then(() => setNewKp(''));
                 }}
               >
-                <input className="input !w-44" placeholder="Neue Kompanie" value={newKp} onChange={(e) => setNewKp(e.target.value)} />
-                <Button type="submit">Hinzufügen</Button>
+                <input className="input !w-44" placeholder={t('admin.newKp')} value={newKp} onChange={(e) => setNewKp(e.target.value)} />
+                <Button type="submit">{t('common.add')}</Button>
               </form>
             )
           }
@@ -53,26 +55,26 @@ export function AdminPage() {
             {kompanien.map((k) => (
               <KpPanel key={k.id} kp={k} zuege={zuege.filter((z) => z.kpId === k.id)} users={users} run={run} onEdit={setEditUser} />
             ))}
-            {kompanien.length === 0 && <Empty>Keine Kompanien.</Empty>}
+            {kompanien.length === 0 && <Empty>{t('admin.noKp')}</Empty>}
           </div>
         </Card>
 
         <Card
-          title="Benutzer"
+          title={t('admin.users')}
           actions={
             <Button variant="primary" onClick={() => setEditUser({ role: me.role === 'BAT' ? 'KPKDT' : 'KADER', kpId: me.kpId, zugId: null, funktion: '' })}>
-              + Benutzer
+              {t('admin.addUser')}
             </Button>
           }
         >
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="py-1 pr-2">Name</th>
-                <th className="py-1 pr-2">E-Mail</th>
-                <th className="py-1 pr-2">Rolle</th>
-                <th className="py-1 pr-2">Funktion</th>
-                <th className="py-1 pr-2">Kp / Zug</th>
+                <th className="py-1 pr-2">{t('profile.name')}</th>
+                <th className="py-1 pr-2">{t('login.email')}</th>
+                <th className="py-1 pr-2">{t('profile.role')}</th>
+                <th className="py-1 pr-2">{t('admin.funktion')}</th>
+                <th className="py-1 pr-2">{t('admin.kpZug')}</th>
                 <th />
               </tr>
             </thead>
@@ -82,7 +84,7 @@ export function AdminPage() {
                   <td className="py-1.5 pr-2 font-medium">{u.name}</td>
                   <td className="py-1.5 pr-2 text-slate-600">{u.email}</td>
                   <td className="py-1.5 pr-2">
-                    {u.role === 'ZFHR' && u.zugId && zuege.find((z) => z.id === u.zugId)?.zfhrUserId !== u.id ? 'Zfhr Stv' : ROLE_LABEL[u.role]}
+                    {u.role === 'ZFHR' && u.zugId && zuege.find((z) => z.id === u.zugId)?.zfhrUserId !== u.id ? t('admin.zfhrStv') : t(`role.${u.role}`)}
                   </td>
                   <td className="py-1.5 pr-2 text-slate-600">{u.funktion}</td>
                   <td className="py-1.5 pr-2 text-slate-600">
@@ -92,11 +94,11 @@ export function AdminPage() {
                     {canManageUser(me, u) && (
                       <>
                         <Button variant="ghost" className="text-xs" onClick={() => setEditUser(u)}>
-                          Bearbeiten
+                          {t('common.edit')}
                         </Button>
                         {u.id !== me.id && (
-                          <Button variant="ghost" className="text-xs text-red-600" onClick={() => confirm(`${u.name} löschen?`) && run(() => api.deleteUser(u.id))}>
-                            Löschen
+                          <Button variant="ghost" className="text-xs text-red-600" onClick={() => confirm(t('admin.confirmDelete', { name: u.name })) && run(() => api.deleteUser(u.id))}>
+                            {t('common.delete')}
                           </Button>
                         )}
                       </>
@@ -127,6 +129,7 @@ export function AdminPage() {
 }
 
 function UserDialog({ user, onClose, onSave }: { user: Partial<UserRow>; onClose: () => void; onSave: (u: Partial<UserRow>, password: string) => void }) {
+  const { t } = useT();
   const me = useUser();
   const org = useQuery({ queryKey: ['org'], queryFn: api.org });
   const [u, setU] = useState(user);
@@ -138,38 +141,38 @@ function UserDialog({ user, onClose, onSave }: { user: Partial<UserRow>; onClose
 
   return (
     <Modal
-      title={u.id ? 'Benutzer bearbeiten' : 'Neuer Benutzer'}
+      title={u.id ? t('admin.editUser') : t('admin.newUser')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!valid} onClick={() => onSave(u, password)}>
-            Speichern
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Name (Grad Name)">
+        <Field label={t('admin.nameRank')}>
           <input className="input" value={u.name ?? ''} onChange={(e) => setU({ ...u, name: e.target.value })} />
         </Field>
-        <Field label="E-Mail">
+        <Field label={t('login.email')}>
           <input className="input" type="email" value={u.email ?? ''} onChange={(e) => setU({ ...u, email: e.target.value })} />
         </Field>
-        <Field label="Rolle">
+        <Field label={t('profile.role')}>
           <select className="input" value={u.role} onChange={(e) => setU({ ...u, role: e.target.value as Role })}>
             {roles.map((r) => (
               <option key={r} value={r}>
-                {ROLE_LABEL[r]}
+                {t(`role.${r}`)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Funktion">
-          <input className="input" value={u.funktion ?? ''} onChange={(e) => setU({ ...u, funktion: e.target.value })} placeholder="z. B. Grfhr Pi Z 1" />
+        <Field label={t('admin.funktion')}>
+          <input className="input" value={u.funktion ?? ''} onChange={(e) => setU({ ...u, funktion: e.target.value })} placeholder={t('admin.funktionPh')} />
         </Field>
         {u.role !== 'BAT' && (
-          <Field label="Kompanie">
+          <Field label={t('common.kompanie')}>
             <select className="input" value={u.kpId ?? ''} onChange={(e) => setU({ ...u, kpId: e.target.value ? Number(e.target.value) : null, zugId: null })}>
               <option value="">–</option>
               {kps.map((k) => (
@@ -181,7 +184,7 @@ function UserDialog({ user, onClose, onSave }: { user: Partial<UserRow>; onClose
           </Field>
         )}
         {(u.role === 'ZFHR' || u.role === 'KADER' || u.role === 'LOGOF') && (
-          <Field label="Zug">
+          <Field label={t('common.zug')}>
             <select className="input" value={u.zugId ?? ''} onChange={(e) => setU({ ...u, zugId: e.target.value ? Number(e.target.value) : null })}>
               <option value="">–</option>
               {zuege.map((z) => (
@@ -192,7 +195,7 @@ function UserDialog({ user, onClose, onSave }: { user: Partial<UserRow>; onClose
             </select>
           </Field>
         )}
-        <Field label={u.id ? 'Neues Passwort (optional)' : 'Passwort (mind. 8 Zeichen)'} className="col-span-2">
+        <Field label={u.id ? t('admin.newPasswordOpt') : t('admin.passwordMin')} className="col-span-2">
           <input className="input" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
       </div>
@@ -204,6 +207,7 @@ type Run = (fn: () => Promise<unknown>) => Promise<void>;
 
 /** A Kompanie with its Kommando and, per Zug, the Zugführer and Kader – all editable in place. */
 function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]; users: UserRow[]; run: Run; onEdit: (u: Partial<UserRow>) => void }) {
+  const { t } = useT();
   const me = useUser();
   const [assign, setAssign] = useState<{ zug: Zug | null; role: Role } | null>(null);
   const [bestandOf, setBestandOf] = useState<Zug | null>(null);
@@ -230,37 +234,37 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
               variant="ghost"
               className="text-xs"
               onClick={() => {
-                const name = prompt('Neuer Name', kp.name);
+                const name = prompt(t('admin.newName'), kp.name);
                 if (name) run(() => api.updateKp(kp.id, name));
               }}
             >
-              Umbenennen
+              {t('admin.rename')}
             </Button>
-            <Button variant="ghost" className="text-xs text-red-600" onClick={() => confirm(`${kp.name} mit allen WKs löschen?`) && run(() => api.deleteKp(kp.id))}>
-              Löschen
+            <Button variant="ghost" className="text-xs text-red-600" onClick={() => confirm(t('admin.confirmDeleteKp', { name: kp.name })) && run(() => api.deleteKp(kp.id))}>
+              {t('common.delete')}
             </Button>
           </>
         )}
       </div>
       <div className="divide-y divide-slate-100">
         <PeopleRow
-          title="Kommando"
+          title={t('admin.kommando')}
           people={kommando}
           onEdit={onEdit}
           actions={
             me.role === 'BAT' || me.role === 'ADMIN' ? (
               <>
                 <Button variant="ghost" className="text-xs" onClick={() => newPerson('KPKDT', null)}>
-                  + Kp Kdt
+                  {t('admin.addKpKdt')}
                 </Button>
                 <Button variant="ghost" className="text-xs" onClick={() => newPerson('LOGOF', null)}>
-                  + Log Of
+                  {t('admin.addLogOf')}
                 </Button>
               </>
             ) : (
               canManageUser(me, { role: 'LOGOF', kpId: kp.id, batId: me.batId }) && (
                 <Button variant="ghost" className="text-xs" onClick={() => newPerson('LOGOF', null)}>
-                  + Log Of
+                  {t('admin.addLogOf')}
                 </Button>
               )
             )
@@ -278,29 +282,29 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
                 {editZuege && (
                   <>
                     <Button variant="ghost" className="!py-0.5 text-xs" onClick={() => setAssign({ zug: z, role: 'ZFHR' })}>
-                      + Zugführer
+                      {t('admin.addZfhr')}
                     </Button>
                     <Button variant="ghost" className="!py-0.5 text-xs" onClick={() => setAssign({ zug: z, role: 'KADER' })}>
-                      + Kader
+                      {t('admin.addKader')}
                     </Button>
                     <Button
                       variant="ghost"
                       className="!py-0.5 text-xs"
                       onClick={() => {
-                        const name = prompt('Neuer Name', z.name);
+                        const name = prompt(t('admin.newName'), z.name);
                         if (name) run(() => api.updateZug(z.id, { name }));
                       }}
                     >
-                      Umbenennen
+                      {t('admin.rename')}
                     </Button>
-                    <Button variant="ghost" className="!py-0.5 text-xs text-red-600" onClick={() => confirm(`${z.name} löschen?`) && run(() => api.deleteZug(z.id))}>
-                      Löschen
+                    <Button variant="ghost" className="!py-0.5 text-xs text-red-600" onClick={() => confirm(t('admin.confirmDelete', { name: z.name })) && run(() => api.deleteZug(z.id))}>
+                      {t('common.delete')}
                     </Button>
                   </>
                 )}
               </div>
               <div className="grid gap-1 sm:grid-cols-[7rem,1fr]">
-                <span className="text-xs text-slate-500">Zugführer</span>
+                <span className="text-xs text-slate-500">{t('admin.zfhr')}</span>
                 <div className="flex flex-wrap gap-1">
                   {zfhr.map((u) => (
                     <Person
@@ -312,7 +316,7 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
                       onMain={editZuege && u.role === 'ZFHR' && z.zfhrUserId !== u.id ? () => run(() => api.updateZug(z.id, { zfhrUserId: u.id })) : undefined}
                     />
                   ))}
-                  {zfhr.length === 0 && <span className="text-xs text-amber-700">kein Zugführer</span>}
+                  {zfhr.length === 0 && <span className="text-xs text-amber-700">{t('admin.noZfhr')}</span>}
                 </div>
                 <span className="text-xs text-slate-500">Kader</span>
                 <div className="flex flex-wrap gap-1">
@@ -324,7 +328,7 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
                 <span className="text-xs text-slate-500">Gruppen</span>
                 <div className="flex flex-wrap items-center gap-1 text-xs">
                   {z.gruppen.map((g) => (
-                    <span key={g.id} className="rounded-full bg-slate-500/10 px-2 py-0.5" title={`Soll ${g.soll.kader} Kader · ${g.soll.sdt} Sdt — Ist ${g.ist.kader} · ${g.ist.sdt}`}>
+                    <span key={g.id} className="rounded-full bg-slate-500/10 px-2 py-0.5" title={t('admin.groupTitle', { sk: g.soll.kader, ss: g.soll.sdt, ik: g.ist.kader, is: g.ist.sdt })}>
                       <b className="font-medium">{g.name}</b>
                       {g.leiterUserId && ` · ${users.find((u) => u.id === g.leiterUserId)?.name ?? ''}`}
                       <span className="text-slate-500"> · {bestandTotal(g.ist)}/{bestandTotal(g.soll)}</span>
@@ -333,17 +337,17 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
                   {z.gruppen.length === 0 && <span className="text-slate-400">–</span>}
                   {editZuege && (
                     <Button variant="ghost" className="!py-0.5 text-xs" onClick={() => setGruppenOf(z)}>
-                      Gruppen bearbeiten
+                      {t('admin.editGroups')}
                     </Button>
                   )}
                 </div>
                 <span className="text-xs text-slate-500">Bestand</span>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                  <BestandText label="Soll" b={z.soll} />
-                  <BestandText label="Ist" b={z.ist} soll={z.soll} />
+                  <BestandText label={t('admin.soll')} b={z.soll} />
+                  <BestandText label={t('admin.ist')} b={z.ist} soll={z.soll} />
                   {editZuege && (
                     <Button variant="ghost" className="!py-0.5 text-xs" onClick={() => setBestandOf(z)}>
-                      Bestand bearbeiten
+                      {t('admin.editBestand')}
                     </Button>
                   )}
                 </div>
@@ -351,18 +355,18 @@ function KpPanel({ kp, zuege, users, run, onEdit }: { kp: Kompanie; zuege: Zug[]
             </div>
           );
         })}
-        {ohneZug.length > 0 && <PeopleRow title="Ohne Zug" people={ohneZug} onEdit={onEdit} />}
+        {ohneZug.length > 0 && <PeopleRow title={t('admin.noZug')} people={ohneZug} onEdit={onEdit} />}
         {editZuege && (
           <div className="px-3 py-2">
             <Button
               variant="ghost"
               className="text-xs"
               onClick={() => {
-                const name = prompt('Name des Zuges (z. B. Pi Z 4)');
+                const name = prompt(t('admin.zugNamePrompt'));
                 if (name) run(() => api.createZug(kp.id, name));
               }}
             >
-              + Zug
+              {t('admin.addZug')}
             </Button>
           </div>
         )}
@@ -424,9 +428,10 @@ function PeopleRow({ title, people, onEdit, actions }: { title: string; people: 
 
 /** «Soll 2 / 6 / 30 = 38»; the Ist in amber where it falls short of the Soll. */
 function BestandText({ label, b, soll }: { label: string; b: Bestand; soll?: Bestand }) {
+  const { t } = useT();
   const short = (k: keyof Bestand) => soll && b[k] < soll[k];
   return (
-    <span className="tabular-nums" title={BESTAND_KEYS.map((k) => `${BESTAND_LABEL[k]} ${b[k]}`).join(', ')}>
+    <span className="tabular-nums" title={BESTAND_KEYS.map((k) => `${t(`bestand.${k}`)} ${b[k]}`).join(', ')}>
       <span className="text-slate-500">{label} </span>
       {BESTAND_KEYS.map((k, i) => (
         <span key={k}>
@@ -442,6 +447,7 @@ function BestandText({ label, b, soll }: { label: string; b: Bestand; soll?: Bes
 
 /** Soll- and Istbestand of a Zug by Zugführer, Kader and Soldaten. */
 function BestandDialog({ zug, onSave, onClose }: { zug: Zug; onSave: (soll: Bestand, ist: Bestand) => void; onClose: () => void }) {
+  const { t } = useT();
   const [soll, setSoll] = useState(zug.soll);
   const [ist, setIst] = useState(zug.ist);
   // With Gruppen, Kader and Soldaten are their sum (edited under «Gruppen bearbeiten»).
@@ -451,7 +457,7 @@ function BestandDialog({ zug, onSave, onClose }: { zug: Zug; onSave: (soll: Best
       type="number"
       min={0}
       max={999}
-      aria-label={`${label} ${BESTAND_LABEL[k]}`}
+      aria-label={`${label} ${t(`bestand.${k}`)}`}
       className="input w-20 text-center tabular-nums"
       value={b[k]}
       onChange={(e) => set({ ...b, [k]: Math.max(0, Math.min(999, Math.round(Number(e.target.value) || 0))) })}
@@ -463,9 +469,9 @@ function BestandDialog({ zug, onSave, onClose }: { zug: Zug; onSave: (soll: Best
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" onClick={() => onSave(soll, ist)}>
-            Speichern
+            {t('common.save')}
           </Button>
         </>
       }
@@ -474,14 +480,14 @@ function BestandDialog({ zug, onSave, onClose }: { zug: Zug; onSave: (soll: Best
         <thead>
           <tr className="text-left text-xs text-slate-500">
             <th className="py-1" />
-            <th className="py-1 text-center font-medium">Sollbestand</th>
-            <th className="py-1 text-center font-medium">Istbestand</th>
+            <th className="py-1 text-center font-medium">{t('admin.sollbestand')}</th>
+            <th className="py-1 text-center font-medium">{t('admin.istbestand')}</th>
           </tr>
         </thead>
         <tbody>
           {BESTAND_KEYS.map((k) => (
             <tr key={k}>
-              <td className="py-1 pr-3">{BESTAND_LABEL[k]}</td>
+              <td className="py-1 pr-3">{t(`bestand.${k}`)}</td>
               {fromGruppen && k !== 'zfhr' ? (
                 <>
                   <td className="py-1 text-center tabular-nums text-slate-500">{soll[k]}</td>
@@ -489,8 +495,8 @@ function BestandDialog({ zug, onSave, onClose }: { zug: Zug; onSave: (soll: Best
                 </>
               ) : (
                 <>
-                  <td className="py-1 text-center">{input(soll, setSoll, k, 'Soll')}</td>
-                  <td className="py-1 text-center">{input(ist, setIst, k, 'Ist')}</td>
+                  <td className="py-1 text-center">{input(soll, setSoll, k, t('admin.soll'))}</td>
+                  <td className="py-1 text-center">{input(ist, setIst, k, t('admin.ist'))}</td>
                 </>
               )}
             </tr>
@@ -503,8 +509,8 @@ function BestandDialog({ zug, onSave, onClose }: { zug: Zug; onSave: (soll: Best
         </tbody>
       </table>
       <p className="text-xs text-slate-500">
-        {fromGruppen && 'Kader und Soldaten ergeben sich aus den Gruppen des Zuges. '}
-        Erscheint in der Personalplanung jedes WKs und in der Jahresplanung des Bataillons.
+        {fromGruppen && t('admin.fromGroups')}
+        {t('admin.bestandHint')}
       </p>
     </Modal>
   );
@@ -512,10 +518,11 @@ function BestandDialog({ zug, onSave, onClose }: { zug: Zug; onSave: (soll: Best
 
 /** Gruppen of a Zug: name, Gruppenführer and Bestand (Kader, Soldaten); the Zug's Bestand is their sum. */
 function GruppenDialog({ zug, leaders, onSave, onClose }: { zug: Zug; leaders: UserRow[]; onSave: (items: GruppeInput[]) => void; onClose: () => void }) {
+  const { t } = useT();
   const [rows, setRows] = useState<GruppeInput[]>(() =>
     zug.gruppen.length
       ? zug.gruppen.map(({ id, name, leiterUserId, soll, ist }) => ({ id, name, leiterUserId, soll, ist }))
-      : [{ name: 'Gruppe 1', leiterUserId: null, soll: { zfhr: 0, kader: 0, sdt: 0 }, ist: { zfhr: 0, kader: 0, sdt: 0 } }],
+      : [{ name: t('admin.groupN', { n: 1 }), leiterUserId: null, soll: { zfhr: 0, kader: 0, sdt: 0 }, ist: { zfhr: 0, kader: 0, sdt: 0 } }],
   );
   const set = (i: number, patch: Partial<GruppeInput>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const num = (i: number, which: 'soll' | 'ist', k: 'kader' | 'sdt', label: string) => (
@@ -538,9 +545,9 @@ function GruppenDialog({ zug, leaders, onSave, onClose }: { zug: Zug; leaders: U
       wide
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!valid} onClick={() => onSave(rows.map((r) => ({ ...r, name: r.name.trim() })))}>
-            Speichern
+            {t('common.save')}
           </Button>
         </>
       }
@@ -549,13 +556,13 @@ function GruppenDialog({ zug, leaders, onSave, onClose }: { zug: Zug; leaders: U
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-slate-500">
-              <th className="py-1 pr-2 font-normal">Gruppe</th>
-              <th className="py-1 pr-2 font-normal">Gruppenführer/in</th>
+              <th className="py-1 pr-2 font-normal">{t('admin.gruppe')}</th>
+              <th className="py-1 pr-2 font-normal">{t('admin.grfhr')}</th>
               <th className="py-1 text-center font-normal" colSpan={2}>
-                Soll Kader · Sdt
+                {t('admin.sollKaderSdt')}
               </th>
               <th className="py-1 text-center font-normal" colSpan={2}>
-                Ist Kader · Sdt
+                {t('admin.istKaderSdt')}
               </th>
               <th />
             </tr>
@@ -564,10 +571,10 @@ function GruppenDialog({ zug, leaders, onSave, onClose }: { zug: Zug; leaders: U
             {rows.map((r, i) => (
               <tr key={r.id ?? `neu${i}`}>
                 <td className="py-1 pr-2">
-                  <input className="input min-w-[7rem]" value={r.name} aria-label="Name der Gruppe" onChange={(e) => set(i, { name: e.target.value })} />
+                  <input className="input min-w-[7rem]" value={r.name} aria-label={t('admin.groupName')} onChange={(e) => set(i, { name: e.target.value })} />
                 </td>
                 <td className="py-1 pr-2">
-                  <select className="input min-w-[9rem]" value={r.leiterUserId ?? ''} aria-label="Gruppenführer/in" onChange={(e) => set(i, { leiterUserId: e.target.value ? Number(e.target.value) : null })}>
+                  <select className="input min-w-[9rem]" value={r.leiterUserId ?? ''} aria-label={t('admin.grfhr')} onChange={(e) => set(i, { leiterUserId: e.target.value ? Number(e.target.value) : null })}>
                     <option value="">–</option>
                     {leaders.map((u) => (
                       <option key={u.id} value={u.id}>
@@ -576,12 +583,12 @@ function GruppenDialog({ zug, leaders, onSave, onClose }: { zug: Zug; leaders: U
                     ))}
                   </select>
                 </td>
-                <td className="py-1 pr-1">{num(i, 'soll', 'kader', 'Soll Kader')}</td>
-                <td className="py-1 pr-3">{num(i, 'soll', 'sdt', 'Soll Soldaten')}</td>
-                <td className="py-1 pr-1">{num(i, 'ist', 'kader', 'Ist Kader')}</td>
-                <td className="py-1 pr-2">{num(i, 'ist', 'sdt', 'Ist Soldaten')}</td>
+                <td className="py-1 pr-1">{num(i, 'soll', 'kader', t('admin.sollKader'))}</td>
+                <td className="py-1 pr-3">{num(i, 'soll', 'sdt', t('admin.sollSdt'))}</td>
+                <td className="py-1 pr-1">{num(i, 'ist', 'kader', t('admin.istKader'))}</td>
+                <td className="py-1 pr-2">{num(i, 'ist', 'sdt', t('admin.istSdt'))}</td>
                 <td className="py-1">
-                  <button className="px-1 text-slate-400 hover:text-red-600" aria-label="Gruppe entfernen" onClick={() => setRows(rows.filter((_, j) => j !== i))}>
+                  <button className="px-1 text-slate-400 hover:text-red-600" aria-label={t('admin.removeGroup')} onClick={() => setRows(rows.filter((_, j) => j !== i))}>
                     ✕
                   </button>
                 </td>
@@ -603,13 +610,12 @@ function GruppenDialog({ zug, leaders, onSave, onClose }: { zug: Zug; leaders: U
       <Button
         variant="ghost"
         className="text-xs"
-        onClick={() => setRows([...rows, { name: `Gruppe ${rows.length + 1}`, leiterUserId: null, soll: { zfhr: 0, kader: 0, sdt: 0 }, ist: { zfhr: 0, kader: 0, sdt: 0 } }])}
+        onClick={() => setRows([...rows, { name: t('admin.groupN', { n: rows.length + 1 }), leiterUserId: null, soll: { zfhr: 0, kader: 0, sdt: 0 }, ist: { zfhr: 0, kader: 0, sdt: 0 } }])}
       >
-        + Gruppe
+        {t('admin.addGroup')}
       </Button>
       <p className="text-xs text-slate-500">
-        Kader und Soldaten des Zuges ergeben sich aus den Gruppen; der Zugführer-Bestand bleibt beim Zug. Neue WKs übernehmen die Gruppen für Detailplanung und
-        Turnus (pro WK anpassbar). In der Jahresplanung hat jede Gruppe eine eigene Zeile.
+        {t('admin.groupsHint')}
       </p>
     </Modal>
   );
@@ -617,20 +623,21 @@ function GruppenDialog({ zug, leaders, onSave, onClose }: { zug: Zug; leaders: U
 
 /** A person as a chip: click to edit; optional «main Zugführer» star and removal from the Zug. */
 function Person({ u, main, onEdit, onRemove, onMain }: { u: UserRow; main?: boolean; onEdit?: () => void; onRemove?: () => void; onMain?: () => void }) {
+  const { t } = useT();
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${main ? 'border-zs-orange bg-orange-50' : 'border-slate-200 bg-white'}`}>
-      {main && <span title="Haupt-Zugführer/in">★</span>}
+      {main && <span title={t('admin.mainZfhr')}>★</span>}
       <button className="hover:underline disabled:no-underline" disabled={!onEdit} onClick={onEdit} title={u.email}>
         {u.name}
-        <span className="text-slate-500"> · {u.role === 'ZFHR' && !main ? 'Zfhr Stv' : u.funktion || ROLE_LABEL[u.role]}</span>
+        <span className="text-slate-500"> · {u.role === 'ZFHR' && !main ? t('admin.zfhrStv') : u.funktion || t(`role.${u.role}`)}</span>
       </button>
       {onMain && (
-        <button className="text-slate-400 hover:text-zs-orange" onClick={onMain} title="Als Haupt-Zugführer/in setzen" aria-label={`${u.name} als Haupt-Zugführer/in`}>
+        <button className="text-slate-400 hover:text-zs-orange" onClick={onMain} title={t('admin.setMain')} aria-label={t('admin.setMainOf', { name: u.name })}>
           ☆
         </button>
       )}
       {onRemove && (
-        <button className="text-slate-400 hover:text-red-600" onClick={onRemove} title="Aus dem Zug entfernen" aria-label={`${u.name} aus dem Zug entfernen`}>
+        <button className="text-slate-400 hover:text-red-600" onClick={onRemove} title={t('admin.removeFromZug')} aria-label={t('admin.removeFromZugOf', { name: u.name })}>
           ✕
         </button>
       )}
@@ -655,35 +662,36 @@ function AssignDialog({
   onNew: () => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [pick, setPick] = useState<number | ''>('');
-  const label = role === 'ZFHR' ? 'Zugführer/in' : 'Kader';
+  const label = t(role === 'ZFHR' ? 'role.ZFHR' : 'role.KADER');
   return (
     <Modal
-      title={`${label} für ${zug.name}`}
+      title={t('admin.assignTitle', { label, zug: zug.name })}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!pick} onClick={() => onAssign(candidates.find((c) => c.id === pick)!)}>
-            Zuteilen
+            {t('admin.assign')}
           </Button>
         </>
       }
     >
       <Field label={`Bestehende Person aus ${kp.name}`}>
         <select className="input" value={pick} onChange={(e) => setPick(e.target.value ? Number(e.target.value) : '')}>
-          <option value="">– wählen –</option>
+          <option value="">{t('common.choose')}</option>
           {candidates.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
-              {c.zugId ? ' (wechselt den Zug)' : ' (ohne Zug)'}
+              {c.zugId ? t('admin.changesZug') : t('admin.withoutZug')}
             </option>
           ))}
         </select>
       </Field>
-      {candidates.length === 0 && <p className="text-sm text-slate-500">Keine weiteren Personen mit dieser Rolle in der Kompanie.</p>}
+      {candidates.length === 0 && <p className="text-sm text-slate-500">{t('admin.noCandidates')}</p>}
       <div className="border-t pt-3">
-        <Button onClick={onNew}>+ Neue Person erfassen</Button>
+        <Button onClick={onNew}>{t('admin.newPerson')}</Button>
       </div>
     </Modal>
   );

@@ -5,20 +5,24 @@ import type { Ausbildungsstufe, Fachbereich, LibraryEntry } from '@shared/types'
 import { AUSBILDUNGSSTUFEN, FACHBEREICHE } from '@shared/types';
 import { FachbereichTags } from '../components/FachbereichTags';
 import { avProgress } from '@shared/av';
-import { fmtDate, fmtTime, weekday, wkDays } from '@shared/util';
+import { fmtDate, fmtTime, wkDays } from '@shared/util';
+import { weekdayShortIn } from '@shared/i18n';
+import { currentLang } from '../lib/lang';
 import { api } from '../api';
 import { useUser } from '../auth';
 import { Button, Card, Empty, errMsg, Field, Modal, useToast } from '../components/ui';
 import { DOC_CSS, docContext, docHtml, downloadJson, downloadWord } from '../features/av/avDocument';
 import { FileArea } from '../components/FileArea';
+import { useT } from '../i18n';
 
 type Status = '' | 'complete' | 'progress' | 'open';
 const statusOf = (done: number, total: number): Exclude<Status, ''> => (done === total ? 'complete' : done <= 1 ? 'open' : 'progress');
-const STATUS_LABEL = { complete: 'Vollständig', progress: 'In Arbeit', open: 'Begonnen' } as const;
+const STATUS_KEYS = ['complete', 'progress', 'open'] as const;
 const barColor = (pct: number) => (pct >= 100 ? 'bg-emerald-500' : pct >= 55 ? 'bg-amber-400' : 'bg-red-400');
 
 /** All Ausbildungsvorbereitungen of the Bataillon: progress, search, preview and reuse as template. */
 export function BibliothekPage() {
+  const { t } = useT();
   const q = useQuery({ queryKey: ['library'], queryFn: api.library });
   const [text, setText] = useState('');
   const [stufe, setStufe] = useState<Ausbildungsstufe | ''>('');
@@ -48,16 +52,16 @@ export function BibliothekPage() {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-6xl space-y-4 p-3 sm:p-6">
         <div>
-          <h1 className="text-xl font-semibold">Lektionsbibliothek</h1>
-          <p className="text-sm text-slate-500">Alle Ausbildungsvorbereitungen des Bataillons – zum Nachschlagen und als Vorlage für eigene Lektionen.</p>
+          <h1 className="text-xl font-semibold">{t('nav.library')}</h1>
+          <p className="text-sm text-slate-500">{t('lib.intro')}</p>
         </div>
 
         {q.isLoading ? (
-          <Empty>Laden …</Empty>
+          <Empty>{t('common.loading')}</Empty>
         ) : (
           <>
             <ProgressOverview entries={withProgress} />
-            <Card title="Fortschritt nach Fachbereich">
+            <Card title={t('lib.byFachbereich')}>
               <FachbereichOverview entries={withProgress} />
             </Card>
           </>
@@ -65,33 +69,33 @@ export function BibliothekPage() {
 
         <Card>
           <div className="flex flex-wrap items-end gap-2">
-            <Field label="Suche" className="min-w-[14rem] flex-1">
-              <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Thema, Ziel, Material, Leiter …" />
+            <Field label={t('common.search')} className="min-w-[14rem] flex-1">
+              <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('lib.searchPh')} />
             </Field>
-            <Field label="Fachbereich">
+            <Field label={t('av.fachbereich')}>
               <select className="input" value={fb} onChange={(e) => setFb(e.target.value as Fachbereich | '')}>
-                <option value="">Alle</option>
+                <option value="">{t('lib.all')}</option>
                 {(Object.keys(FACHBEREICHE) as Fachbereich[]).map((k) => (
                   <option key={k} value={k}>
-                    {FACHBEREICHE[k]}
+                    {t(`fachbereich.${k}`)}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Stufe">
+            <Field label={t('lib.stufe')}>
               <select className="input" value={stufe} onChange={(e) => setStufe(e.target.value as Ausbildungsstufe | '')}>
-                <option value="">Alle</option>
+                <option value="">{t('lib.all')}</option>
                 {(Object.keys(AUSBILDUNGSSTUFEN) as Ausbildungsstufe[]).map((k) => (
                   <option key={k} value={k}>
-                    {AUSBILDUNGSSTUFEN[k]}
+                    {t(`stufe.${k}`)}
                   </option>
                 ))}
               </select>
             </Field>
             {kompanien.length > 1 && (
-              <Field label="Kompanie">
+              <Field label={t('common.kompanie')}>
                 <select className="input" value={kp} onChange={(e) => setKp(e.target.value ? Number(e.target.value) : '')}>
-                  <option value="">Alle</option>
+                  <option value="">{t('lib.all')}</option>
                   {kompanien.map(([id, name]) => (
                     <option key={id} value={id}>
                       {name}
@@ -100,12 +104,12 @@ export function BibliothekPage() {
                 </select>
               </Field>
             )}
-            <Field label="Stand">
+            <Field label={t('lib.stand')}>
               <select className="input" value={status} onChange={(e) => setStatus(e.target.value as Status)}>
-                <option value="">Alle</option>
-                {(Object.keys(STATUS_LABEL) as (keyof typeof STATUS_LABEL)[]).map((k) => (
+                <option value="">{t('lib.all')}</option>
+                {STATUS_KEYS.map((k) => (
                   <option key={k} value={k}>
-                    {STATUS_LABEL[k]}
+                    {t(`lib.status.${k}`)}
                   </option>
                 ))}
               </select>
@@ -118,7 +122,7 @@ export function BibliothekPage() {
         </p>
         {list.length === 0 && !q.isLoading ? (
           <Card>
-            <Empty>Keine passenden Ausbildungsvorbereitungen.</Empty>
+            <Empty>{t('lib.noMatch')}</Empty>
           </Card>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
@@ -135,6 +139,7 @@ export function BibliothekPage() {
 }
 
 function ProgressOverview({ entries }: { entries: { e: LibraryEntry; p: { done: number; total: number } }[] }) {
+  const { t } = useT();
   const total = entries.length;
   const complete = entries.filter(({ p }) => p.done === p.total).length;
   const avg = total ? Math.round((entries.reduce((a, { p }) => a + p.done / p.total, 0) / total) * 100) : 0;
@@ -152,30 +157,30 @@ function ProgressOverview({ entries }: { entries: { e: LibraryEntry; p: { done: 
   }
   return (
     <div className="grid gap-4 md:grid-cols-[18rem,1fr]">
-      <Card title="Fortschritt gesamt">
+      <Card title={t('lib.total')}>
         <div className="text-4xl font-semibold tabular-nums">{avg}%</div>
         <div className="mt-2 h-2.5 overflow-hidden rounded bg-slate-200">
           <div className={`h-full ${barColor(avg)}`} style={{ width: `${avg}%` }} />
         </div>
         <ul className="mt-3 space-y-1 text-sm">
           <li className="flex justify-between">
-            <span>Lektionen</span> <b>{total}</b>
+            <span>{t('lib.lessons')}</span> <b>{total}</b>
           </li>
           <li className="flex justify-between text-emerald-700">
-            <span>Vollständig (7/7)</span> <b>{counts.complete}</b>
+            <span>{t('lib.complete77')}</span> <b>{counts.complete}</b>
           </li>
           <li className="flex justify-between text-amber-700">
-            <span>In Arbeit</span> <b>{counts.progress}</b>
+            <span>{t('lib.status.progress')}</span> <b>{counts.progress}</b>
           </li>
           <li className="flex justify-between text-red-700">
-            <span>Begonnen</span> <b>{counts.open}</b>
+            <span>{t('lib.status.open')}</span> <b>{counts.open}</b>
           </li>
         </ul>
-        <p className="mt-2 text-xs text-slate-500">{complete === total && total > 0 ? 'Alle Lektionen sind vollständig vorbereitet.' : 'Fortschritt = ausgefüllte der 7 Schritte.'}</p>
+        <p className="mt-2 text-xs text-slate-500">{complete === total && total > 0 ? t('lib.allComplete') : t('lib.progressHint')}</p>
       </Card>
-      <Card title="Nach Kompanie und Zug">
+      <Card title={t('lib.byKpZug')}>
         {groups.size === 0 ? (
-          <Empty>Noch keine Ausbildungsvorbereitungen.</Empty>
+          <Empty>{t('lek.none')}</Empty>
         ) : (
           <ul className="space-y-2">
             {[...groups.values()]
@@ -205,6 +210,7 @@ function ProgressOverview({ entries }: { entries: { e: LibraryEntry; p: { done: 
 }
 
 function LibraryCard({ e, done, total, onPreview, onReuse }: { e: LibraryEntry; done: number; total: number; onPreview: () => void; onReuse: () => void }) {
+  const { t } = useT();
   const me = useUser();
   const pct = Math.round((done / total) * 100);
   const canReuse = (me.role === 'ZFHR' || me.role === 'KADER' || me.role === 'LOGOF') && me.zugId !== null;
@@ -214,18 +220,18 @@ function LibraryCard({ e, done, total, onPreview, onReuse }: { e: LibraryEntry; 
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 font-semibold">
-            {e.av.thema || 'Ohne Thema'} <FachbereichTags list={e.av.fachbereiche} />
+            {e.av.thema || t('lib.noTheme')} <FachbereichTags list={e.av.fachbereiche} />
             {!!e.av.attachmentCount && (
-              <span className="text-xs font-normal text-slate-500" title="Anhänge">
+              <span className="text-xs font-normal text-slate-500" title={t('av.attachments')}>
                 📎 {e.av.attachmentCount}
               </span>
             )}
           </div>
           <div className="text-sm text-slate-500">
-            {[e.kpName, e.zugName, e.av.stufe && AUSBILDUNGSSTUFEN[e.av.stufe], e.av.ausbildungsart].filter(Boolean).join(' · ')}
+            {[e.kpName, e.zugName, e.av.stufe && t(`stufe.${e.av.stufe}`), e.av.ausbildungsart].filter(Boolean).join(' · ')}
           </div>
           <div className="text-xs text-slate-500">
-            {e.av.datum ? `${weekday(e.av.datum).slice(0, 2)} ${fmtDate(e.av.datum)}` : e.wkTitle}
+            {e.av.datum ? `${weekdayShortIn(currentLang(), e.av.datum)} ${fmtDate(e.av.datum)}` : e.wkTitle}
             {e.av.zeitVon && ` · ${e.av.zeitVon}–${e.av.zeitBis}`}
             {e.av.leiter && ` · ${e.av.leiter}`}
           </div>
@@ -237,9 +243,9 @@ function LibraryCard({ e, done, total, onPreview, onReuse }: { e: LibraryEntry; 
           <div className="mt-1 h-1.5 overflow-hidden rounded bg-slate-200">
             <div className={`h-full ${barColor(pct)}`} style={{ width: `${pct}%` }} />
           </div>
-          <div className="mt-1 flex justify-end gap-0.5" aria-label="Ausgefüllte Schritte">
+          <div className="mt-1 flex justify-end gap-0.5" aria-label={t('lib.filledSteps')}>
             {Object.entries(steps).map(([k, ok], i) => (
-              <span key={k} title={STEP_NAMES[i]} className={`h-2 w-2 rounded-sm ${ok ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+              <span key={k} title={t(`lib.step.${i as 0 | 1 | 2 | 3 | 4 | 5 | 6}`)} className={`h-2 w-2 rounded-sm ${ok ? 'bg-emerald-500' : 'bg-slate-200'}`} />
             ))}
           </div>
         </div>
@@ -249,11 +255,11 @@ function LibraryCard({ e, done, total, onPreview, onReuse }: { e: LibraryEntry; 
       )}
       <div className="mt-auto flex justify-end gap-2 pt-2">
         <Button variant="ghost" className="text-xs" onClick={onPreview}>
-          Ansehen
+          {t('lib.view')}
         </Button>
         {canReuse && (
           <Button className="text-xs" onClick={onReuse}>
-            Als Vorlage verwenden
+            {t('lib.useAsTemplate')}
           </Button>
         )}
       </div>
@@ -262,6 +268,7 @@ function LibraryCard({ e, done, total, onPreview, onReuse }: { e: LibraryEntry; 
 }
 
 function FachbereichOverview({ entries }: { entries: { e: LibraryEntry; p: { done: number; total: number } }[] }) {
+  const { t } = useT();
   const keys = [...(Object.keys(FACHBEREICHE) as Fachbereich[]), null];
   return (
     <ul className="grid gap-2 sm:grid-cols-5">
@@ -272,7 +279,7 @@ function FachbereichOverview({ entries }: { entries: { e: LibraryEntry; p: { don
         return (
           <li key={k ?? 'none'} className="rounded-md border border-slate-200 p-2">
             <div className="flex items-center justify-between gap-1 text-xs">
-              {k ? <FachbereichTags list={[k]} /> : <span className="text-slate-500">ohne Fachbereich</span>}
+              {k ? <FachbereichTags list={[k]} /> : <span className="text-slate-500">{t('lib.noFachbereich')}</span>}
               <span className="text-slate-500">{list.length} Lektionen</span>
             </div>
             <div className="mt-1 text-lg font-semibold tabular-nums">{list.length ? `${pct}%` : '–'}</div>
@@ -286,15 +293,15 @@ function FachbereichOverview({ entries }: { entries: { e: LibraryEntry; p: { don
   );
 }
 
-const STEP_NAMES = ['Eckdaten', 'Thema & Grundlagen', 'Ausbildungsstufe', 'Zielsetzung', 'Mittel', 'Ablauf', 'Controlling'];
 
 function PreviewDialog({ e, onClose, onReuse }: { e: LibraryEntry; onClose: () => void; onReuse: () => void }) {
+  const { t } = useT();
   const me = useUser();
   const bat = useQuery({ queryKey: ['org'], queryFn: api.org }).data?.bataillon;
   const ctx = docContext(bat, [e.kpName, e.zugName, e.wkTitle].join('\n'));
   return (
     <Modal
-      title={e.av.thema || 'Ausbildungsvorbereitung'}
+      title={e.av.thema || t('av.doc')}
       onClose={onClose}
       wide
       footer={
@@ -306,10 +313,10 @@ function PreviewDialog({ e, onClose, onReuse }: { e: LibraryEntry; onClose: () =
             Word
           </Button>
           <span className="flex-1" />
-          <Button onClick={onClose}>Schliessen</Button>
+          <Button onClick={onClose}>{t('common.close')}</Button>
           {(me.role === 'ZFHR' || me.role === 'KADER' || me.role === 'LOGOF') && me.zugId !== null && (
             <Button variant="primary" onClick={onReuse}>
-              Als Vorlage verwenden
+              {t('lib.useAsTemplate')}
             </Button>
           )}
         </>
@@ -320,7 +327,7 @@ function PreviewDialog({ e, onClose, onReuse }: { e: LibraryEntry; onClose: () =
       </div>
       {!!e.av.attachmentCount && (
         <div>
-          <span className="label">Anhänge</span>
+          <span className="label">{t('av.attachments')}</span>
           <FileArea queryKey={['av-files', e.av.id]} load={() => api.avAttachments(e.av.id)} upload={() => Promise.resolve()} canUpload={false} compact />
         </div>
       )}
@@ -330,6 +337,7 @@ function PreviewDialog({ e, onClose, onReuse }: { e: LibraryEntry; onClose: () =
 
 /** Copies the content into a new Ausbildungsvorbereitung for a time slot of the own Zug. */
 function ReuseDialog({ e, onClose }: { e: LibraryEntry; onClose: () => void }) {
+  const { t } = useT();
   const me = useUser();
   const nav = useNavigate();
   const qc = useQueryClient();
@@ -367,7 +375,7 @@ function ReuseDialog({ e, onClose }: { e: LibraryEntry; onClose: () => void }) {
       qc.invalidateQueries({ queryKey: ['library'] });
       qc.invalidateQueries({ queryKey: ['avs', activeWk] });
       if (e.av.attachmentCount) await api.copyAvAttachments(created.id, e.av.id);
-      toast('Vorlage übernommen – jetzt anpassen');
+      toast(t('lib.templateTaken'));
       nav(`/wk/${activeWk}/av/${created.id}`);
     } catch (err) {
       toast(errMsg(err), 'error');
@@ -376,13 +384,13 @@ function ReuseDialog({ e, onClose }: { e: LibraryEntry; onClose: () => void }) {
 
   return (
     <Modal
-      title="Als Vorlage verwenden"
+      title={t('lib.useAsTemplate')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!activeWk || !detail.data} onClick={create}>
-            Übernehmen
+            {t('lib.take')}
           </Button>
         </>
       }
@@ -392,10 +400,10 @@ function ReuseDialog({ e, onClose }: { e: LibraryEntry; onClose: () => void }) {
         aus dem gewählten Zeitfenster; Teilnehmer und Controlling bleiben leer.
       </p>
       {options.length === 0 ? (
-        <p className="text-sm text-red-700">Keine WKs deiner Kompanie vorhanden.</p>
+        <p className="text-sm text-red-700">{t('lib.noWks')}</p>
       ) : (
         <>
-          <Field label="WK">
+          <Field label={t('dash.col.wk')}>
             <select
               className="input"
               value={activeWk ?? ''}
@@ -411,12 +419,12 @@ function ReuseDialog({ e, onClose }: { e: LibraryEntry; onClose: () => void }) {
               ))}
             </select>
           </Field>
-          <Field label="Zeitfenster">
+          <Field label={t('av.slot')}>
             <select className="input" value={blockId} onChange={(ev) => setBlockId(ev.target.value ? Number(ev.target.value) : '')}>
-              <option value="">– ohne Zuordnung –</option>
+              <option value="">{t('av.noSlot')}</option>
               {slots.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {weekday(b.date).slice(0, 2)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)} {b.title}
+                  {weekdayShortIn(currentLang(), b.date)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)} {b.title}
                 </option>
               ))}
             </select>

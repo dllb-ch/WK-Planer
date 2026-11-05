@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { docHtml, parseJson } from './avDocument';
+import { setCurrentLang } from '../../lib/lang';
+
+// The document is written in the language of the interface; German unless a test says otherwise.
+beforeEach(() => setCurrentLang('de', false));
 
 // A file as saved by the standalone Grfhr form.
 const toolFile = JSON.stringify({
@@ -52,5 +56,11 @@ describe('Ausbildungsvorbereitung file and document', () => {
     expect(html).toContain('08:10–08:45');
     expect(html).toContain('Pumpen &lt;Typ 2&gt;');
     expect(html).toContain('☒</span> Festigen');
+    // In French: the labels follow the language, the content stays as entered.
+    setCurrentLang('fr', false);
+    const fr = docHtml({ ...f, blockId: null, zugId: 1 }, { org: 'Pi Z 1' });
+    expect(fr).toContain('☒</span> Consolidation');
+    expect(fr).toContain('Objectifs :');
+    expect(fr).toContain('Pumpen &lt;Typ 2&gt;');
   });
 });

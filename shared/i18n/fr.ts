@@ -1,7 +1,9 @@
 // Français – termes selon docs/glossar.md (OFPP : Manuel Conduite dans la protection civile, Directives prescriptions de sécurité).
 import type { Catalog } from './de';
+import { areaTexts } from './areas';
 
 export const fr: Catalog = {
+  ...areaTexts(1),
   'common.loading': 'Chargement …',
   'common.language': 'Langue',
 

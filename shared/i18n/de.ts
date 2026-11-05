@@ -1,7 +1,10 @@
 // German: the source language. Every key here must exist in fr, it and en (the type Catalog enforces it).
 // Terms follow docs/glossar.md (BABS: Handbuch Führung im Zivilschutz, Weisungen Sicherheitsvorschriften).
-// Placeholders: {name}.
+// Placeholders: {name}. Newer texts live in areas/*.ts with all four languages side by side.
+import { areaTexts } from './areas';
+
 export const de = {
+  ...areaTexts(0),
   // ---- Common ----
   'common.loading': 'Laden …',
   'common.language': 'Sprache',

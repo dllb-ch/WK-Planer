@@ -1,7 +1,9 @@
 // Italiano – termini secondo docs/glossar.md (UFPP: Manuale Condotta nella protezione civile, Istruzioni prescrizioni di sicurezza).
 import type { Catalog } from './de';
+import { areaTexts } from './areas';
 
 export const it: Catalog = {
+  ...areaTexts(2),
   'common.loading': 'Caricamento …',
   'common.language': 'Lingua',
 

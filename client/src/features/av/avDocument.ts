@@ -3,11 +3,13 @@
 import type { AvInput, Ausbildungsstufe } from '@shared/types';
 import { AUSBILDUNGSSTUFEN, FACHBEREICHE, PITT } from '@shared/types';
 import { fachbereicheOf, normalizeAv, phaseOf, schedule } from '@shared/av';
+import { currentLang, currentT as tt } from '../../lib/lang';
+import { LOCALE } from '@shared/i18n';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const nl = (s: unknown) => esc(s).replace(/\n/g, '<br>');
 const fmtDateLong = (d: string) =>
-  d ? new Date(d + 'T00:00').toLocaleDateString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+  d ? new Date(d + 'T00:00').toLocaleDateString(LOCALE[currentLang()], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 
 /** Styles of the document; inlined so print and Word look the same. */
 export const DOC_CSS = `
@@ -49,12 +51,12 @@ export function docHtml(f: AvInput, ctx: DocContext) {
       .filter(({ r }) => r.text.trim() || r.phase)
       .map(
         ({ r, t }) => `<tr><td style="width:18%;white-space:nowrap">${t.von ? `${t.von}–${t.bis}<br>` : ''}<small>${esc(r.dauer)}′</small></td>
-      <td style="width:15%">${r.phase ? esc(PITT[r.phase]) : ''}</td><td>${nl(r.text)}</td></tr>`,
+      <td style="width:15%">${r.phase ? esc(tt(`pitt.${r.phase}`)) : ''}</td><td>${nl(r.text)}</td></tr>`,
       )
       .join('') || '<tr><td>&nbsp;</td><td></td><td></td></tr>';
   const extra = [
-    f.postenplakat && `<tr><td class="lbl">Postenplakat</td><td>${nl(f.postenplakat)}</td></tr>`,
-    f.bemerkungen && `<tr><td class="lbl">Bemerkungen</td><td>${nl(f.bemerkungen)}</td></tr>`,
+    f.postenplakat && `<tr><td class="lbl">${tt('av.postenplakat')}</td><td>${nl(f.postenplakat)}</td></tr>`,
+    f.bemerkungen && `<tr><td class="lbl">${tt('common.notes')}</td><td>${nl(f.bemerkungen)}</td></tr>`,
   ]
     .filter(Boolean)
     .join('');
@@ -64,40 +66,40 @@ export function docHtml(f: AvInput, ctx: DocContext) {
       ? `<div class="dhead"><div class="kopf"><b>${esc(ctx.kopf[0])}</b>${ctx.kopf.slice(1).map(esc).join('<br>')}<div class="org" style="text-align:left;margin-top:3px">${nl(ctx.org)}</div></div><div>${ctx.logo ? `<img src="${esc(ctx.logo)}" alt="" style="height:13mm;max-width:60mm">` : ''}</div></div>`
       : `<div class="dhead"><div>${ctx.logo ? `<img src="${esc(ctx.logo)}" alt="" style="max-height:16mm;max-width:70mm">` : ''}</div><div class="org">${nl(ctx.org)}</div></div>`
   }
-  <h1>Ausbildungsvorbereitung Grfhr</h1>
+  <h1>${tt('avd.title')}</h1>
   <table>
-    <tr><td class="lbl" style="width:18%">Ausbildungsart:</td><td style="width:37%">${esc(f.ausbildungsart)}</td><td class="lbl" style="width:12%">Datum:</td><td>${esc(fmtDateLong(f.datum))}</td></tr>
-    <tr><td class="lbl">Teilnehmer</td><td>${esc(f.teilnehmer)}</td><td class="lbl">Zeit:</td><td>${esc(zeit)}</td></tr>
-    <tr><td class="lbl">Arbeitsplatz</td><td>${esc(f.arbeitsplatz)}</td><td class="lbl">Leiter:</td><td>${esc(f.leiter)}</td></tr>
+    <tr><td class="lbl" style="width:18%">${tt('avd.art')}</td><td style="width:37%">${esc(f.ausbildungsart)}</td><td class="lbl" style="width:12%">${tt('avd.date')}</td><td>${esc(fmtDateLong(f.datum))}</td></tr>
+    <tr><td class="lbl">${tt('av.participants')}</td><td>${esc(f.teilnehmer)}</td><td class="lbl">${tt('avd.time')}</td><td>${esc(zeit)}</td></tr>
+    <tr><td class="lbl">${tt('av.place')}</td><td>${esc(f.arbeitsplatz)}</td><td class="lbl">${tt('avd.leader')}</td><td>${esc(f.leiter)}</td></tr>
   </table>
   <table>
-    <tr><td class="lbl" style="width:18%">Thema</td><td>${esc(f.thema)}</td></tr>
-    <tr><td class="lbl">Fachbereich</td><td>${esc(f.fachbereiche.map((k) => FACHBEREICHE[k]).join(', '))}</td></tr>
-    <tr><td class="lbl">Grundlagen</td><td>${nl(f.grundlagen)}</td></tr>
+    <tr><td class="lbl" style="width:18%">${tt('av.theme')}</td><td>${esc(f.thema)}</td></tr>
+    <tr><td class="lbl">${tt('av.fachbereich')}</td><td>${esc(f.fachbereiche.map((k) => tt(`fachbereich.${k}`)).join(', '))}</td></tr>
+    <tr><td class="lbl">${tt('av.grundlagen')}</td><td>${nl(f.grundlagen)}</td></tr>
   </table>
   <table>
-    <tr><th colspan="3">Ausbildungsstufe</th></tr>
-    <tr><td style="width:33%">${box('ANLERNEN')} Anlernen</td><td style="width:33%">${box('FESTIGEN')} Festigen</td><td>${box('ANWENDEN')} Anwenden</td></tr>
+    <tr><th colspan="3">${tt('av.stufe')}</th></tr>
+    <tr><td style="width:33%">${box('ANLERNEN')} ${tt('stufe.ANLERNEN')}</td><td style="width:33%">${box('FESTIGEN')} ${tt('stufe.FESTIGEN')}</td><td>${box('ANWENDEN')} ${tt('stufe.ANWENDEN')}</td></tr>
   </table>
   <table>
-    <tr><th>Zielsetzung:</th></tr>
+    <tr><th>${tt('avd.ziele')}</th></tr>
     <tr><td>${ziele.length ? '<ul>' + ziele.map((z) => `<li>${esc(z)}</li>`).join('') + '</ul>' : '&nbsp;'}</td></tr>
   </table>
   <table>
-    <tr><th colspan="2">Mittel</th></tr>
-    <tr><td class="lbl" style="width:18%">Pers. Ausrüstung</td><td>${nl(f.persAusruestung)}</td></tr>
-    <tr><td class="lbl">Fahrzeug</td><td>${nl(f.fahrzeug)}</td></tr>
-    <tr><td class="lbl">Material</td><td>${nl(f.material)}</td></tr>
-    <tr><td class="lbl">Unterlagen</td><td>${nl(f.unterlagen)}</td></tr>
+    <tr><th colspan="2">${tt('av.mittel')}</th></tr>
+    <tr><td class="lbl" style="width:18%">${tt('avd.persAusr')}</td><td>${nl(f.persAusruestung)}</td></tr>
+    <tr><td class="lbl">${tt('av.fahrzeug')}</td><td>${nl(f.fahrzeug)}</td></tr>
+    <tr><td class="lbl">${tt('av.material')}</td><td>${nl(f.material)}</td></tr>
+    <tr><td class="lbl">${tt('av.unterlagen')}</td><td>${nl(f.unterlagen)}</td></tr>
     ${extra}
   </table>
   <table class="ablauf">
-    <thead><tr><th>Zeit</th><th>Phase<br>PITT</th><th>Ablauf der Tätigkeiten</th></tr></thead>
+    <thead><tr><th>${tt('common.time')}</th><th>${tt('avd.phasePitt')}</th><th>${tt('av.ablauf')}</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <table>
-    <tr><th>Bemerkungen Controlling</th></tr>
-    <tr><td><small><i>(Ausbildungskontrolle, Rückmeldung über die Zielerreichung, Beurteilung der AdZS)</i></small><br>${nl(f.controlling) || '<br><br><br>'}</td></tr>
+    <tr><th>${tt('av.ctrl')}</th></tr>
+    <tr><td><small><i>(${tt('av.ctrlLabel')})</i></small><br>${nl(f.controlling) || '<br><br><br>'}</td></tr>
   </table>
 </div>`;
 }
@@ -118,7 +120,7 @@ function download(name: string, blob: Blob) {
 /** Word opens HTML with the msword type as a document (as in the standalone tool). */
 export function downloadWord(f: AvInput, ctx: DocContext) {
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><title>Ausbildungsvorbereitung Grfhr</title>
+<head><meta charset="utf-8"><title>${tt('avd.title')}</title>
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 <style>@page{size:21cm 29.7cm;margin:2cm 2cm 1.8cm 2cm}body{font-family:Arial}${DOC_CSS}</style></head>
 <body>${docHtml(f, ctx)}</body></html>`;

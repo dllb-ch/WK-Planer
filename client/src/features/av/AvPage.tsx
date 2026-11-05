@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AblaufSchritt, Ausbildungsstufe, AvInput, Fachbereich, PittPhase, ResourceKind } from '@shared/types';
-import { AUSBILDUNGSSTUFEN, FACHBEREICHE, PITT } from '@shared/types';
+import { FACHBEREICHE, PITT } from '@shared/types';
 import { canCreateAv, canEditAv } from '@shared/permissions';
-import { fmtDate, fmtTime, parseTime, weekday } from '@shared/util';
+import { fmtDate, fmtTime, parseTime } from '@shared/util';
 import { guessFachbereiche, schedule } from '@shared/av';
 import { api, ApiError, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
@@ -16,9 +16,11 @@ import { AddRow, CellInput, CellTextArea, ChoiceRow, Group, IconButton, Ring, Ro
 import { ContextMenu, type MenuItem, type MenuState } from '../../components/ContextMenu';
 import { DOC_CSS, docContext, docHtml, downloadJson, downloadWord, parseJson } from './avDocument';
 import { usePrintPage } from '../../components/Briefkopf';
+import { useT } from '../../i18n';
 
 /** Ausbildungsvorbereitung Grfhr (Handbuch Anhänge p. 24–25) for one slot of a Zug. */
 export function AvPage({ detail }: { detail: WkDetail }) {
+  const { t, tn, weekdayShort } = useT();
   const { avId } = useParams();
   const [search] = useSearchParams();
   const me = useUser();
@@ -34,7 +36,7 @@ export function AvPage({ detail }: { detail: WkDetail }) {
   const [scrolled, setScrolled] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  usePrintPage(['Ausbildungsvorbereitung', f?.thema, zuege.find((z) => z.id === f?.zugId)?.name, wk.title].filter(Boolean).join(' · '));
+  usePrintPage([t('av.doc'), f?.thema, zuege.find((z) => z.id === f?.zugId)?.name, wk.title].filter(Boolean).join(' · '));
 
   // New document: prefill from the slot and its detail plan.
   useEffect(() => {
@@ -88,8 +90,8 @@ export function AvPage({ detail }: { detail: WkDetail }) {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  if (q.error) return <div className="p-6 text-slate-600">{q.error instanceof ApiError && q.error.status === 403 ? 'Kein Zugriff.' : errMsg(q.error)}</div>;
-  if (!f) return <div className="p-6 text-slate-500">Laden …</div>;
+  if (q.error) return <div className="p-6 text-slate-600">{q.error instanceof ApiError && q.error.status === 403 ? t('yp.noAccess') : errMsg(q.error)}</div>;
+  if (!f) return <div className="p-6 text-slate-500">{t('common.loading')}</div>;
 
   const editable = isNew ? canCreateAv(me, wk, f.zugId) : !!q.data && canEditAv(me, wk, q.data);
   const set = (patch: Partial<AvInput>) => {
@@ -115,13 +117,13 @@ export function AvPage({ detail }: { detail: WkDetail }) {
         qc.invalidateQueries({ queryKey: ['avs', wk.id] });
         qc.invalidateQueries({ queryKey: ['av', wk.id, avId] });
       }
-      toast('Ausbildungsvorbereitung gespeichert');
+      toast(t('av.saved'));
     } catch (e) {
       toast(errMsg(e), 'error');
     }
   };
   const remove = async () => {
-    if (!confirm('Ausbildungsvorbereitung löschen?')) return;
+    if (!confirm(t('av.confirmDelete'))) return;
     try {
       await api.deleteAv(wk.id, Number(avId));
       qc.invalidateQueries({ queryKey: ['avs', wk.id] });
@@ -150,9 +152,9 @@ export function AvPage({ detail }: { detail: WkDetail }) {
     try {
       const data = parseJson(await file.text());
       set({ ...data, blockId: f.blockId, zugId: f.zugId, leiterUserIds: f.leiterUserIds, leiter: f.leiterUserIds.length ? f.leiter : data.leiter });
-      toast(`«${file.name}» übernommen – noch nicht gespeichert`);
+      toast(t('av.fileTaken', { name: file.name }));
     } catch (e) {
-      toast(`«${file.name}» konnte nicht gelesen werden: ${errMsg(e)}`, 'error');
+      toast(t('av.fileUnreadable', { name: file.name, error: errMsg(e) }), 'error');
     }
   };
 
@@ -164,12 +166,12 @@ export function AvPage({ detail }: { detail: WkDetail }) {
   );
 
   const shareItems: MenuItem[] = [
-    { label: 'Drucken / PDF', icon: '⎙', onClick: () => window.print() },
-    { label: 'Word-Dokument', icon: '📄', onClick: () => downloadWord(f, ctx) },
+    { label: t('av.printPdf'), icon: '⎙', onClick: () => window.print() },
+    { label: t('av.word'), icon: '📄', onClick: () => downloadWord(f, ctx) },
     'separator',
-    { label: 'Als Datei weitergeben (.json)', icon: '⇩', onClick: () => downloadJson(f) },
-    ...(editable ? ([{ label: 'Datei übernehmen (.json) …', icon: '⇧', onClick: () => fileInput.current?.click() }] as MenuItem[]) : []),
-    ...(!isNew && editable ? (['separator', { label: 'Löschen', icon: '🗑', danger: true, onClick: remove }] as MenuItem[]) : []),
+    { label: t('av.shareJson'), icon: '⇩', onClick: () => downloadJson(f) },
+    ...(editable ? ([{ label: t('av.importJson'), icon: '⇧', onClick: () => fileInput.current?.click() }] as MenuItem[]) : []),
+    ...(!isNew && editable ? (['separator', { label: t('common.delete'), icon: '🗑', danger: true, onClick: remove }] as MenuItem[]) : []),
   ];
 
   return (
@@ -188,13 +190,13 @@ export function AvPage({ detail }: { detail: WkDetail }) {
                 <span className="max-sm:hidden">Zugansicht</span>
               </Link>
             </div>
-            <div className={`max-w-[34vw] truncate font-semibold transition-opacity max-sm:hidden ${scrolled ? 'opacity-100' : 'opacity-0'}`}>{f.thema || 'Neue Ausbildungslektion'}</div>
+            <div className={`max-w-[34vw] truncate font-semibold transition-opacity max-sm:hidden ${scrolled ? 'opacity-100' : 'opacity-0'}`}>{f.thema || t('av.newLesson')}</div>
             <div className="flex items-center justify-end gap-0.5">
               <button
                 type="button"
                 className="grid h-9 w-9 place-items-center rounded-lg text-zs-blue hover:bg-slate-500/10"
-                aria-label="Teilen"
-                title="Teilen"
+                aria-label={t('av.share')}
+                title={t('av.share')}
                 onClick={(e) => {
                   const r = e.currentTarget.getBoundingClientRect();
                   setMenu({ x: r.right - 250, y: r.bottom + 6, items: shareItems });
@@ -209,7 +211,7 @@ export function AvPage({ detail }: { detail: WkDetail }) {
                   onClick={save}
                   className="ml-1 rounded-full bg-zs-blue px-3.5 py-1.5 font-semibold text-white transition hover:brightness-110 active:opacity-60 disabled:opacity-40"
                 >
-                  Speichern
+                  {t('common.save')}
                 </button>
               )}
             </div>
@@ -220,21 +222,21 @@ export function AvPage({ detail }: { detail: WkDetail }) {
 
         <main className="mx-auto max-w-[760px] px-4 pb-24 pt-1">
           <div className="mx-1 mb-6 mt-2.5">
-            <h1 className="text-[34px] font-bold leading-[1.15] tracking-[-0.025em] [overflow-wrap:anywhere]">{f.thema || 'Neue Ausbildungslektion'}</h1>
+            <h1 className="text-[34px] font-bold leading-[1.15] tracking-[-0.025em] [overflow-wrap:anywhere]">{f.thema || t('av.newLesson')}</h1>
             <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[15px] text-slate-500">
               {editable && (
                 <>
                   <Ring value={done / 7} />
-                  <span>{done} von 7 Abschnitten</span>
+                  <span>{t('av.sectionsDone', { n: done })}</span>
                   <span aria-hidden>·</span>
                 </>
               )}
               <span className={dirty ? 'text-orange-600' : ''}>
-                {dirty ? 'Nicht gespeicherte Änderungen' : isNew ? 'Neu – noch nicht gespeichert' : `Gespeichert · ${q.data?.createdByName ?? ''}`}
+                {dirty ? t('av.unsaved') : isNew ? t('av.newUnsaved') : t('av.savedBy', { name: q.data?.createdByName ?? '' })}
               </span>
               <span aria-hidden>·</span>
               <span>{zugName}</span>
-              {!editable && <span>· nur lesen</span>}
+              {!editable && <span>{t('av.readOnly')}</span>}
             </p>
           </div>
 
@@ -244,8 +246,8 @@ export function AvPage({ detail }: { detail: WkDetail }) {
             </div>
           ) : (
             <>
-              <Group n={1} title="Eckdaten" done={sections.eck}>
-                <Row label="Zeitfenster">
+              <Group n={1} title={t('av.eckdaten')} done={sections.eck}>
+                <Row label={t('av.slot')}>
                   <select
                     className="cell-input"
                     value={f.blockId ?? ''}
@@ -254,10 +256,10 @@ export function AvPage({ detail }: { detail: WkDetail }) {
                       set({ blockId: b?.id ?? null, ...(b ? { datum: b.date, zeitVon: fmtTime(b.startMin), zeitBis: fmtTime(b.endMin) } : {}) });
                     }}
                   >
-                    <option value="">– ohne Zuordnung –</option>
+                    <option value="">{t('av.noSlot')}</option>
                     {slotBlocks.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {weekday(b.date).slice(0, 2)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)} {b.title}
+                        {weekdayShort(b.date)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}–{fmtTime(b.endMin)} {b.title}
                       </option>
                     ))}
                   </select>
@@ -265,21 +267,21 @@ export function AvPage({ detail }: { detail: WkDetail }) {
                     ⌄
                   </span>
                 </Row>
-                <Row label="Ausbildungsart">{line('ausbildungsart', 'z. B. WK, Gruppenausbildung', 'av-art')}</Row>
-                <Row label="Datum">
-                  <CellInput type="date" value={f.datum} onChange={(e) => set({ datum: e.target.value })} aria-label="Datum" />
+                <Row label={t('av.art')}>{line('ausbildungsart', t('av.artPh'), 'av-art')}</Row>
+                <Row label={t('common.date')}>
+                  <CellInput type="date" value={f.datum} onChange={(e) => set({ datum: e.target.value })} aria-label={t('common.date')} />
                 </Row>
-                <Row label="Zeit">
-                  <CellInput type="time" value={f.zeitVon} onChange={(e) => set({ zeitVon: e.target.value })} aria-label="Zeit von" />
+                <Row label={t('common.time')}>
+                  <CellInput type="time" value={f.zeitVon} onChange={(e) => set({ zeitVon: e.target.value })} aria-label={t('av.timeFrom')} />
                   <span className="text-slate-500">bis</span>
-                  <CellInput type="time" value={f.zeitBis} onChange={(e) => set({ zeitBis: e.target.value })} aria-label="Zeit bis" />
+                  <CellInput type="time" value={f.zeitBis} onChange={(e) => set({ zeitBis: e.target.value })} aria-label={t('av.timeTo')} />
                 </Row>
-                <Row label="Teilnehmer">{line('teilnehmer', 'z. B. Gruppe 2, 8 AdZS', 'av-teilnehmer')}</Row>
-                <StackRow label="Arbeitsplatz">
+                <Row label={t('av.participants')}>{line('teilnehmer', t('av.participantsPh'), 'av-teilnehmer')}</Row>
+                <StackRow label={t('av.place')}>
                   {line('arbeitsplatz', 'z. B. Theorieraum 1')}
                   <ApprovedPicker wk={detail.wk} f={f} kinds={['RAUM', 'GELAENDE']} field="arbeitsplatz" onPick={set} />
                 </StackRow>
-                <StackRow label="Leiter / zugeteilte Personen">
+                <StackRow label={t('av.leaders')}>
                   <div className="py-1">
                     <PersonMultiSelect
                       kpId={wk.kpId}
@@ -291,7 +293,7 @@ export function AvPage({ detail }: { detail: WkDetail }) {
                   </div>
                 </StackRow>
                 <datalist id="av-art">
-                  {['Wiederholungskurs (WK)', 'Gruppenausbildung', 'Theorielektion', 'Praktische Ausbildung', 'Übung', 'Einsatz zugunsten der Gemeinschaft (EzG)'].map((v) => (
+                  {[t('av.art.wk'), t('av.art.group'), t('av.art.theory'), t('av.art.practical'), t('av.art.exercise'), t('av.art.ezg')].map((v) => (
                     <option key={v} value={v} />
                   ))}
                 </datalist>
@@ -302,9 +304,9 @@ export function AvPage({ detail }: { detail: WkDetail }) {
                 </datalist>
               </Group>
 
-              <Group n={2} title="Thema & Grundlagen" done={sections.thema}>
-                <Row label="Thema">{line('thema', 'Worum geht es in dieser Lektion?')}</Row>
-                <StackRow label="Fachbereich">
+              <Group n={2} title={t('av.themeGroup')} done={sections.thema}>
+                <Row label={t('av.theme')}>{line('thema', t('av.themePh'))}</Row>
+                <StackRow label={t('av.fachbereich')}>
                   <div className="flex flex-wrap gap-1.5 py-1.5">
                     {(Object.keys(FACHBEREICHE) as Fachbereich[]).map((k) => {
                       const on = f.fachbereiche.includes(k);
@@ -316,20 +318,20 @@ export function AvPage({ detail }: { detail: WkDetail }) {
                           onClick={() => set({ fachbereiche: on ? f.fachbereiche.filter((x) => x !== k) : [...f.fachbereiche, k] })}
                           className={`rounded-full px-3 py-1 text-sm transition ${on ? 'bg-zs-blue font-medium text-white' : 'bg-slate-500/10 text-slate-700 hover:bg-slate-500/15'}`}
                         >
-                          {FACHBEREICHE[k]}
+                          {t(`fachbereich.${k}`)}
                         </button>
                       );
                     })}
                   </div>
                 </StackRow>
-                <StackRow label="Grundlagen">{text('grundlagen', 'Reglemente, Merkblätter, Behelfe, Kursunterlagen …')}</StackRow>
+                <StackRow label={t('av.grundlagen')}>{text('grundlagen', t('av.grundlagenPh'))}</StackRow>
               </Group>
 
-              <Group n={3} title="Ausbildungsstufe" done={sections.stufe} aside="Eine Stufe wählen">
-                <div role="radiogroup" aria-label="Ausbildungsstufe">
-                  {(Object.keys(AUSBILDUNGSSTUFEN) as Ausbildungsstufe[]).map((k, i) => (
+              <Group n={3} title={t('av.stufe')} done={sections.stufe} aside={t('av.oneStufe')}>
+                <div role="radiogroup" aria-label={t('av.stufe')}>
+                  {(['ANLERNEN', 'FESTIGEN', 'ANWENDEN'] as Ausbildungsstufe[]).map((k, i) => (
                     <div key={k} className={i ? 'relative before:absolute before:left-4 before:right-0 before:top-0 before:border-t-[0.5px] before:border-slate-400/45' : ''}>
-                      <ChoiceRow title={AUSBILDUNGSSTUFEN[k]} detail={STUFE_HINT[k]} checked={f.stufe === k} onClick={() => set({ stufe: f.stufe === k ? '' : k })} />
+                      <ChoiceRow title={t(`stufe.${k}`)} detail={t(`av.stufeHint.${k}`)} checked={f.stufe === k} onClick={() => set({ stufe: f.stufe === k ? '' : k })} />
                     </div>
                   ))}
                 </div>
@@ -337,36 +339,36 @@ export function AvPage({ detail }: { detail: WkDetail }) {
 
               <Group
                 n={4}
-                title="Zielsetzung"
+                title={t('av.ziele')}
                 done={sections.ziele}
                 foot={
                   <>
-                    Ziele beobachtbar formulieren – <em>«Die AdZS können … (wer, was, wie gut)»</em>. Mit ⏎ folgt das nächste Ziel.
+                    {tn('av.zieleHint', { example: <em>{t('av.zieleExample')}</em> })}
                   </>
                 }
               >
                 <Ziele items={f.zielsetzungen} onChange={(zielsetzungen) => set({ zielsetzungen })} />
               </Group>
 
-              <Group n={5} title="Mittel" done={sections.mittel}>
-                <StackRow label="Persönliche Ausrüstung">{text('persAusruestung', 'z. B. Arbeitsanzug, Helm, Handschuhe')}</StackRow>
-                <StackRow label="Fahrzeug">
-                  {text('fahrzeug', 'z. B. Mannschaftstransporter')}
+              <Group n={5} title={t('av.mittel')} done={sections.mittel}>
+                <StackRow label={t('av.persAusr')}>{text('persAusruestung', t('av.persAusrPh'))}</StackRow>
+                <StackRow label={t('av.fahrzeug')}>
+                  {text('fahrzeug', t('av.fahrzeugPh'))}
                   <ApprovedPicker wk={detail.wk} f={f} kinds={['FAHRZEUG', 'ANHAENGER']} field="fahrzeug" onPick={set} />
                 </StackRow>
-                <StackRow label="Material">{text('material', 'z. B. Werkzeugkiste, Absperrmaterial')}</StackRow>
-                <StackRow label="Unterlagen">{text('unterlagen', 'z. B. Merkblatt, Checkliste, Präsentation')}</StackRow>
-                <StackRow label="Postenplakat">{text('postenplakat', 'z. B. Plakat mit Ampelschema')}</StackRow>
-                <StackRow label="Bemerkungen">{text('bemerkungen', '')}</StackRow>
+                <StackRow label={t('av.material')}>{text('material', t('av.materialPh'))}</StackRow>
+                <StackRow label={t('av.unterlagen')}>{text('unterlagen', t('av.unterlagenPh'))}</StackRow>
+                <StackRow label={t('av.postenplakat')}>{text('postenplakat', t('av.postenplakatPh'))}</StackRow>
+                <StackRow label={t('common.notes')}>{text('bemerkungen', '')}</StackRow>
               </Group>
 
-              <Group n={6} title="Ablauf der Tätigkeiten" done={sections.ablauf} aside="Uhrzeiten aus «Zeit von»">
+              <Group n={6} title={t('av.ablauf')} done={sections.ablauf} aside={t('av.ablaufAside')}>
                 <Ablauf rows={f.ablauf} zeitVon={f.zeitVon} zeitBis={f.zeitBis} editable onChange={(ablauf) => set({ ablauf })} />
               </Group>
 
-              <Group n={7} title="Bemerkungen Controlling" done={sections.ctrl} aside="Nach der Lektion">
-                <StackRow label="Ausbildungskontrolle, Rückmeldung über die Zielerreichung, Beurteilung der AdZS">
-                  {text('controlling', 'Wurden die Ziele erreicht? Was lief gut, was verbessern wir nächstes Mal?', 4)}
+              <Group n={7} title={t('av.ctrl')} done={sections.ctrl} aside={t('av.ctrlAside')}>
+                <StackRow label={t('av.ctrlLabel')}>
+                  {text('controlling', t('av.ctrlPh'), 4)}
                 </StackRow>
               </Group>
             </>
@@ -374,8 +376,8 @@ export function AvPage({ detail }: { detail: WkDetail }) {
 
           {slotBlock && (
             <Group
-              title="Angefragte Ressourcen"
-              aside={`${weekday(slotBlock.date).slice(0, 2)} ${fmtDate(slotBlock.date).slice(0, 6)} ${fmtTime(slotBlock.startMin)}–${fmtTime(slotBlock.endMin)}`}
+              title={t('av.requested')}
+              aside={`${weekdayShort(slotBlock.date)} ${fmtDate(slotBlock.date).slice(0, 6)} ${fmtTime(slotBlock.startMin)}–${fmtTime(slotBlock.endMin)}`}
             >
               <div className="p-4">
                 <BlockRequests detail={detail} block={slotBlock} />
@@ -383,17 +385,17 @@ export function AvPage({ detail }: { detail: WkDetail }) {
             </Group>
           )}
 
-          <Group title="Anhänge" foot="Präsentation, Merkblatt, Checkliste, Fotos …">
+          <Group title={t('av.attachments')} foot={t('av.attachmentsFoot')}>
             <div className="p-4">
               {isNew ? (
-                <p className="text-[15px] text-slate-500">Nach dem ersten Speichern können Dateien angehängt werden.</p>
+                <p className="text-[15px] text-slate-500">{t('av.attachAfterSave')}</p>
               ) : (
                 <FileArea
                   queryKey={['av-files', Number(avId)]}
                   load={() => api.avAttachments(Number(avId))}
                   upload={(file, p) => api.uploadAvAttachment(Number(avId), file, p)}
                   canUpload={editable}
-                  emptyText="Keine Anhänge."
+                  emptyText={t('av.noAttachments')}
                 />
               )}
             </div>
@@ -404,11 +406,6 @@ export function AvPage({ detail }: { detail: WkDetail }) {
   );
 }
 
-const STUFE_HINT: Record<Ausbildungsstufe, string> = {
-  ANLERNEN: 'Neues kennenlernen: vorzeigen, erklären, nachmachen.',
-  FESTIGEN: 'Bekanntes wiederholen, bis es sicher und korrekt sitzt.',
-  ANWENDEN: 'Selbständig in einer realitätsnahen Situation umsetzen.',
-};
 
 const ShareIcon = () => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -423,6 +420,7 @@ const TrashIcon = () => (
 
 /** Aims as numbered rows; Enter inserts the next one. */
 function Ziele({ items, onChange }: { items: string[]; onChange: (v: string[]) => void }) {
+  const { t } = useT();
   const list = items.length ? items : [''];
   const [focus, setFocus] = useState<number | null>(null);
   return (
@@ -432,7 +430,7 @@ function Ziele({ items, onChange }: { items: string[]; onChange: (v: string[]) =
           <span className="w-[22px] flex-none text-right tabular-nums text-slate-500">{i + 1}.</span>
           <CellInput
             value={z}
-            placeholder="Die AdZS können …"
+            placeholder={t('av.zielPh')}
             ref={(el: HTMLInputElement | null) => {
               if (el && focus === i) {
                 el.focus();
@@ -449,7 +447,7 @@ function Ziele({ items, onChange }: { items: string[]; onChange: (v: string[]) =
             }}
             aria-label={`Ziel ${i + 1}`}
           />
-          <IconButton label="Ziel entfernen" destructive onClick={() => onChange(list.length > 1 ? list.filter((_, j) => j !== i) : [''])}>
+          <IconButton label={t('av.removeZiel')} destructive onClick={() => onChange(list.length > 1 ? list.filter((_, j) => j !== i) : [''])}>
             <TrashIcon />
           </IconButton>
         </div>
@@ -460,7 +458,7 @@ function Ziele({ items, onChange }: { items: string[]; onChange: (v: string[]) =
           setFocus(list.length);
         }}
       >
-        Ziel hinzufügen
+        {t('av.addZiel')}
       </AddRow>
     </>
   );
@@ -481,6 +479,7 @@ const PHASE_COLOR: Record<PittPhase, string> = { P: '#007aff', I: '#ff9500', T1:
 
 /** Ablauf by duration: times follow from «Zeit von»; the bar compares the total with the available time. */
 function Ablauf({ rows, zeitVon, zeitBis, editable, onChange }: { rows: AblaufSchritt[]; zeitVon: string; zeitBis: string; editable: boolean; onChange: (r: AblaufSchritt[]) => void }) {
+  const { t } = useT();
   const upd = (i: number, patch: Partial<AblaufSchritt>) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const move = (i: number, d: -1 | 1) => {
     const next = [...rows];
@@ -499,64 +498,64 @@ function Ablauf({ rows, zeitVon, zeitBis, editable, onChange }: { rows: AblaufSc
           <span className="w-1 flex-none rounded-sm transition-colors" style={{ background: color(r.phase) }} aria-hidden />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`min-w-[98px] tabular-nums ${times[i].von ? 'font-semibold' : 'text-slate-500'}`}>{times[i].von ? `${times[i].von}–${times[i].bis}` : `Schritt ${i + 1}`}</span>
+              <span className={`min-w-[98px] tabular-nums ${times[i].von ? 'font-semibold' : 'text-slate-500'}`}>{times[i].von ? `${times[i].von}–${times[i].bis}` : t('av.stepN', { n: i + 1 })}</span>
               {editable ? (
                 <select
                   className="max-w-[220px] cursor-pointer appearance-none rounded-[7px] bg-slate-500/10 bg-[length:8px_12px] bg-[right_8px_center] bg-no-repeat py-[5px] pl-2.5 pr-[26px] text-sm text-slate-900 outline-none"
                   style={{ backgroundImage: SELECT_ARROWS }}
                   value={r.phase}
                   onChange={(e) => upd(i, { phase: e.target.value as PittPhase | '' })}
-                  aria-label="Phase"
+                  aria-label={t('av.phase')}
                 >
-                  <option value="">Phase …</option>
+                  <option value="">{t('av.phaseChoose')}</option>
                   {(Object.keys(PITT) as PittPhase[]).map((p) => (
                     <option key={p} value={p}>
-                      {PITT[p]}
+                      {t(`pitt.${p}`)}
                     </option>
                   ))}
                 </select>
               ) : (
-                <span className="text-sm font-medium">{r.phase ? PITT[r.phase] : ''}</span>
+                <span className="text-sm font-medium">{r.phase ? t(`pitt.${r.phase}`) : ''}</span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {editable ? <Stepper value={r.dauer} unit="Min." label="Dauer" onChange={(dauer) => upd(i, { dauer })} /> : <span className="text-sm text-slate-500">{r.dauer} Min.</span>}
+              {editable ? <Stepper value={r.dauer} unit={t('av.min')} label={t('av.duration')} onChange={(dauer) => upd(i, { dauer })} /> : <span className="text-sm text-slate-500">{r.dauer} {t('av.min')}</span>}
               {editable && (
                 <div className="ml-auto flex">
-                  <IconButton label="Nach oben" disabled={i === 0} onClick={() => move(i, -1)}>
+                  <IconButton label={t('tpl.up')} disabled={i === 0} onClick={() => move(i, -1)}>
                     ↑
                   </IconButton>
-                  <IconButton label="Nach unten" disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
+                  <IconButton label={t('tpl.down')} disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
                     ↓
                   </IconButton>
-                  <IconButton label="Schritt entfernen" destructive onClick={() => onChange(rows.filter((_, j) => j !== i))}>
+                  <IconButton label={t('av.removeStep')} destructive onClick={() => onChange(rows.filter((_, j) => j !== i))}>
                     <TrashIcon />
                   </IconButton>
                 </div>
               )}
             </div>
             {editable ? (
-              <CellTextArea value={r.text} onChange={(e) => upd(i, { text: e.target.value })} placeholder="Was passiert? Wer macht was? Methode, Hilfsmittel …" aria-label="Tätigkeit" />
+              <CellTextArea value={r.text} onChange={(e) => upd(i, { text: e.target.value })} placeholder={t('av.activityPh')} aria-label={t('av.activity')} />
             ) : (
               <span className="whitespace-pre-wrap text-sm">{r.text}</span>
             )}
           </div>
         </div>
       ))}
-      {editable && <AddRow onClick={() => onChange([...rows, { dauer: 10, phase: '', text: '' }])}>Schritt hinzufügen</AddRow>}
+      {editable && <AddRow onClick={() => onChange([...rows, { dauer: 10, phase: '', text: '' }])}>{t('av.addStep')}</AddRow>}
       <div className="flex flex-col gap-[9px] px-4 pb-3.5 pt-3">
         <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-[15px]">
-          <b>Total {total} Min.</b>
+          <b>{t('av.total', { n: total })}</b>
           {avail !== null ? (
             avail === total ? (
-              <span className="text-emerald-600">✓ passt genau ({avail} Min.)</span>
+              <span className="text-emerald-600">{t('av.fits', { n: avail })}</span>
             ) : avail > total ? (
-              <span className="text-orange-600">noch {avail - total} von {avail} Min. frei</span>
+              <span className="text-orange-600">{t('av.free', { free: avail - total, avail })}</span>
             ) : (
-              <span className="text-red-600">{total - avail} Min. zu lang</span>
+              <span className="text-red-600">{t('av.tooLong', { n: total - avail })}</span>
             )
           ) : (
-            <span className="text-slate-500">Zeit von/bis eintragen für Kontrolle</span>
+            <span className="text-slate-500">{t('av.enterTimes')}</span>
           )}
         </div>
         <div className="flex h-2 overflow-hidden rounded bg-slate-500/10">
@@ -568,7 +567,7 @@ function Ablauf({ rows, zeitVon, zeitBis, editable, onChange }: { rows: AblaufSc
           {(Object.keys(PITT) as PittPhase[]).map((p) => (
             <span key={p} className="inline-flex items-center gap-[5px]">
               <i className="h-2 w-2 rounded-full" style={{ background: PHASE_COLOR[p] }} />
-              {PITT[p]}
+              {t(`pitt.${p}`)}
             </span>
           ))}
         </div>
@@ -596,6 +595,7 @@ function ApprovedPicker({
   field: 'arbeitsplatz' | 'fahrzeug';
   onPick: (patch: Partial<AvInput>) => void;
 }) {
+  const { t } = useT();
   const requests = useQuery({ queryKey: ['requests', wk.id], queryFn: () => api.requests(wk.id) });
   const resources = useQuery({ queryKey: ['resources', wk.kpId], queryFn: () => api.resources(wk.kpId) });
   const from = f.zeitVon ? parseTime(f.zeitVon) : 0;
@@ -606,7 +606,7 @@ function ApprovedPicker({
     .filter((q) => !f.datum || (q.startMin < to && q.endMin > from))
     .flatMap((q) => {
       const ids = q.resourceId != null ? [q.resourceId] : q.assignedIds;
-      const names = ids.length ? ids.map(name).filter((n): n is string => !!n) : q.kind === 'GELAENDE' ? [`Gelände: ${q.zweck}`] : [];
+      const names = ids.length ? ids.map(name).filter((n): n is string => !!n) : q.kind === 'GELAENDE' ? [t('av.siteOf', { zweck: q.zweck })] : [];
       return names.map((n) => ({ key: `${q.id}:${n}`, name: n, when: `${f.datum ? '' : `${fmtDate(q.date).slice(0, 6)} `}${fmtTime(q.startMin)}–${fmtTime(q.endMin)}` }));
     });
   if (!items.length) return null;
@@ -614,7 +614,7 @@ function ApprovedPicker({
   const has = (n: string) => current.split(/[,\n]/).some((x) => x.trim() === n);
   return (
     <div className="mb-1 flex flex-wrap items-center gap-1 text-xs print:hidden">
-      <span className="text-slate-500">Bewilligt:</span>
+      <span className="text-slate-500">{t('av.approved')}</span>
       {items.map((i) => (
         <button
           key={i.key}

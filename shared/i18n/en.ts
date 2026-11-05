@@ -1,7 +1,9 @@
 // English – own translation (the FOCP publishes no English versions); terms as in docs/glossar.md.
 import type { Catalog } from './de';
+import { areaTexts } from './areas';
 
 export const en: Catalog = {
+  ...areaTexts(3),
   'common.loading': 'Loading …',
   'common.language': 'Language',
 

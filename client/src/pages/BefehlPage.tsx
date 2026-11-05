@@ -8,11 +8,14 @@ import { fmtDate, wkDays } from '@shared/util';
 import { api, type WkSummary } from '../api';
 import { useUser } from '../auth';
 import { Button, Card, Empty, errMsg, Field, TextArea, useToast } from '../components/ui';
+import { useT } from '../i18n';
+import { currentT } from '../lib/lang';
 
 type Draft = Omit<Ausbildungsbefehl, 'id' | 'batId' | 'year'>;
 const empty = (): Draft => ({ dienstart: 'Wiederholungskurse nach Art. 53 BZG', leitziel: '', absicht: '', organisation: '', besonderes: '', auftraege: [], files: [] });
 
 export function BefehlPage() {
+  const { t } = useT();
   const me = useUser();
   const qc = useQueryClient();
   const toast = useToast();
@@ -49,7 +52,7 @@ export function BefehlPage() {
       qc.invalidateQueries({ queryKey: ['befehl', activeYear] });
       qc.invalidateQueries({ queryKey: ['befehle'] });
       qc.invalidateQueries({ queryKey: ['wks'] });
-      toast(['Ausbildungsbefehl gespeichert', ...saved.wks.map(syncText).filter(Boolean)].join(' · '));
+      toast([t('bef.saved'), ...saved.wks.map(syncText).filter(Boolean)].join(' · '));
     } catch (e) {
       toast(errMsg(e), 'error');
     }
@@ -57,14 +60,14 @@ export function BefehlPage() {
 
   const yearOptions = Array.from(new Set([...(years.data ?? []), activeYear, ...newYears])).sort((a, b) => b - a);
   const switchYear = (y: number) => {
-    if (dirty && !confirm('Nicht gespeicherte Änderungen verwerfen?')) return;
+    if (dirty && !confirm(t('bef.discard'))) return;
     setYear(y);
     setDirty(false);
     setD(null);
   };
   const addYear = () => {
     const proposal = Math.max(new Date().getFullYear(), ...yearOptions) + 1;
-    const input = prompt('Ausbildungsbefehl für welches Jahr?', String(proposal));
+    const input = prompt(t('bef.whichYear'), String(proposal));
     const y = Number(input);
     if (!input || !Number.isInteger(y) || y < 2000 || y > 2100) return;
     setNewYears([...newYears, y]);
@@ -77,7 +80,7 @@ export function BefehlPage() {
       await api.uploadBefehlFile(activeYear, file);
       qc.invalidateQueries({ queryKey: ['befehl', activeYear] });
       qc.invalidateQueries({ queryKey: ['befehle'] });
-      toast(`«${file.name}» angehängt`);
+      toast(t('bef.attached', { name: file.name }));
     } catch (e) {
       toast(errMsg(e), 'error');
     }
@@ -92,7 +95,7 @@ export function BefehlPage() {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-4xl space-y-4 p-6">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-semibold">Ausbildungsbefehl des Bataillons</h1>
+          <h1 className="text-xl font-semibold">{t('bef.title')}</h1>
           <select
             className="input no-print !w-auto"
             value={activeYear}
@@ -104,20 +107,20 @@ export function BefehlPage() {
           </select>
           {editable && (
             <Button className="no-print" onClick={addYear}>
-              + Neues Jahr
+              {t('bef.newYear')}
             </Button>
           )}
           <span className="flex-1" />
           <Button className="no-print" onClick={() => window.print()}>
-            Drucken
+            {t('common.print')}
           </Button>
           {editable && (
             <Button className="no-print" variant="primary" disabled={!dirty} onClick={save}>
-              Speichern
+              {t('common.save')}
             </Button>
           )}
         </div>
-        {!editable && <p className="text-sm text-slate-500">Vom Bat Kommando erteilt. Sie sehen den Auftrag an Ihre Kompanie.</p>}
+        {!editable && <p className="text-sm text-slate-500">{t('bef.readOnly')}</p>}
 
         {!d ? (
           <Card>
@@ -126,11 +129,11 @@ export function BefehlPage() {
         ) : (
           <>
             <Card
-              title="Dokumente"
+              title={t('bef.documents')}
               actions={
                 editable && (
                   <label className="no-print cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                    + PDF anhängen
+                    {t('bef.attachPdf')}
                     <input
                       type="file"
                       accept="application/pdf,.pdf"
@@ -142,7 +145,7 @@ export function BefehlPage() {
               }
             >
               {files.length === 0 ? (
-                <p className="text-sm text-slate-400">{editable ? 'Unterschriebenen Befehl oder Beilagen als PDF anhängen.' : 'Keine Dokumente angehängt.'}</p>
+                <p className="text-sm text-slate-400">{editable ? t('bef.attachHint') : t('bef.noDocs')}</p>
               ) : (
                 <ul className="space-y-1 text-sm">
                   {files.map((f) => (
@@ -161,7 +164,7 @@ export function BefehlPage() {
                             qc.invalidateQueries({ queryKey: ['befehl', activeYear] });
                           }}
                         >
-                          Entfernen
+                          {t('common.remove')}
                         </button>
                       )}
                     </li>
@@ -169,17 +172,17 @@ export function BefehlPage() {
                 </ul>
               )}
             </Card>
-            <Card title="1. Dienstart und Rechtsgrundlagen">
+            <Card title={t('bef.s1')}>
               <Text value={d.dienstart} editable={editable} onChange={(v) => set({ dienstart: v })} rows={1} />
             </Card>
-            <Card title="2. Ziel und Zweck (Leitziel)">
+            <Card title={t('bef.s2')}>
               <Text value={d.leitziel} editable={editable} onChange={(v) => set({ leitziel: v })} />
             </Card>
-            <Card title="3. Absicht des Bat Kdt">
+            <Card title={t('bef.s3')}>
               <Text value={d.absicht} editable={editable} onChange={(v) => set({ absicht: v })} />
             </Card>
-            <Card title="4. Aufträge an die Kompanien (Richtziele)">
-              {shownKps.length === 0 && <Empty>Keine Aufträge.</Empty>}
+            <Card title={t('bef.s4')}>
+              {shownKps.length === 0 && <Empty>{t('bef.noTasks')}</Empty>}
               <div className="space-y-4">
                 {shownKps.map((k) => {
                   const a = auftrag(k.id);
@@ -195,10 +198,10 @@ export function BefehlPage() {
                       </div>
                       {editable ? (
                         <div className="space-y-2">
-                          <Field label="Richtziele">
+                          <Field label={t('bef.richtziele')}>
                             <TextArea value={a.richtziele} onChange={(e) => setAuftrag(k.id, { richtziele: e.target.value })} />
                           </Field>
-                          <Field label="Teilnehmende">
+                          <Field label={t('bef.teilnehmende')}>
                             <input className="input" value={a.teilnehmende} onChange={(e) => setAuftrag(k.id, { teilnehmende: e.target.value })} />
                           </Field>
                           <Dienste wks={wksOf(k.id)} />
@@ -207,7 +210,7 @@ export function BefehlPage() {
                         <div className="space-y-1 text-sm">
                           <p className="whitespace-pre-wrap">{a.richtziele}</p>
                           <p className="text-slate-600">
-                            <b>Teilnehmende:</b> {a.teilnehmende || '–'}
+                            <b>{t('bef.teilnehmendeBold')}</b> {a.teilnehmende || '–'}
                           </p>
                           <Dienste wks={wksOf(k.id)} />
                         </div>
@@ -217,10 +220,10 @@ export function BefehlPage() {
                 })}
               </div>
             </Card>
-            <Card title="5. Organisation der Anlässe (Verantwortlichkeiten)">
+            <Card title={t('bef.s5')}>
               <Text value={d.organisation} editable={editable} onChange={(v) => set({ organisation: v })} />
             </Card>
-            <Card title="6. Besonderes">
+            <Card title={t('bef.s6')}>
               <Text value={d.besonderes} editable={editable} onChange={(v) => set({ besonderes: v })} />
             </Card>
           </>
@@ -240,7 +243,8 @@ function Text({ value, editable, onChange, rows = 3 }: { value: string; editable
 
 /** The Dienstleistungen of a Kp in the year, as planned in the Jahresplanung. */
 function Dienste({ wks }: { wks: WkSummary[] }) {
-  if (wks.length === 0) return <p className="text-sm text-slate-500">Noch kein WK in der Jahresplanung.</p>;
+  const { t } = useT();
+  if (wks.length === 0) return <p className="text-sm text-slate-500">{t('bef.noWkYet')}</p>;
   return (
     <ul className="space-y-0.5 text-sm text-slate-600">
       {wks.map((w) => (
@@ -248,8 +252,8 @@ function Dienste({ wks }: { wks: WkSummary[] }) {
           <Link to={`/wk/${w.id}`} className="font-medium text-zs-blue hover:underline print:text-black">
             {w.title}
           </Link>
-          {w.avorDays.length > 0 && <> · <b>AVOR:</b> {w.avorDays.map(fmtDate).join(', ')}</>}
-          {w.kvkDays.length > 0 && <> · <b>KVK:</b> {w.kvkDays.map(fmtDate).join(', ')}</>} · <b>WK:</b> {fmtDate(w.startDate)} – {fmtDate(w.endDate)}
+          {w.avorDays.length > 0 && <> · <b>{t('duty.AVOR')}:</b> {w.avorDays.map(fmtDate).join(', ')}</>}
+          {w.kvkDays.length > 0 && <> · <b>{t('duty.KVK')}:</b> {w.kvkDays.map(fmtDate).join(', ')}</>} · <b>{t('duty.WK')}:</b> {fmtDate(w.startDate)} – {fmtDate(w.endDate)}
         </li>
       ))}
     </ul>
@@ -258,11 +262,11 @@ function Dienste({ wks }: { wks: WkSummary[] }) {
 
 const syncText = (w: WkSync) =>
   w.action === 'created'
-    ? `WK ${w.kpName} angelegt`
+    ? currentT('bef.sync.created', { kp: w.kpName })
     : w.action === 'linked'
-      ? `WK ${w.kpName} verknüpft`
+      ? currentT('bef.sync.linked', { kp: w.kpName })
       : w.action === 'updated'
-        ? `Daten WK ${w.kpName} angepasst`
+        ? currentT('bef.sync.updated', { kp: w.kpName })
         : w.action === 'locked'
-          ? `WK ${w.kpName} ist eingereicht/freigegeben – Daten nicht geändert`
+          ? currentT('bef.sync.locked', { kp: w.kpName })
           : '';

@@ -3,24 +3,26 @@
 import { useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { MapView, ResourceKind } from '@shared/types';
-import { RESOURCE_KIND_LABEL } from '@shared/types';
+import { currentT } from '../lib/lang';
 import { api, type SetupData, type SetupPerson } from '../api';
 import { errMsg } from '../components/ui';
 import { AddRow, CellInput, Group, IconButton, Row, StackRow } from '../components/grouped';
 import { SwissMap } from '../components/SwissMap';
+import { useT } from '../i18n';
 
 type Kp = SetupData['kompanien'][number];
 type Zug = Kp['zuege'][number];
 type Resource = SetupData['resources'][number];
 
-const STEPS = ['Start', 'Bataillon', 'Kompanien & Züge', 'Personen', 'Ressourcen', 'Karte', 'Zusammenfassung'] as const;
+const STEPS = [0, 1, 2, 3, 4, 5, 6] as const;
 const emptyBestand = () => ({ zfhr: 1, kader: 0, sdt: 0 });
-const newZug = (n: number): Zug => ({ name: `Zug ${n}`, soll: emptyBestand(), zfhr: null });
+const newZug = (n: number): Zug => ({ name: currentT('setup.zugN', { n }), soll: emptyBestand(), zfhr: null });
 const newKp = (): Kp => ({ name: '', kdt: null, zuege: [newZug(1), newZug(2)] });
 const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 const personOk = (p: SetupPerson | null) => !p || (p.name.trim() && validEmail(p.email));
 
 export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
+  const { t } = useT();
   const qc = useQueryClient();
   const [step, setStep] = useState(0);
   const [token, setToken] = useState('');
@@ -29,12 +31,12 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
   const [bat, setBat] = useState<SetupData['bataillon']>({
     name: '',
     regionName: '',
-    briefkopf: { amt: '', abteilung: 'Zivilschutz', adresse: '', telefon: '', web: '' },
+    briefkopf: { amt: '', abteilung: t('bat.line2Ph'), adresse: '', telefon: '', web: '' },
     logo: null,
     kantonLogo: null,
     mapView: null,
   });
-  const [admin, setAdmin] = useState({ name: '', email: '', funktion: 'Bat Kdt', password: '', repeat: '' });
+  const [admin, setAdmin] = useState({ name: '', email: '', funktion: t('setup.batKdt'), password: '', repeat: '' });
   const [startPassword, setStartPassword] = useState('');
   const [kps, setKps] = useState<Kp[]>([newKp()]);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -92,7 +94,7 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
   const setRes = (i: number, patch: Partial<Resource>) => setResources(resources.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const pickLogo = (key: 'logo' | 'kantonLogo', file: File | undefined) => {
     if (!file) return;
-    if (file.size > 500_000) return setError('Logo zu gross (max. 500 KB)');
+    if (file.size > 500_000) return setError(t('bat.logoTooLarge'));
     const r = new FileReader();
     r.onload = () => setBat((b) => ({ ...b, [key]: String(r.result) }));
     r.readAsDataURL(file);
@@ -107,9 +109,9 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
             <path d="M16 6 L26 24 H6 Z" fill="#1e3a8a" />
           </svg>
           <div>
-            <h1 className="text-[28px] font-bold leading-tight tracking-tight">WK-Planer einrichten</h1>
+            <h1 className="text-[28px] font-bold leading-tight tracking-tight">{t('setup.title')}</h1>
             <p className="text-[15px] text-slate-500">
-              Schritt {step + 1} von {STEPS.length}: {STEPS[step]}
+              {t('setup.stepOf', { n: step + 1, total: STEPS.length, name: t(`setup.step.${STEPS[step]}`) })}
             </p>
           </div>
         </header>
@@ -122,46 +124,45 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
         {step === 0 && (
           <>
             <p className="mx-1 mb-5 text-[15px] text-slate-600">
-              Diese Installation ist noch leer. Richten Sie Ihre Organisation ein – Bataillon, Kompanien, Züge, Konten und Ressourcen. Alles lässt sich
-              später unter «Organisation» ändern und ergänzen.
+              {t('setup.intro')}
             </p>
             {tokenRequired && (
-              <Group title="Einrichtungs-Code" foot="Steht in der Server-Konfiguration (SETUP_TOKEN).">
-                <Row label="Code">
+              <Group title={t('setup.code')} foot={t('setup.codeFoot')}>
+                <Row label={t('setup.codeLabel')}>
                   <CellInput value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" />
                 </Row>
               </Group>
             )}
             <div className="space-y-3">
               <BigButton disabled={!valid[0]} onClick={() => setStep(1)}>
-                Eigene Organisation einrichten
+                {t('setup.own')}
               </BigButton>
               <BigButton secondary disabled={!valid[0] || busy} onClick={() => run(() => api.setupDemo(token.trim() || undefined))}>
-                Mit Demo-Daten ausprobieren
+                {t('setup.demo')}
               </BigButton>
-              <p className="mx-1 text-[13px] text-slate-500">Die Demo legt ein Beispiel-Bataillon mit Demo-Konten an (Passwort «zivilschutz»).</p>
+              <p className="mx-1 text-[13px] text-slate-500">{t('setup.demoHint')}</p>
             </div>
           </>
         )}
 
         {step === 1 && (
           <>
-            <Group title="Bataillon">
-              <Row label="Name">
-                <CellInput value={bat.name} autoFocus placeholder="z. B. ZS Bat Musterregion" onChange={(e) => setBat({ ...bat, name: e.target.value })} />
+            <Group title={t('setup.step.1')}>
+              <Row label={t('profile.name')}>
+                <CellInput value={bat.name} autoFocus placeholder={t('setup.batPh')} onChange={(e) => setBat({ ...bat, name: e.target.value })} />
               </Row>
-              <Row label="Region">
-                <CellInput value={bat.regionName} placeholder="z. B. Zivilschutzorganisation Region Musterland" onChange={(e) => setBat({ ...bat, regionName: e.target.value })} />
+              <Row label={t('setup.region')}>
+                <CellInput value={bat.regionName} placeholder={t('bat.regionPh')} onChange={(e) => setBat({ ...bat, regionName: e.target.value })} />
               </Row>
             </Group>
-            <Group title="Briefkopf der Dokumente" foot="Erscheint auf Dossier, Arbeitsprogramm, Tagesbefehl und allen anderen Ausdrucken.">
+            <Group title={t('setup.letterhead')} foot={t('setup.letterheadFoot')}>
               {(
                 [
-                  ['amt', 'Zeile 1 (fett)', 'Amt für Bevölkerungsschutz'],
-                  ['abteilung', 'Zeile 2', 'Zivilschutz'],
-                  ['adresse', 'Adresse', 'Musterstrasse 1, 1234 Musterhausen'],
-                  ['telefon', 'Telefon', 'T +41 00 000 00 00'],
-                  ['web', 'Web', 'zivilschutz.example.ch'],
+                  ['amt', t('setup.line1'), t('setup.line1Ph')],
+                  ['abteilung', t('setup.line2'), t('bat.line2Ph')],
+                  ['adresse', t('setup.address'), t('bat.addressPh')],
+                  ['telefon', t('bat.phone'), t('setup.phonePh')],
+                  ['web', t('bat.web'), 'zivilschutz.example.ch'],
                 ] as const
               ).map(([k, label, ph]) => (
                 <Row key={k} label={label}>
@@ -169,9 +170,9 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
                 </Row>
               ))}
             </Group>
-            <Group title="Logos" foot="PNG, JPEG, SVG oder WebP, höchstens 500 KB. Optional.">
-              <LogoRow label="Kanton (Kopfzeile)" value={bat.kantonLogo} onPick={(f) => pickLogo('kantonLogo', f)} onClear={() => setBat({ ...bat, kantonLogo: null })} />
-              <LogoRow label="Region (Deckblatt)" value={bat.logo} onPick={(f) => pickLogo('logo', f)} onClear={() => setBat({ ...bat, logo: null })} />
+            <Group title={t('setup.logos')} foot={t('setup.logosFoot')}>
+              <LogoRow label={t('setup.kantonLogo')} value={bat.kantonLogo} onPick={(f) => pickLogo('kantonLogo', f)} onClear={() => setBat({ ...bat, kantonLogo: null })} />
+              <LogoRow label={t('setup.regionLogo')} value={bat.logo} onPick={(f) => pickLogo('logo', f)} onClear={() => setBat({ ...bat, logo: null })} />
             </Group>
           </>
         )}
@@ -181,26 +182,26 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
             {kps.map((k, i) => (
               <Group
                 key={i}
-                title={`Kompanie ${i + 1}`}
+                title={t('setup.kpN', { n: i + 1 })}
                 aside={
                   kps.length > 1 && (
                     <button className="text-zs-blue" onClick={() => setKps(kps.filter((_, j) => j !== i))}>
-                      Entfernen
+                      {t('common.remove')}
                     </button>
                   )
                 }
-                foot="Sollbestand pro Zug: Zugführer · Kader · Soldaten (später auch pro Gruppe)."
+                foot={t('setup.sollFoot')}
               >
-                <Row label="Name">
-                  <CellInput value={k.name} placeholder="z. B. Pi Kp" onChange={(e) => setKp(i, { name: e.target.value })} />
+                <Row label={t('profile.name')}>
+                  <CellInput value={k.name} placeholder={t('setup.kpPh')} onChange={(e) => setKp(i, { name: e.target.value })} />
                 </Row>
                 {k.zuege.map((z, zi) => (
                   <div key={zi} className="flex min-h-[44px] flex-wrap items-center gap-2 py-1.5 pl-4 pr-2.5">
-                    <CellInput className="!w-auto min-w-[8rem] !py-1" value={z.name} placeholder="Zug" aria-label="Name des Zuges" onChange={(e) => setZug(i, zi, { name: e.target.value })} />
+                    <CellInput className="!w-auto min-w-[8rem] !py-1" value={z.name} placeholder={t('setup.zugPh')} aria-label={t('setup.zugName')} onChange={(e) => setZug(i, zi, { name: e.target.value })} />
                     <span className="ml-auto flex items-center gap-1 text-xs text-slate-500">
                       {(['zfhr', 'kader', 'sdt'] as const).map((r) => (
                         <label key={r} className="flex items-center gap-1">
-                          {r === 'zfhr' ? 'Zfhr' : r === 'kader' ? 'Kader' : 'Sdt'}
+                          {r === 'zfhr' ? t('setup.zfhrShort') : r === 'kader' ? t('setup.kaderShort') : t('setup.sdtShort')}
                           <input
                             type="number"
                             min={0}
@@ -212,57 +213,56 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
                         </label>
                       ))}
                     </span>
-                    <IconButton label="Zug entfernen" destructive disabled={k.zuege.length <= 1} onClick={() => setKp(i, { zuege: k.zuege.filter((_, j) => j !== zi) })}>
+                    <IconButton label={t('setup.removeZug')} destructive disabled={k.zuege.length <= 1} onClick={() => setKp(i, { zuege: k.zuege.filter((_, j) => j !== zi) })}>
                       ✕
                     </IconButton>
                   </div>
                 ))}
-                <AddRow onClick={() => setKp(i, { zuege: [...k.zuege, newZug(k.zuege.length + 1)] })}>Zug hinzufügen</AddRow>
+                <AddRow onClick={() => setKp(i, { zuege: [...k.zuege, newZug(k.zuege.length + 1)] })}>{t('setup.addZug')}</AddRow>
               </Group>
             ))}
             <BigButton secondary onClick={() => setKps((ks) => [...ks, newKp()])}>
-              + Kompanie
+              {t('setup.addKp')}
             </BigButton>
           </>
         )}
 
         {step === 3 && (
           <>
-            <Group title="Bat Kommando – Ihr Konto" foot="Mit diesem Konto sind Sie nach der Einrichtung angemeldet.">
-              <Row label="Grad, Name">
-                <CellInput value={admin.name} placeholder="z. B. Maj Muster" onChange={(e) => setAdmin({ ...admin, name: e.target.value })} />
+            <Group title={t('setup.account')} foot={t('setup.accountFoot')}>
+              <Row label={t('setup.rankName')}>
+                <CellInput value={admin.name} placeholder={t('setup.rankNamePh')} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} />
               </Row>
-              <Row label="Funktion">
+              <Row label={t('admin.funktion')}>
                 <CellInput value={admin.funktion} onChange={(e) => setAdmin({ ...admin, funktion: e.target.value })} />
               </Row>
-              <Row label="E-Mail">
+              <Row label={t('login.email')}>
                 <CellInput type="email" autoComplete="email" value={admin.email} onChange={(e) => setAdmin({ ...admin, email: e.target.value })} />
               </Row>
-              <Row label="Passwort">
-                <CellInput type="password" autoComplete="new-password" placeholder="mindestens 8 Zeichen" value={admin.password} onChange={(e) => setAdmin({ ...admin, password: e.target.value })} />
+              <Row label={t('login.password')}>
+                <CellInput type="password" autoComplete="new-password" placeholder={t('setup.min8')} value={admin.password} onChange={(e) => setAdmin({ ...admin, password: e.target.value })} />
               </Row>
-              <Row label="Wiederholen">
+              <Row label={t('setup.repeat')}>
                 <CellInput type="password" autoComplete="new-password" value={admin.repeat} onChange={(e) => setAdmin({ ...admin, repeat: e.target.value })} />
               </Row>
             </Group>
-            {admin.repeat && admin.repeat !== admin.password && <Note>Die Passwörter stimmen nicht überein.</Note>}
+            {admin.repeat && admin.repeat !== admin.password && <Note>{t('setup.mismatch')}</Note>}
 
             <p className="mx-1 mb-4 text-[15px] text-slate-600">
-              Optional: Kp Kdt und Zugführer gleich mit Konto erfassen. Weitere Personen (Kader, Log Of …) folgen später unter
-              «Organisation › Kompanien & Personal».
+              {t('setup.peopleIntro')}
             </p>
             {kps.map((k, i) => (
-              <Group key={i} title={k.name || `Kompanie ${i + 1}`}>
-                <PersonRow label="Kp Kdt" value={k.kdt} onChange={(kdt) => setKp(i, { kdt })} />
+              <Group key={i} title={k.name || t('setup.kpN', { n: i + 1 })}>
+                <PersonRow label={t('role.KPKDT')} value={k.kdt} onChange={(kdt) => setKp(i, { kdt })} />
                 {k.zuege.map((z, zi) => (
-                  <PersonRow key={zi} label={`Zfhr ${z.name}`} value={z.zfhr} onChange={(zfhr) => setZug(i, zi, { zfhr })} />
+                  <PersonRow key={zi} label={t('setup.zfhrOf', { zug: z.name })} value={z.zfhr} onChange={(zfhr) => setZug(i, zi, { zfhr })} />
                 ))}
               </Group>
             ))}
             {others.length > 0 && (
-              <Group title="Startpasswort der weiteren Konten" foot="Teilen Sie es den Personen mit; sie ändern es unter «Mein Konto».">
-                <Row label="Passwort">
-                  <CellInput type="text" autoComplete="off" placeholder="mindestens 8 Zeichen" value={startPassword} onChange={(e) => setStartPassword(e.target.value)} />
+              <Group title={t('setup.startPassword')} foot={t('setup.startPasswordFoot')}>
+                <Row label={t('login.password')}>
+                  <CellInput type="text" autoComplete="off" placeholder={t('setup.min8')} value={startPassword} onChange={(e) => setStartPassword(e.target.value)} />
                 </Row>
               </Group>
             )}
@@ -273,25 +273,24 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
         {step === 4 && (
           <>
             <p className="mx-1 mb-4 text-[15px] text-slate-600">
-              Fahrzeuge, Anhänger, Räume und Gelände, die die Züge anfragen können – pro Kompanie oder für das ganze Bataillon. Geländeflächen auf der Karte
-              und weitere Angaben folgen unter «Organisation › Vorlagen & Ressourcen».
+              {t('setup.resIntro')}
             </p>
             {resources.length > 0 && (
               <Group title={`Ressourcen (${resources.length})`}>
                 {resources.map((r, i) => (
                   <div key={i} className="flex flex-wrap items-center gap-2 py-2 pl-4 pr-2.5">
-                    <span className="w-24 shrink-0 text-[13px] text-slate-500">{RESOURCE_KIND_LABEL[r.kind]}</span>
-                    <CellInput className="!w-auto min-w-[9rem] flex-1 !py-1" value={r.name} placeholder="Name" aria-label="Name" onChange={(e) => setRes(i, { name: e.target.value })} />
+                    <span className="w-24 shrink-0 text-[13px] text-slate-500">{t(`resource.${r.kind}`)}</span>
+                    <CellInput className="!w-auto min-w-[9rem] flex-1 !py-1" value={r.name} placeholder={t('profile.name')} aria-label={t('profile.name')} onChange={(e) => setRes(i, { name: e.target.value })} />
                     <CellInput
                       className="!w-32 !py-1"
                       value={r.category}
-                      placeholder={r.kind === 'FAHRZEUG' ? 'Typ, z. B. Bus' : 'Kategorie'}
-                      aria-label="Typ"
+                      placeholder={r.kind === 'FAHRZEUG' ? t('setup.typePh') : t('setup.category')}
+                      aria-label={t('setup.type')}
                       onChange={(e) => setRes(i, { category: e.target.value })}
                     />
                     {r.kind === 'FAHRZEUG' && (
                       <label className="flex items-center gap-1 text-xs text-slate-500">
-                        Plätze
+                        {t('setup.seats')}
                         <input
                           type="number"
                           min={0}
@@ -304,18 +303,18 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
                     )}
                     <select
                       className="input !w-auto !py-1 text-sm"
-                      aria-label="Gehört zu"
+                      aria-label={t('setup.belongsTo')}
                       value={r.kp ?? ''}
                       onChange={(e) => setRes(i, { kp: e.target.value === '' ? null : Number(e.target.value) })}
                     >
-                      <option value="">Bataillon</option>
+                      <option value="">{t('setup.step.1')}</option>
                       {kps.map((k, ki) => (
                         <option key={ki} value={ki}>
-                          {k.name || `Kompanie ${ki + 1}`}
+                          {k.name || t('setup.kpN', { n: ki + 1 })}
                         </option>
                       ))}
                     </select>
-                    <IconButton label="Entfernen" destructive onClick={() => setResources(resources.filter((_, j) => j !== i))}>
+                    <IconButton label={t('common.remove')} destructive onClick={() => setResources(resources.filter((_, j) => j !== i))}>
                       ✕
                     </IconButton>
                   </div>
@@ -329,7 +328,7 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
                   className="rounded-full bg-white px-4 py-2 text-[15px] text-zs-blue active:opacity-60"
                   onClick={() => setResources((rs) => [...rs, { kp: kps.length === 1 ? 0 : null, kind, name: '', category: '', seats: kind === 'FAHRZEUG' ? 9 : 0, capacity: '' }])}
                 >
-                  + {RESOURCE_KIND_LABEL[kind]}
+                  + {t(`resource.${kind}`)}
                 </button>
               ))}
             </div>
@@ -337,32 +336,32 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
         )}
 
         {step === 5 && (
-          <Group title="Standard-Kartenausschnitt" foot="Hier öffnen sich alle Karten (Gelände, Ressourcen, Erkundungen, Übungen). Optional – ohne Auswahl die ganze Schweiz.">
+          <Group title={t('bat.mapView')} foot={t('setup.mapFoot')}>
             <div className="space-y-2 p-3">
               <SwissMap view={bat.mapView} onViewChange={setShownView} height={320} />
               <div className="flex flex-wrap items-center gap-2 text-[13px]">
                 <button className="rounded-full bg-zs-blue/10 px-3 py-1 font-medium text-zs-blue disabled:opacity-40" disabled={!shownView} onClick={() => setBat({ ...bat, mapView: shownView })}>
-                  Aktuellen Ausschnitt übernehmen
+                  {t('bat.takeView')}
                 </button>
                 {bat.mapView && (
                   <button className="rounded-full px-3 py-1 text-zs-blue" onClick={() => setBat({ ...bat, mapView: null })}>
-                    Zurücksetzen
+                    {t('setup.reset')}
                   </button>
                 )}
-                <span className="text-slate-500">{bat.mapView ? `Gewählt: Zoom ${bat.mapView.zoom}` : 'Kein Ausschnitt gewählt'}</span>
+                <span className="text-slate-500">{bat.mapView ? t('setup.chosenZoom', { zoom: bat.mapView.zoom }) : t('setup.noView')}</span>
               </div>
             </div>
           </Group>
         )}
 
         {step === 6 && (
-          <Group title="Bereit zum Einrichten">
-            <Summary label="Bataillon" value={bat.name} />
-            <Summary label="Kompanien" value={kps.map((k) => `${k.name} (${k.zuege.length} Züge)`).join(', ')} />
-            <Summary label="Konten" value={`${1 + others.length} (Bat Kommando${others.length ? ` + ${others.length} weitere` : ''})`} />
-            <Summary label="Ressourcen" value={resources.length ? `${resources.length}` : 'keine'} />
-            <Summary label="Briefkopf" value={[bat.briefkopf.amt, bat.briefkopf.adresse].filter(Boolean).join(' · ') || '–'} />
-            <Summary label="Karte" value={bat.mapView ? 'eigener Ausschnitt' : 'ganze Schweiz'} />
+          <Group title={t('setup.ready')}>
+            <Summary label={t('setup.step.1')} value={bat.name} />
+            <Summary label={t('setup.kompanien')} value={kps.map((k) => t('setup.kpSummary', { name: k.name, n: k.zuege.length })).join(', ')} />
+            <Summary label={t('setup.accounts')} value={others.length ? t('setup.accountsSummaryMore', { n: 1 + others.length, more: others.length }) : t('setup.accountsSummary', { n: 1 })} />
+            <Summary label={t('setup.step.4')} value={resources.length ? `${resources.length}` : t('common.none')} />
+            <Summary label={t('setup.letterheadShort')} value={[bat.briefkopf.amt, bat.briefkopf.adresse].filter(Boolean).join(' · ') || '–'} />
+            <Summary label={t('setup.step.5')} value={bat.mapView ? t('setup.ownView') : t('setup.wholeCh')} />
           </Group>
         )}
 
@@ -371,12 +370,12 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
         {step > 0 && (
           <div className="mt-6 flex items-center gap-3">
             <button className="rounded-full px-4 py-2.5 text-[17px] text-zs-blue active:opacity-60" onClick={() => setStep(step - 1)}>
-              Zurück
+              {t('common.back')}
             </button>
             <span className="flex-1" />
             {step < STEPS.length - 1 ? (
               <button className="rounded-full bg-zs-blue px-6 py-2.5 text-[17px] font-semibold text-white active:opacity-60 disabled:opacity-40" disabled={!valid[step]} onClick={() => setStep(step + 1)}>
-                Weiter
+                {t('common.next')}
               </button>
             ) : (
               <button
@@ -384,7 +383,7 @@ export function SetupWizard({ tokenRequired }: { tokenRequired: boolean }) {
                 disabled={busy || !valid.every(Boolean)}
                 onClick={submit}
               >
-                {busy ? 'Wird eingerichtet …' : 'Einrichten'}
+                {busy ? t('setup.busy') : t('setup.submit')}
               </button>
             )}
           </div>
@@ -416,6 +415,7 @@ const Summary = ({ label, value }: { label: string; value: string }) => (
 
 /** Name and e-mail of an optional account; empty = no account. */
 function PersonRow({ label, value, onChange }: { label: string; value: SetupPerson | null; onChange: (p: SetupPerson | null) => void }) {
+  const { t } = useT();
   const p = value ?? { name: '', email: '' };
   const set = (patch: Partial<SetupPerson>) => {
     const next = { ...p, ...patch };
@@ -423,27 +423,28 @@ function PersonRow({ label, value, onChange }: { label: string; value: SetupPers
   };
   const incomplete = !!value && !personOk(value);
   return (
-    <StackRow label={<span className={incomplete ? 'text-red-600' : ''}>{label}{incomplete ? ' – Name und gültige E-Mail' : ''}</span>}>
+    <StackRow label={<span className={incomplete ? 'text-red-600' : ''}>{label}{incomplete ? t('setup.incomplete') : ''}</span>}>
       <div className="flex flex-wrap gap-x-3">
-        <CellInput className="!w-auto min-w-[9rem] flex-1 !py-1" placeholder="Grad, Name" value={p.name} onChange={(e) => set({ name: e.target.value })} />
-        <CellInput className="!w-auto min-w-[12rem] flex-1 !py-1" type="email" placeholder="E-Mail" value={p.email} onChange={(e) => set({ email: e.target.value })} />
+        <CellInput className="!w-auto min-w-[9rem] flex-1 !py-1" placeholder={t('setup.rankName')} value={p.name} onChange={(e) => set({ name: e.target.value })} />
+        <CellInput className="!w-auto min-w-[12rem] flex-1 !py-1" type="email" placeholder={t('login.email')} value={p.email} onChange={(e) => set({ email: e.target.value })} />
       </div>
     </StackRow>
   );
 }
 
 function LogoRow({ label, value, onPick, onClear }: { label: string; value: string | null; onPick: (f: File | undefined) => void; onClear: () => void }) {
+  const { t } = useT();
   return (
     <Row label={label}>
-      {value ? <img src={value} alt="" className="max-h-10 max-w-[140px] rounded bg-white" /> : <span className="py-[11px] text-slate-400">Kein Logo</span>}
+      {value ? <img src={value} alt="" className="max-h-10 max-w-[140px] rounded bg-white" /> : <span className="py-[11px] text-slate-400">{t('bat.noLogo')}</span>}
       <span className="flex-1" />
       <label className="cursor-pointer rounded-full bg-zs-blue/10 px-3 py-1 text-[13px] font-medium text-zs-blue">
-        Bild wählen
+        {t('bat.pickImage')}
         <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="sr-only" onChange={(e) => onPick(e.target.files?.[0])} />
       </label>
       {value && (
         <button className="text-[13px] text-zs-blue" onClick={onClear}>
-          Entfernen
+          {t('common.remove')}
         </button>
       )}
     </Row>

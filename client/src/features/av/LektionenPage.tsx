@@ -2,15 +2,17 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { canCreateAv, canViewAv } from '@shared/permissions';
-import { fmtDate, fmtTime, weekday } from '@shared/util';
+import { fmtDate, fmtTime } from '@shared/util';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Card, Empty } from '../../components/ui';
 import { AusbildungCard } from '../../pages/AusbildungenPage';
+import { useT } from '../../i18n';
 
 const TRAINING = ['AUSBILDUNG', 'UEBUNG'];
 
 export function LektionenPage({ detail }: { detail: WkDetail }) {
+  const { t, weekdayShort } = useT();
   const me = useUser();
   const { wk, zuege, blocks } = detail;
   const avs = useQuery({ queryKey: ['avs', wk.id], queryFn: () => api.avs(wk.id) });
@@ -21,10 +23,9 @@ export function LektionenPage({ detail }: { detail: WkDetail }) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-4xl space-y-4 p-3 sm:p-6">
         <p className="text-sm text-slate-600">
-          Ausbildungsvorbereitungen (Lektionen) aller Züge dieses WK. Neue Lektionen entstehen in der Zugansicht beim Zeitfenster oder hier bei den offenen
-          Ausbildungsblöcken.
+          {t('lek.intro')}
         </p>
-        {avs.isLoading && <Empty>Laden …</Empty>}
+        {avs.isLoading && <Empty>{t('common.loading')}</Empty>}
         {shown.map((z) => {
           const own = list
             .filter((a) => a.zugId === z.id)
@@ -34,9 +35,9 @@ export function LektionenPage({ detail }: { detail: WkDetail }) {
             .sort((a, b) => a.date.localeCompare(b.date) || a.startMin - b.startMin);
           const create = canCreateAv(me, wk, z.id);
           return (
-            <Card key={z.id} title={`${z.name} (${own.length} Lektionen)`}>
+            <Card key={z.id} title={t('lek.cardTitle', { zug: z.name, n: own.length })}>
               {own.length === 0 ? (
-                <Empty>Noch keine Ausbildungsvorbereitungen.</Empty>
+                <Empty>{t('lek.none')}</Empty>
               ) : (
                 <div className="space-y-2">
                   {own.map((a) => (
@@ -46,17 +47,17 @@ export function LektionenPage({ detail }: { detail: WkDetail }) {
               )}
               {open.length > 0 && (
                 <div className="mt-3 border-t border-slate-100 pt-2">
-                  <div className="label">Ausbildungsblöcke ohne Vorbereitung</div>
+                  <div className="label">{t('lek.openBlocks')}</div>
                   <ul className="space-y-0.5 text-sm">
                     {open.map((b) => (
                       <li key={b.id} className="flex flex-wrap items-center gap-x-3">
                         <span className="w-32 shrink-0 tabular-nums text-slate-500">
-                          {weekday(b.date).slice(0, 2)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}
+                          {weekdayShort(b.date)} {fmtDate(b.date).slice(0, 6)} {fmtTime(b.startMin)}
                         </span>
                         <span className="flex-1">{b.title}</span>
                         {create && (
                           <Link to={`../av/neu?block=${b.id}&zug=${z.id}`} className="text-xs text-zs-blue hover:underline">
-                            Vorbereitung erstellen →
+                            {t('lek.create')}
                           </Link>
                         )}
                       </li>
