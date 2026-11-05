@@ -55,8 +55,8 @@ und teilt zu. Der Belegungsplan zeigt Auslastung und Doppelbelegungen â€“ auch Ã
 ## Schnellstart
 
 ```bash
-git clone https://github.com/<organisation>/wk-planer.git
-cd wk-planer
+git clone https://github.com/dllb-ch/WK-Planer.git
+cd WK-Planer
 docker compose up -d --build
 ```
 

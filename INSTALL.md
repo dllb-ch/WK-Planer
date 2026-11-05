@@ -12,8 +12,8 @@
 Voraussetzung: [Docker](https://docs.docker.com/get-docker/) mit Compose.
 
 ```bash
-git clone https://github.com/<organisation>/wk-planer.git
-cd wk-planer
+git clone https://github.com/dllb-ch/WK-Planer.git
+cd WK-Planer
 docker compose up -d --build
 ```
 
