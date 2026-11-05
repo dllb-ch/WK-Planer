@@ -39,22 +39,24 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
+/** Signs the user in (session cookie) and answers with the session user. */
+export async function startSessionFor(db: DB, res: Response, row: any) {
+  const token = randomBytes(32).toString('hex');
+  const expires = Date.now() + SESSION_DAYS * 86400_000;
+  await db.prepare('DELETE FROM session WHERE expires_at < ?').run(Date.now());
+  await db.prepare('INSERT INTO session (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, row.id, expires);
+  res.cookie(COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: SESSION_DAYS * 86400_000,
+  });
+  res.json(toSessionUser(row));
+}
+
 export function authRouter(db: DB) {
   const r = asyncRouter();
-
-  async function startSession(res: Response, row: any) {
-    const token = randomBytes(32).toString('hex');
-    const expires = Date.now() + SESSION_DAYS * 86400_000;
-    await db.prepare('DELETE FROM session WHERE expires_at < ?').run(Date.now());
-    await db.prepare('INSERT INTO session (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, row.id, expires);
-    res.cookie(COOKIE, token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: SESSION_DAYS * 86400_000,
-    });
-    res.json(toSessionUser(row));
-  }
+  const startSession = (res: Response, row: any) => startSessionFor(db, res, row);
 
   r.post('/login', async (req, res) => {
     const { email, password } = parse(z.object({ email: z.string(), password: z.string() }), req.body);

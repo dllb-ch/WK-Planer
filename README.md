@@ -70,7 +70,7 @@ Oder ohne Docker direkt im Browser: [Demo](https://dllb-ch.github.io/WK-Planer/)
 
 ## Dokumentation
 
-- **[Installation und Betrieb](INSTALL.md):** Docker, Entwicklung, Server mit HTTPS, Einstellungen, Tests
+- **[Installation und Betrieb](INSTALL.md):** Docker, Entwicklung, erste Einrichtung, Server mit HTTPS, Einstellungen, Tests
 - **[Handbuch](docs/handbuch.md):** alle Funktionen und ihre Bedienung, nach Rolle
 
 ## Technik

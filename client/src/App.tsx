@@ -8,6 +8,7 @@ import { errMsg, useToast } from './components/ui';
 import { canViewBefehl, canViewYearPlan } from '@shared/permissions';
 import { useAuth, useUser } from './auth';
 import { LoginPage } from './pages/LoginPage';
+import { SetupWizard } from './pages/SetupWizard';
 import { DashboardPage } from './pages/DashboardPage';
 import { WkPage } from './pages/WkPage';
 import { BefehlPage } from './pages/BefehlPage';
@@ -29,7 +30,10 @@ export function App() {
 
 function AuthedApp() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="p-8 text-slate-500">Laden …</div>;
+  // An empty installation: the setup wizard instead of the login.
+  const setup = useQuery({ queryKey: ['setup'], queryFn: api.setupStatus, enabled: !loading && !user, staleTime: Infinity });
+  if (loading || (!user && setup.isLoading)) return <div className="p-8 text-slate-500">Laden …</div>;
+  if (!user && setup.data?.required) return <SetupWizard tokenRequired={setup.data.tokenRequired} />;
   if (!user) return <LoginPage />;
   return (
     <div className="flex h-full flex-col">

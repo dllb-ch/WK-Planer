@@ -1,6 +1,6 @@
 // Records the README animations from a running demo instance (fresh database with the demo data).
 //
-//   rm -rf /tmp/wk-record && PGLITE_DIR=/tmp/wk-record API_PORT=3012 npm start   # in one terminal (after npm run build)
+//   rm -rf /tmp/wk-record && PGLITE_DIR=/tmp/wk-record API_PORT=3012 SEED_DEMO=1 npm start   # in one terminal (after npm run build)
 //   BASE=http://localhost:3012 node docs/media/record.mjs                      # in another
 //
 // Needs Chromium (npx playwright install chromium, or CHROME=/path/to/chromium) and ffmpeg. Writes docs/media/*.gif.

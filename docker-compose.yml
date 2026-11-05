@@ -8,6 +8,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://zs:zs@db:5432/zs
+      # Demo data on first start; without it an empty database opens the setup wizard.
+      SEED_DEMO: '1'
     ports:
       - 127.0.0.1:8080:8080
   db:

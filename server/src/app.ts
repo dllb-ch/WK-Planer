@@ -16,6 +16,7 @@ import { personalRouter, publicRouter } from './routes/personal';
 import { rapportRouter } from './routes/rapporte';
 import { filesRouter } from './routes/files';
 import { einsatzRouter } from './routes/einsatz';
+import { setupRouter } from './routes/setup';
 
 export function createApp(db: DB, env: NodeJS.ProcessEnv = process.env) {
   const app = express();
@@ -23,11 +24,14 @@ export function createApp(db: DB, env: NodeJS.ProcessEnv = process.env) {
   // Behind Traefik: the client address comes from X-Forwarded-For.
   if (env.TRUST_PROXY) app.set('trust proxy', Number(env.TRUST_PROXY) || env.TRUST_PROXY);
   if (env.GATE_PASSWORD) app.use(gate({ user: env.GATE_USER || 'zivilschutz', password: env.GATE_PASSWORD }));
-  app.use(express.json({ limit: '1mb' }));
+  // Room for two logos (data URLs) in the Bataillon settings and the setup.
+  app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser());
   app.use(sessionMiddleware(db));
 
   app.use('/api/auth', authRouter(db));
+  // First-time setup of an empty installation (refuses once there is an account).
+  app.use('/api/setup', setupRouter(db, { SETUP_TOKEN: env.SETUP_TOKEN }));
   // QR check-in: without login.
   app.use('/api/public', publicRouter(db));
   // An archived WK is read only; it can only be restored or deleted.

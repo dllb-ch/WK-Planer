@@ -2,6 +2,8 @@ import type {
   Ausbildungsbefehl,
   Ausbildungsvorbereitung,
   Bataillon,
+  Bestand,
+  ResourceKind,
   AvInput,
   Block,
   BlockDetail,
@@ -97,6 +99,22 @@ async function demoUpload(url: string, file: File) {
   return body as { id: number };
 }
 
+/** First-time setup of an empty installation (server/src/routes/setup.ts). */
+export interface SetupPerson {
+  name: string;
+  email: string;
+  funktion?: string;
+}
+export interface SetupData {
+  token?: string;
+  bataillon: Pick<Bataillon, 'name' | 'regionName' | 'briefkopf' | 'logo' | 'kantonLogo' | 'mapView'>;
+  admin: SetupPerson & { password: string };
+  startPassword?: string;
+  kompanien: { name: string; kdt: SetupPerson | null; zuege: { name: string; soll: Bestand; zfhr: SetupPerson | null }[] }[];
+  /** kp: index in kompanien, null = material of the Bataillon. */
+  resources: { kp: number | null; kind: ResourceKind; name: string; category: string; seats: number; capacity: string }[];
+}
+
 /** Demo account to switch to (top-right menu). */
 export interface DemoAccount {
   email: string;
@@ -156,6 +174,9 @@ export const api = {
   login: (email: string, password: string) => req<SessionUser>('POST', '/auth/login', { email, password }),
   logout: () => req('POST', '/auth/logout'),
   me: () => req<SessionUser>('GET', '/auth/me'),
+  setupStatus: () => req<{ required: boolean; tokenRequired: boolean }>('GET', '/setup'),
+  setup: (b: SetupData) => req<SessionUser>('POST', '/setup', b),
+  setupDemo: (token?: string) => req<{ ok: true }>('POST', '/setup/demo', { token }),
   demoAccounts: () => req<DemoAccount[]>('GET', '/auth/demo-accounts'),
   demoSwitch: (email: string) => req<SessionUser>('POST', '/auth/demo-switch', { email }),
   changePassword: (oldPassword: string, newPassword: string) => req('POST', '/auth/password', { oldPassword, newPassword }),

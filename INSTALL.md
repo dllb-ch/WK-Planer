@@ -2,6 +2,7 @@
 
 - [Ausprobieren mit Docker](#ausprobieren-mit-docker)
 - [Entwicklung](#entwicklung)
+- [Erste Einrichtung](#erste-einrichtung)
 - [Betrieb auf einem Server](#betrieb-auf-einem-server)
 - [Einstellungen](#einstellungen)
 - [Vor dem produktiven Einsatz](#vor-dem-produktiven-einsatz)
@@ -18,7 +19,8 @@ cd WK-Planer
 docker compose up -d --build
 ```
 
-Danach <http://localhost:8080> öffnen. Beim ersten Start füllt die App die leere Datenbank mit einem Beispiel-WK.
+Danach <http://localhost:8080> öffnen. Diese Schnellstart-Konfiguration füllt die leere Datenbank beim ersten Start
+mit einem Beispiel-WK (`SEED_DEMO=1`).
 Anmelden mit einem Demo-Konto, Passwort `zivilschutz`:
 
 | Rolle | E-Mail |
@@ -51,10 +53,29 @@ echo 'DATABASE_URL=postgres://zs:zs@127.0.0.1:54329/zs' > server/.env
 npm run dev
 ```
 
-`npm run seed` setzt die Datenbank auf die Demo-Daten zurück.
+Eine leere Datenbank öffnet im Browser die [Einrichtung](#erste-einrichtung); `SEED_DEMO=1 npm run dev` füllt sie
+stattdessen gleich mit den Demo-Daten. `npm run seed` setzt die Datenbank auf die Demo-Daten zurück.
 
 Das Schema steht in `server/src/sql/schema.sql` und wird beim Start angelegt bzw. ergänzt (`… IF NOT EXISTS`).
 SQL wird mit `?`-Platzhaltern geschrieben; `server/src/db.ts` übersetzt sie für PostgreSQL.
+
+## Erste Einrichtung
+
+Eine leere Installation zeigt statt der Anmeldung einen Assistenten, der die Organisation in einem Durchgang anlegt:
+
+1. **Bataillon:** Name, Region, Briefkopf der Dokumente (Amt, Abteilung, Adresse, Telefon, Web) und Logos.
+2. **Kompanien und Züge** mit dem Sollbestand pro Zug (Zugführer, Kader, Soldaten).
+3. **Personen:** das eigene Konto (Bat Kommando) und, wenn gewünscht, Kp Kdt und Zugführer mit einem gemeinsamen
+   Startpasswort, das sie unter «Mein Konto» ändern.
+4. **Ressourcen:** Fahrzeuge, Anhänger, Räume und Gelände – pro Kompanie oder für das Bataillon.
+5. **Karte:** der Ausschnitt, in dem sich alle Karten öffnen.
+
+Danach ist man als Bat Kommando angemeldet; der Vorbereitungs-Zeitplan wird mit der Standardvorlage angelegt. Alles
+Weitere (Gruppen, Kader, Log Of, Geländeflächen, eigene Vorlagen) folgt unter «Organisation». Statt der eigenen
+Organisation lässt sich auch die Demo laden. Sobald ein Konto besteht, ist die Einrichtung gesperrt.
+
+Ist eine leere Installation öffentlich erreichbar, sollte `SETUP_TOKEN` gesetzt sein: Der Assistent fragt dann nach
+diesem Code, damit niemand anderes die Installation zuerst einrichtet.
 
 ## Betrieb auf einem Server
 
@@ -89,14 +110,17 @@ Ohne Traefik genügt die `docker-compose.yml` im Hauptordner hinter einem belieb
 | `API_PORT` | Port des Servers (Standard 3001, im Container 8080) |
 | `GATE_PASSWORD`, `GATE_USER` | Optionaler Passwortschutz (HTTP Basic Auth) vor der ganzen App; der QR-Check-in bleibt frei. Nach 10 Fehlversuchen ist eine Adresse 15 Minuten gesperrt |
 | `TRUST_PROXY` | `1` hinter einem Reverse Proxy (richtige Adressen für Login-Sperren) |
+| `SETUP_TOKEN` | Code für die [erste Einrichtung](#erste-einrichtung) einer leeren Installation |
+| `SEED_DEMO` | `1`: eine leere Datenbank beim Start mit den Demo-Daten füllen statt die Einrichtung zu zeigen |
 | `DOMAIN`, `TRAEFIK_CERTRESOLVER`, `POSTGRES_PASSWORD` | Nur für `deploy/docker-compose.yml` |
 
 Für die Entwicklung stehen die Variablen in `server/.env`, auf dem Server in `deploy/.env`.
 
 ## Vor dem produktiven Einsatz
 
-1. Demo-Konten löschen oder ihre Passwörter ändern («Organisation › Kompanien & Personal»).
-2. Eigenes Bataillon, Kompanien, Züge und Gruppen erfassen, Benutzer anlegen.
+1. Mit einer leeren Datenbank starten und die [erste Einrichtung](#erste-einrichtung) durchlaufen – oder, wenn mit
+   Demo-Daten begonnen wurde, Demo-Konten löschen bzw. ihre Passwörter ändern («Organisation › Kompanien & Personal»).
+2. Gruppen, weitere Benutzer (Kader, Log Of) und Vorlagen ergänzen.
 3. Briefkopf, Adresse und Logos unter «Organisation › Vorlagen & Ressourcen» einstellen, ebenso Fahrzeuge, Räume
    und Gelände.
 4. Für den Check-in per Handy muss die App unter einer Adresse erreichbar sein, die die Handys öffnen können
