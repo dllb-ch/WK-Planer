@@ -12,8 +12,9 @@
     "build": "npm run build -w client",
     "start": "npm run start -w server",
     "test": "vitest run",
-    "typecheck": "tsc -p server && tsc -p client",
-    "test:e2e": "playwright test"
+    "typecheck": "tsc -p server && tsc -p client && tsc -p client/tsconfig.demo.json",
+    "test:e2e": "playwright test",
+    "build:demo": "npm run build:demo -w client"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

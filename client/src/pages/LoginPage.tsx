@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DEMO as IS_DEMO } from '../lib/base';
 import { useAuth } from '../auth';
 import { Button, errMsg, Field } from '../components/ui';
 
@@ -54,12 +55,17 @@ export function LoginPage() {
             Anmelden
           </Button>
         </form>
-        {import.meta.env.DEV && (
+        {(import.meta.env.DEV || IS_DEMO) && (
           <div className="mt-5 border-t pt-4">
-            <p className="mb-2 text-xs text-slate-500">Demo-Konten (Passwort aus README):</p>
+            <p className="mb-2 text-xs text-slate-500">{IS_DEMO ? 'Demo – als Rolle anmelden:' : 'Demo-Konten (Passwort aus README):'}</p>
             <div className="grid grid-cols-2 gap-1.5">
               {DEMO.map((d) => (
-                <button key={d.email} type="button" className="rounded border px-2 py-1 text-left text-xs hover:bg-slate-50" onClick={() => setEmail(d.email)}>
+                <button
+                  key={d.email}
+                  type="button"
+                  className="rounded border px-2 py-1 text-left text-xs hover:bg-slate-50"
+                  onClick={() => (IS_DEMO ? login(d.email, 'zivilschutz').catch((e) => setError(errMsg(e))) : setEmail(d.email))}
+                >
                   {d.label}
                 </button>
               ))}

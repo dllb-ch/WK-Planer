@@ -1,4 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
+import { appPath } from './lib/base';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { SessionUser } from '@shared/types';
 import { api, ApiError } from './api';
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     staleTime: Infinity,
     // Not on the QR check-in: the session check would run into the password gate and make the phone ask for it.
-    enabled: !location.pathname.startsWith('/checkin/'),
+    enabled: !appPath().startsWith('/checkin/'),
   });
 
   const signedIn = async (u: SessionUser) => {

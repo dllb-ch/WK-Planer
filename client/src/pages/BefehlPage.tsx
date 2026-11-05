@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FileLink } from '../components/FileArea';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Ausbildungsbefehl, AuftragKp, WkSync } from '@shared/types';
@@ -147,9 +148,9 @@ export function BefehlPage() {
                   {files.map((f) => (
                     <li key={f.id} className="flex items-center gap-2">
                       <span aria-hidden>📄</span>
-                      <a href={api.befehlFileUrl(activeYear, f.id)} target="_blank" rel="noreferrer" className="text-zs-blue hover:underline">
+                      <FileLink url={api.befehlFileUrl(activeYear, f.id)} className="text-zs-blue hover:underline">
                         {f.name}
-                      </a>
+                      </FileLink>
                       <span className="text-xs text-slate-500">{Math.max(1, Math.round(f.size / 1024))} KB</span>
                       {editable && (
                         <button

@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"],
+    "allowImportingTsExtensions": false
+  },
+  "include": ["src/demo", "src/vite-env.d.ts", "../shared"],
+  "exclude": ["../shared/**/*.test.ts"]
+}

@@ -58,9 +58,12 @@ import type {
   PendenzInput,
   Role,
 } from '@shared/types';
+import { DEMO } from './lib/base';
 
 /** Raw upload with progress (fetch has none). Name and type travel in headers; the body is the file. */
 function uploadFile(url: string, file: File, onProgress?: (p: number) => void) {
+  // The demo answers fetch in the page; XMLHttpRequest would go to the network.
+  if (DEMO) return demoUpload(url, file);
   return new Promise<{ id: number }>((resolve, reject) => {
     const x = new XMLHttpRequest();
     x.open('POST', url);
@@ -83,6 +86,16 @@ function uploadFile(url: string, file: File, onProgress?: (p: number) => void) {
   });
 }
 
+async function demoUpload(url: string, file: File) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name), 'X-Mime': file.type || 'application/octet-stream' },
+    body: file,
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, body?.error ?? res.statusText, body);
+  return body as { id: number };
+}
 
 /** Demo account to switch to (top-right menu). */
 export interface DemoAccount {

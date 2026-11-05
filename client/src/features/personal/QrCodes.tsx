@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BASE } from '../../lib/base';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CheckInDay } from '@shared/types';
 import { fmtDate, weekday } from '@shared/util';
@@ -12,7 +13,7 @@ const MODE_LABEL: Record<CheckInDay['mode'], string> = {
   CLOSED: 'Geschlossen',
 };
 
-export const checkinUrl = (token: string) => `${location.origin}/checkin/${token}`;
+export const checkinUrl = (token: string) => `${location.origin}${BASE}/checkin/${token}`;
 
 export function useQr(text: string) {
   const [src, setSrc] = useState('');

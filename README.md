@@ -8,6 +8,9 @@ Mehrere Personen planen gleichzeitig, jede Rolle mit ihren eigenen Rechten: Bat 
 Zugführer und Kader. Läuft im Browser auf Computer, Tablet und Handy, lässt sich als App installieren und
 funktioniert im hellen und dunklen Modus.
 
+**[Demo im Browser ausprobieren →](https://dllb-ch.github.io/WK-Planer/)** – ohne Installation und ohne Konto: Rolle
+wählen und loslegen. Die Demo läuft vollständig im Browser; Änderungen bleiben auf dem eigenen Gerät.
+
 ## Funktionen
 
 ### Check-in per QR-Code
@@ -62,6 +65,8 @@ docker compose up -d --build
 
 Danach <http://localhost:8080> öffnen und mit `kpkdt@demo.ch` (Passwort `zivilschutz`) anmelden – die App startet
 mit einem Beispiel-WK und Demo-Konten für alle Rollen.
+
+Oder ohne Docker direkt im Browser: [Demo](https://dllb-ch.github.io/WK-Planer/).
 
 ## Dokumentation
 

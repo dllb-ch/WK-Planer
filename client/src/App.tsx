@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { appPath } from './lib/base';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ROLE_LABEL } from '@shared/types';
@@ -21,7 +22,8 @@ import { ProfilPage } from './pages/ProfilPage';
 
 export function App() {
   // The QR check-in works without login.
-  if (location.pathname.startsWith('/checkin/')) return <CheckInPage token={decodeURIComponent(location.pathname.slice('/checkin/'.length))} />;
+  const path = appPath();
+  if (path.startsWith('/checkin/')) return <CheckInPage token={decodeURIComponent(path.slice('/checkin/'.length))} />;
   return <AuthedApp />;
 }
 

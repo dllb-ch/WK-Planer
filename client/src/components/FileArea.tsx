@@ -1,5 +1,6 @@
 // List of files with upload (button or drag & drop), download and delete.
 import { useState } from 'react';
+import { useFileUrl } from '../lib/base';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Attachment } from '@shared/types';
 import { MAX_UPLOAD_MB } from '@shared/types';
@@ -105,9 +106,7 @@ export function FileArea({
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {images.map((a) => (
-            <a key={a.id} href={api.attachmentUrl(a.id)} target="_blank" rel="noopener" title={a.name} className="block overflow-hidden rounded border border-slate-200 print:break-inside-avoid">
-              <img src={api.attachmentUrl(a.id)} alt={a.name} className="h-32 w-auto max-w-[16rem] object-cover print:h-56 print:max-w-full" loading="lazy" />
-            </a>
+            <ImageLink key={a.id} url={api.attachmentUrl(a.id)} name={a.name} />
           ))}
         </div>
       )}
@@ -120,9 +119,9 @@ export function FileArea({
           {files.map((a) => (
             <li key={a.id} className="flex items-center gap-2 px-2 py-1.5 text-sm">
               <span aria-hidden>{icon(a)}</span>
-              <a href={api.attachmentUrl(a.id)} target="_blank" rel="noopener" className="min-w-0 flex-1 truncate text-zs-blue hover:underline" title={a.name}>
+              <FileLink url={api.attachmentUrl(a.id)} className="min-w-0 flex-1 truncate text-zs-blue hover:underline" title={a.name}>
                 {a.name}
-              </a>
+              </FileLink>
               <span className="shrink-0 text-xs tabular-nums text-slate-500">{fmtSize(a.size)}</span>
               {!compact && (
                 <span className="hidden shrink-0 text-xs text-slate-500 sm:inline">
@@ -162,5 +161,24 @@ export function FileArea({
         </label>
       )}
     </div>
+  );
+}
+
+/** Link to a file of the API (in the demo an object URL, see useFileUrl). */
+export function FileLink({ url, className, title, children }: { url: string; className?: string; title?: string; children: React.ReactNode }) {
+  const href = useFileUrl(url);
+  return (
+    <a href={href || undefined} target="_blank" rel="noopener" className={className} title={title}>
+      {children}
+    </a>
+  );
+}
+
+function ImageLink({ url, name }: { url: string; name: string }) {
+  const src = useFileUrl(url);
+  return (
+    <a href={src || undefined} target="_blank" rel="noopener" title={name} className="block overflow-hidden rounded border border-slate-200 print:break-inside-avoid">
+      {src ? <img src={src} alt={name} className="h-32 w-auto max-w-[16rem] object-cover print:h-56 print:max-w-full" loading="lazy" /> : <div className="h-32 w-32 bg-slate-100" />}
+    </a>
   );
 }

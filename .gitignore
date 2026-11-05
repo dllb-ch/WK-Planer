@@ -20,3 +20,4 @@ specs/
 e2e/.tmp
 test-results
 playwright-report
+dist-demo

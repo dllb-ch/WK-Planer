@@ -5,6 +5,7 @@
 - [Betrieb auf einem Server](#betrieb-auf-einem-server)
 - [Einstellungen](#einstellungen)
 - [Vor dem produktiven Einsatz](#vor-dem-produktiven-einsatz)
+- [Demo im Browser (GitHub Pages)](#demo-im-browser-github-pages)
 - [Tests](#tests)
 
 ## Ausprobieren mit Docker
@@ -101,6 +102,22 @@ Für die Entwicklung stehen die Variablen in `server/.env`, auf dem Server in `d
 4. Für den Check-in per Handy muss die App unter einer Adresse erreichbar sein, die die Handys öffnen können
    (unter `localhost` zeigt die App einen Hinweis).
 5. Regelmässige Sicherungen der Datenbank einrichten.
+
+## Demo im Browser (GitHub Pages)
+
+`npm run build:demo` baut eine Fassung, in der der Server im Browser läuft: PGlite speichert die Daten in der
+IndexedDB des Browsers, Anfragen an `/api/…` beantwortet die Seite selbst (`client/src/demo/`). Jeder Besucher hat
+seine eigenen Demo-Daten; «Demo zurücksetzen» (unten links) beginnt neu. Die Anmeldeseite meldet mit einem Klick als
+Rolle an. Nicht dabei sind der Passwortschutz vor der App und der Check-in von einem anderen Gerät (der QR-Code
+zeigt auf denselben Browser).
+
+Der Workflow `.github/workflows/pages.yml` veröffentlicht die Demo bei jedem Push auf `main`. Einmalig unter
+*Settings › Pages › Source* «GitHub Actions» wählen. Lokal ausprobieren:
+
+```bash
+npm run build:demo
+npm run preview -w client -- --mode demo      # http://localhost:4173/WK-Planer/
+```
 
 ## Tests
 
