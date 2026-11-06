@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { Block, RapportSchema } from '@shared/types';
 import { canCreateRapport } from '@shared/permissions';
-import { RAPPORT_SCHEMAS } from '@shared/rapport';
+import { RAPPORT_SCHEMAS, traktandenOf } from '@shared/rapport';
 import { fmtDate, fmtTime, parseTime, wkDays } from '@shared/util';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
@@ -146,7 +146,7 @@ interface NewRapport {
 }
 
 function NewRapportDialog({ detail, initial, onClose }: { detail: WkDetail; initial: Partial<NewRapport>; onClose: () => void }) {
-  const { t, weekdayShort } = useT();
+  const { t, lang } = useT();
   const me = useUser();
   const nav = useNavigate();
   const toast = useToast();
@@ -228,7 +228,7 @@ function NewRapportDialog({ detail, initial, onClose }: { detail: WkDetail; init
         <span className="label">{t('rap.schema')}</span>
         <div className="grid gap-2 sm:grid-cols-2">
           {(Object.keys(RAPPORT_SCHEMAS) as RapportSchema[]).map((k) => {
-            const s = { label: t(`rap.schema.${k}.label`), hint: t(`rap.schema.${k}.hint`), traktanden: RAPPORT_SCHEMAS[k].traktanden };
+            const s = { label: t(`rap.schema.${k}.label`), hint: t(`rap.schema.${k}.hint`), traktanden: traktandenOf(k, lang) };
             const on = f.schema === k;
             return (
               <button

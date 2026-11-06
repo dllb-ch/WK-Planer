@@ -1,3 +1,4 @@
+import { translate, type Key, type Lang } from './i18n';
 import type { Duty, StandardBlock, TemplateItem, Wk, Zielsetzung } from './types';
 import { KDO_ID } from './types';
 
@@ -98,6 +99,45 @@ export const DEFAULT_VORBEREITUNG: TemplateItem[] = [
   { title: 'Dienstleistungsnachbesprechung (AAR) durchführen', description: 'Bilanz, Zielerreichung, Optimierungsmassnahmen.', daysBefore: -14, ownerRole: 'KPKDT' },
   { title: 'Rückmeldungen Ausbildungskontrolle an Kp Kdt', description: '', daysBefore: -7, ownerRole: 'ZFHR' },
 ];
+
+/** Default texts in another language (shared/i18n/areas/defaults.ts); German stays as written above. */
+const DEFAULT_KEY: Record<string, Key> = {
+  "Ausbildungsbefehl an die Kompanien erteilen": 'def.00',
+  "Leitziel, Absicht, Aufträge und Daten pro Kp.": 'def.01',
+  "Konzept mit provisorischem Arbeitsprogramm erstellen": 'def.02',
+  "Einladung zum Rapport, Versand Konzept und Aufträge für die Vorbereitung": 'def.03',
+  "Studium Konzept, Entwurf Ausbildungsprogramm und Abklärungen pro Bereich": 'def.04',
+  "Themen und Zeitplan des Zuges entwerfen.": 'def.05',
+  "Rapport: Konzept bereinigen, Aufträge für Detailvorbereitungen erteilen": 'def.06',
+  "Räume und Unterkünfte reservieren": 'def.07',
+  "Theoriesäle, Küche, Unterkunft gemäss Konzept.": 'def.08',
+  "Evtl. Rekognoszierung der Arbeitsplätze": 'def.09',
+  "Detailvorbereitungen, Zugführerarbeitsprogramm erstellen": 'def.10',
+  "Detailplanung der Zeitfenster in der Zugansicht.": 'def.11',
+  "Verpflegungs- und Transportkonzept erstellen": 'def.12',
+  "Rapport: Überprüfung Detailvorbereitungen, Bereinigung WK-Dossier": 'def.13',
+  "Fahrzeuge, Räume und Gelände anfragen": 'def.14',
+  "Anfragen im Tab «Ressourcen».": 'def.15',
+  "Fahrzeug- und Materialbestellungen auslösen": 'def.16',
+  "Bewilligte Anfragen bestellen.": 'def.17',
+  "Versand Befehl für den WK mit Arbeitsprogramm": 'def.18',
+  "Arbeitsprogramm prüfen und freigeben": 'def.19',
+  "Fachliche Vorbereitung: Reglemente und Unterlagen studieren": 'def.20',
+  "Ausbildungsvorbereitungen für die eigenen Posten erstellen": 'def.21',
+  "Pro Zeitfenster in der Zugansicht.": 'def.22',
+  "Postenplakate und Material bereitstellen": 'def.23',
+  "KVK: Vorbereitung und Überprüfung der vorgesehenen Ausbildung": 'def.24',
+  "Dienstleistungsnachbesprechung (AAR) durchführen": 'def.25',
+  "Bilanz, Zielerreichung, Optimierungsmassnahmen.": 'def.26',
+  "Rückmeldungen Ausbildungskontrolle an Kp Kdt": 'def.27',
+  "Appell": 'def.28',
+  "Mittagessen": 'def.29',
+  "Kaderrapport": 'def.30',
+};
+const defaultText = (lang: Lang, s: string) => (s && DEFAULT_KEY[s] ? translate(lang, DEFAULT_KEY[s]) : s);
+export const defaultStandardBlocks = (lang: Lang = 'de'): StandardBlock[] => DEFAULT_STANDARD_BLOCKS.map((b) => ({ ...b, title: defaultText(lang, b.title) }));
+export const defaultVorbereitung = (lang: Lang = 'de'): TemplateItem[] =>
+  DEFAULT_VORBEREITUNG.map((it) => ({ ...it, title: defaultText(lang, it.title), description: defaultText(lang, it.description) }));
 
 /**
  * Vehicles for a number of people: as few vehicles as possible (largest first), then the smallest one that

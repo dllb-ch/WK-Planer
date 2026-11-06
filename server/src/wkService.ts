@@ -1,4 +1,5 @@
 // Creating WKs: by hand («Neuer WK») and from the Aufträge of the Ausbildungsbefehl.
+import type { Lang } from '../../shared/i18n';
 import type { DB } from './db';
 import { audit } from './db';
 import { HttpError } from './http';
@@ -20,11 +21,11 @@ export interface NewWk {
 }
 
 export const checkWkDates = (startDate: string, endDate: string) => {
-  if (endDate < startDate || dateRange(startDate, endDate).length > 21) throw new HttpError(400, 'WK-Dauer muss zwischen 1 und 21 Tagen liegen');
+  if (endDate < startDate || dateRange(startDate, endDate).length > 21) throw new HttpError(400, 'srv.wkDauerMussZwischenUnd');
 };
 
 /** New WK with the Vorbereitung timeline of its Kp. */
-export async function createWk(db: DB, userId: number, batId: number, b: NewWk) {
+export async function createWk(db: DB, userId: number, batId: number, b: NewWk, lang: Lang = 'de') {
   checkWkDates(b.startDate, b.endDate);
   return db.transaction(async () => {
     const { lastInsertRowid } = await db
@@ -33,7 +34,7 @@ export async function createWk(db: DB, userId: number, batId: number, b: NewWk) 
       )
       .run(b.kpId, b.title, b.startDate, b.endDate, b.dayStart, b.dayEnd, b.snapMin, JSON.stringify(b.avorDays), JSON.stringify(b.kvkDays ?? []), b.befehlId ?? null);
     const id = Number(lastInsertRowid);
-    await insertMilestones(db, id, b.startDate, (await effectiveTemplate(db, batId, b.kpId)).items);
+    await insertMilestones(db, id, b.startDate, (await effectiveTemplate(db, batId, b.kpId, lang)).items);
     // The Gruppen of the Organisation become the Gruppen of the WK (Detailplanung, Turnus); adjustable per WK.
     await db
       .prepare('INSERT INTO zug_group (wk_id, zug_id, name, sort) SELECT ?, g.zug_id, g.name, g.sort FROM gruppe g JOIN zug ON zug.id = g.zug_id WHERE zug.kp_id = ?')
@@ -55,6 +56,7 @@ export async function syncWksFromBefehl(
   batId: number,
   befehl: { id: number; year: number; dienstart: string },
   auftraege: AuftragKp[],
+  lang: Lang = 'de',
 ): Promise<WkSync[]> {
   const out: WkSync[] = [];
   for (const a of auftraege) {
@@ -90,7 +92,7 @@ export async function syncWksFromBefehl(
         avorDays: [],
         kvkDays,
         befehlId: befehl.id,
-      });
+      }, lang);
       out.push({ ...base, wkId: id, action: 'created' });
       continue;
     }

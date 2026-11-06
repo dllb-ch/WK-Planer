@@ -41,7 +41,7 @@ export function createApp(db: DB, env: NodeJS.ProcessEnv = process.env) {
     if (!Number.isInteger(id)) return next();
     try {
       const row = (await db.prepare('SELECT archived FROM wk WHERE id = ?').get(id)) as { archived: boolean } | undefined;
-      next(row?.archived ? new HttpError(409, 'Der WK ist archiviert – zuerst wiederherstellen') : undefined);
+      next(row?.archived ? new HttpError(409, 'srv.derWkIstArchiviertZuerst') : undefined);
     } catch (e) {
       next(e);
     }

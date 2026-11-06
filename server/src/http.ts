@@ -46,7 +46,7 @@ export function langOf(req: Request): Lang {
   return pickLang(req.get?.('accept-language'));
 }
 
-export const forbidden = () => new HttpError(403, 'Keine Berechtigung für diese Aktion');
+export const forbidden = () => new HttpError(403, 'srv.keineBerechtigungFuerDieseAktion');
 
 /** Throws 403 unless the permission check passes. */
 export function ensure(allowed: boolean): asserts allowed {
@@ -59,12 +59,12 @@ export function parse<S extends ZodTypeAny>(schema: S, data: unknown): z.infer<S
 
 export const idParam = (req: Request, name = 'id') => {
   const n = Number(req.params[name]);
-  if (!Number.isInteger(n)) throw new HttpError(400, `Ungültige ${name}`);
+  if (!Number.isInteger(n)) throw new HttpError(400, 'srv.ungueltige', undefined, { a: name });
   return n;
 };
 
 export const user = (req: Request): SessionUser => {
-  if (!req.user) throw new HttpError(401, 'Nicht angemeldet');
+  if (!req.user) throw new HttpError(401, 'err.auth.required');
   return req.user;
 };
 
@@ -75,7 +75,8 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   } else if ((err as { type?: string })?.type === 'entity.too.large') {
     res.status(413).json({ error: translateMessage(lang, 'err.tooLarge') });
   } else if (err instanceof ZodError) {
-    res.status(400).json({ error: translateMessage(lang, 'err.invalidInput'), issues: err.issues });
+    // Custom messages of the schemas are keys as well.
+    res.status(400).json({ error: translateMessage(lang, 'err.invalidInput'), issues: err.issues.map((i) => ({ ...i, message: translateMessage(lang, i.message) })) });
   } else {
     console.error(err);
     res.status(500).json({ error: translateMessage(lang, 'err.internal') });

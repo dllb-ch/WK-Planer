@@ -4,6 +4,8 @@ import { de } from './de';
 import { fr } from './fr';
 import { it as itCat } from './it';
 import { en } from './en';
+import { traktandenOf } from '../rapport';
+import { defaultStandardBlocks, defaultVorbereitung } from '../util';
 
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 
@@ -26,5 +28,14 @@ describe('i18n', () => {
     expect(pickLang(['en-US', 'it'])).toBe('en');
     expect(pickLang('es-ES')).toBe('de');
     expect(LANGS.map((l) => weekdayIn(l, '2027-04-26'))).toEqual(['Montag', 'lundi', 'lunedì', 'Monday']);
+  });
+
+  it('creates default texts in the language: agendas, standard blocks, preparation template', () => {
+    expect(traktandenOf('FREI').map((t) => t.title)).toEqual(['Ziel des Rapports', 'Umfrage', 'Nächster Rapport']);
+    expect(traktandenOf('FREI', 'fr').map((t) => t.title)).toEqual(['But du rapport', 'Tour de table', 'Prochain rapport']);
+    expect(traktandenOf('BEFEHL', 'it').every((t) => !/[äöü]|Auftr|Absicht/.test(t.title + t.hint))).toBe(true);
+    expect(defaultStandardBlocks('it').map((b) => b.title)).toEqual(['Appello', 'Pranzo', 'Rapporto quadri']);
+    expect(defaultVorbereitung('en')[0]).toMatchObject({ title: 'Issue the training order to the companies', ownerRole: 'BAT', daysBefore: 400 });
+    expect(defaultVorbereitung()[0].title).toBe('Ausbildungsbefehl an die Kompanien erteilen');
   });
 });

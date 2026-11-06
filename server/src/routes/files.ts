@@ -26,7 +26,7 @@ const upload = express.raw({ type: () => true, limit: `${MAX_UPLOAD_MB}mb` });
 
 /** Name and type from the headers (the body is the raw file). */
 function incoming(req: express.Request) {
-  if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Leere Datei');
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'srv.leereDatei');
   const name = decodeURIComponent(String(req.headers['x-filename'] ?? 'Datei')).replace(/[\\/\0]/g, '_').trim().slice(0, 200) || 'Datei';
   const mime = String(req.headers['x-mime'] ?? '').toLowerCase();
   return { name, mime: /^[\w.+-]+\/[\w.+-]+$/.test(mime) ? mime : 'application/octet-stream', data: req.body as Buffer };
@@ -50,13 +50,13 @@ export function filesRouter(db: DB) {
 
   const avOf = async (id: number) => {
     const row = await db.prepare('SELECT * FROM ausbildungsvorbereitung WHERE id = ?').get(id);
-    if (!row) throw new HttpError(404, 'Ausbildungsvorbereitung nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.ausbildungsvorbereitungNichtGefunden');
     const av = toAv(row);
     return { av, wk: await loadWk(db, av.wkId) };
   };
   const zugOf = async (id: number) => {
     const z = (await db.prepare('SELECT zug.id, zug.kp_id, kompanie.bat_id FROM zug JOIN kompanie ON kompanie.id = zug.kp_id WHERE zug.id = ?').get(id)) as any;
-    if (!z) throw new HttpError(404, 'Zug nicht gefunden');
+    if (!z) throw new HttpError(404, 'srv.zugNichtGefunden');
     return { id: z.id as number, kpId: z.kp_id as number, batId: z.bat_id as number };
   };
   const list = async (where: string, id: number, canDelete: (uploadedBy: number | null) => boolean): Promise<Attachment[]> =>
@@ -112,12 +112,12 @@ export function filesRouter(db: DB) {
 
   const erkundungOf = async (id: number) => {
     const row = (await db.prepare('SELECT id, wk_id, zug_id, created_by FROM erkundung WHERE id = ?').get(id)) as any;
-    if (!row) throw new HttpError(404, 'Erkundung nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.erkundungNichtGefunden');
     return { e: { id: row.id as number, zugId: row.zug_id as number | null, createdBy: row.created_by as number }, wk: await loadWk(db, row.wk_id) };
   };
   const uebungOf = async (id: number) => {
     const row = (await db.prepare('SELECT id, wk_id, created_by, data FROM uebung WHERE id = ?').get(id)) as any;
-    if (!row) throw new HttpError(404, 'Übung nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.uebungNichtGefunden');
     const data = normalizeUebung(JSON.parse(row.data || '{}'));
     return { x: { id: row.id as number, createdBy: row.created_by as number, leitungUserIds: data.leitungUserIds }, wk: await loadWk(db, row.wk_id) };
   };
@@ -171,7 +171,7 @@ export function filesRouter(db: DB) {
   /** May the user see (and delete) this file? */
   const access = async (u: SessionUser, id: number) => {
     const f = (await db.prepare('SELECT id, av_id, zug_id, erkundung_id, uebung_id, uploaded_by, name FROM attachment WHERE id = ?').get(id)) as any;
-    if (!f) throw new HttpError(404, 'Datei nicht gefunden');
+    if (!f) throw new HttpError(404, 'srv.dateiNichtGefunden');
     if (f.erkundung_id) {
       const { e, wk } = await erkundungOf(f.erkundung_id);
       return { f, view: canViewErkundung(u, wk, e), del: canEditErkundung(u, wk, e) };

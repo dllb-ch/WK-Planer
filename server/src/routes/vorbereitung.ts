@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import type { DB } from '../db';
 import { audit, tx } from '../db';
-import { ensure, HttpError, idParam, parse, user, asyncRouter } from '../http';
+import { ensure, HttpError, idParam, parse, user, asyncRouter, langOf } from '../http';
 import { loadWk, toBat, toKp } from '../repo';
 import { canEditMilestones, canEditStandardBlocks, canEditTemplates, canTickMilestone, canViewMilestones, canViewTemplate } from '../../../shared/permissions';
 import { effectiveTemplate, insertMilestones, milestonesFor, saveTemplate } from '../vorbereitung';
 import { BLOCK_TYPES, type StandardBlock } from '../../../shared/types';
-import { DEFAULT_STANDARD_BLOCKS } from '../../../shared/util';
+import { defaultStandardBlocks } from '../../../shared/util';
 
 const role = z.enum(['BAT', 'KPKDT', 'LOGOF', 'ZFHR', 'KADER']);
 
@@ -28,7 +28,7 @@ const standardBlocks = z
         scope: z.enum(['ALLE', 'ZUEGE', 'KDO']),
         locked: z.boolean().default(false),
       })
-      .refine((b) => b.endMin > b.startMin, 'Ende muss nach Beginn liegen'),
+      .refine((b) => b.endMin > b.startMin, 'srv.endeMussNachBeginnLiegen'),
   )
   .max(30);
 
@@ -50,7 +50,7 @@ export function vorbereitungRouter(db: DB) {
 
   const kpOf = async (id: number) => {
     const kp = (await db.prepare('SELECT id, bat_id FROM kompanie WHERE id = ?').get(id)) as any;
-    if (!kp) throw new HttpError(404, 'Kompanie nicht gefunden');
+    if (!kp) throw new HttpError(404, 'srv.kompanieNichtGefunden');
     return { id: kp.id as number, batId: kp.bat_id as number };
   };
 
@@ -60,7 +60,7 @@ export function vorbereitungRouter(db: DB) {
     ensure(u.kpId === kp.id || canEditStandardBlocks(u, kp));
     const rows = (await db.prepare('SELECT * FROM standard_block WHERE kp_id = ? ORDER BY sort, id').all(kp.id)) as any[];
     const items: StandardBlock[] = rows.map((x) => ({ title: x.title, type: x.type, startMin: x.start_min, endMin: x.end_min, scope: x.scope, locked: !!x.locked }));
-    res.json({ source: rows.length ? 'KP' : 'DEFAULT', items: rows.length ? items : DEFAULT_STANDARD_BLOCKS });
+    res.json({ source: rows.length ? 'KP' : 'DEFAULT', items: rows.length ? items : defaultStandardBlocks(langOf(req)) });
   });
 
   r.put('/kompanien/:kpId/standardbloecke', async (req, res) => {
@@ -79,7 +79,7 @@ export function vorbereitungRouter(db: DB) {
 
   const loadMilestone = async (wkId: number, id: number) => {
     const row = (await db.prepare('SELECT * FROM milestone WHERE id = ? AND wk_id = ?').get(id, wkId)) as any;
-    if (!row) throw new HttpError(404, 'Eintrag nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.eintragNichtGefunden');
     return { id: row.id as number, ownerRole: row.owner_role };
   };
 
@@ -149,7 +149,7 @@ export function vorbereitungRouter(db: DB) {
     const wk = await loadWk(db, idParam(req));
     ensure(canEditMilestones(u, wk));
     const existing = new Set(((await db.prepare('SELECT title FROM milestone WHERE wk_id = ?').all(wk.id)) as any[]).map((x) => x.title));
-    const missing = (await effectiveTemplate(db, wk.batId, wk.kpId)).items.filter((it) => !existing.has(it.title));
+    const missing = (await effectiveTemplate(db, wk.batId, wk.kpId, langOf(req))).items.filter((it) => !existing.has(it.title));
     await insertMilestones(db, wk.id, wk.startDate, missing);
     res.json({ added: missing.length });
   });
@@ -179,9 +179,9 @@ export function vorbereitungRouter(db: DB) {
   const scope = async (q: Record<string, unknown>) => {
     const batId = Number(q.batId);
     const kpId = q.kpId ? Number(q.kpId) : null;
-    if (!Number.isInteger(batId)) throw new HttpError(400, 'batId erforderlich');
+    if (!Number.isInteger(batId)) throw new HttpError(400, 'srv.batidErforderlich');
     if (kpId !== null && !(await db.prepare('SELECT 1 FROM kompanie WHERE id = ? AND bat_id = ?').get(kpId, batId))) {
-      throw new HttpError(400, 'Kompanie gehört nicht zum Bataillon');
+      throw new HttpError(400, 'srv.kompanieGehoertNichtZumBataillon');
     }
     return { batId, kpId };
   };
@@ -190,7 +190,7 @@ export function vorbereitungRouter(db: DB) {
     const u = user(req);
     const { batId, kpId } = await scope(req.query);
     ensure(canViewTemplate(u, batId, kpId));
-    res.json((await effectiveTemplate(db, batId, kpId)));
+    res.json((await effectiveTemplate(db, batId, kpId, langOf(req))));
   });
 
   r.put('/templates', async (req, res) => {
@@ -200,7 +200,7 @@ export function vorbereitungRouter(db: DB) {
     const items = parse(templateItems, req.body);
     await tx(db, () => saveTemplate(db, batId, kpId, items));
     await audit(db, u.id, 'template', kpId ?? batId, 'save', { batId, kpId, count: items.length });
-    res.json((await effectiveTemplate(db, batId, kpId)));
+    res.json((await effectiveTemplate(db, batId, kpId, langOf(req))));
   });
 
   /** Remove an own template: a Kp falls back to its Bat, a Bat to the built-in default. */
@@ -209,7 +209,7 @@ export function vorbereitungRouter(db: DB) {
     const { batId, kpId } = await scope(req.query);
     ensure(canEditTemplates(u, batId));
     await tx(db, () => saveTemplate(db, batId, kpId, []));
-    res.json((await effectiveTemplate(db, batId, kpId)));
+    res.json((await effectiveTemplate(db, batId, kpId, langOf(req))));
   });
 
   return r;

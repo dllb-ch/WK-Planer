@@ -50,7 +50,7 @@ const requestInput = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startMin: minutes,
   endMin: minutes,
-  zweck: z.string().trim().min(1, 'Zweck erforderlich').max(300),
+  zweck: z.string().trim().min(1, 'srv.zweckErforderlich').max(300),
   note: z.string().max(2000).default(''),
   area: area.default(null),
 });
@@ -62,12 +62,12 @@ export function resourceRouter(db: DB) {
 
   const loadResource = async (id: number) => {
     const row = await db.prepare('SELECT * FROM resource WHERE id = ?').get(id);
-    if (!row) throw new HttpError(404, 'Ressource nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.ressourceNichtGefunden');
     return toResource(row);
   };
   const loadRequest = async (wkId: number, id: number) => {
     const row = await db.prepare(`${REQ_SELECT} WHERE resource_request.id = ? AND wk_id = ?`).get(id, wkId);
-    if (!row) throw new HttpError(404, 'Anfrage nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.anfrageNichtGefunden');
     return toRequest(row);
   };
 
@@ -75,7 +75,7 @@ export function resourceRouter(db: DB) {
 
   const kpRef = async (kpId: number) => {
     const kp = (await db.prepare('SELECT bat_id FROM kompanie WHERE id = ?').get(kpId)) as any;
-    if (!kp) throw new HttpError(404, 'Kompanie nicht gefunden');
+    if (!kp) throw new HttpError(404, 'srv.kompanieNichtGefunden');
     return { kpId, batId: kp.bat_id as number };
   };
 
@@ -101,7 +101,7 @@ export function resourceRouter(db: DB) {
   });
 
   const scopeOf = async (batId: number, kpId: number | null) => {
-    if (kpId !== null && (await kpRef(kpId)).batId !== batId) throw new HttpError(400, 'Kompanie gehört nicht zum Bataillon');
+    if (kpId !== null && (await kpRef(kpId)).batId !== batId) throw new HttpError(400, 'srv.kompanieGehoertNichtZumBataillon');
     return { batId, kpId };
   };
 
@@ -258,33 +258,33 @@ export function resourceRouter(db: DB) {
   // ---- Requests ----
 
   async function validate(wk: Wk, b: z.infer<typeof requestInput>) {
-    if (b.endMin <= b.startMin) throw new HttpError(400, 'Ende muss nach Beginn liegen');
-    if (!wkDays(wk).includes(b.date)) throw new HttpError(400, 'Datum liegt ausserhalb des WK');
-    if (b.zugId !== KDO_ID && !(await zuegeOfKp(db, wk.kpId)).some((z) => z.id === b.zugId)) throw new HttpError(400, 'Unbekannter Zug');
+    if (b.endMin <= b.startMin) throw new HttpError(400, 'srv.endeMussNachBeginnLiegen');
+    if (!wkDays(wk).includes(b.date)) throw new HttpError(400, 'srv.datumLiegtAusserhalbDesWk');
+    if (b.zugId !== KDO_ID && !(await zuegeOfKp(db, wk.kpId)).some((z) => z.id === b.zugId)) throw new HttpError(400, 'srv.unbekannterZug');
     if (b.blockId != null && !(await loadBlock(db, wk.id, b.blockId)).zugIds.includes(b.zugId)) {
-      throw new HttpError(400, 'Der Block gehört nicht zu diesem Zug');
+      throw new HttpError(400, 'srv.derBlockGehoertNichtZu');
     }
     if (b.resourceId != null) {
       const res = await loadResource(b.resourceId);
       const usable = res.kpId === wk.kpId || (res.kpId === null && res.batId === wk.batId);
-      if (!usable) throw new HttpError(400, 'Ressource gehört nicht zur Kompanie oder zum Bataillon');
-      if (res.kind !== b.kind) throw new HttpError(400, 'Ressource passt nicht zur Art');
+      if (!usable) throw new HttpError(400, 'srv.ressourceGehoertNichtZurKompanie');
+      if (res.kind !== b.kind) throw new HttpError(400, 'srv.ressourcePasstNichtZurArt');
       // A specific vehicle or room counts as one of its type.
       b.category = res.category;
       b.quantity = 1;
       b.persons = 0;
     } else if (b.kind === 'GELAENDE') {
-      if (!b.area) throw new HttpError(400, 'Bitte einen Geländeabschnitt wählen oder auf der Karte einzeichnen');
+      if (!b.area) throw new HttpError(400, 'srv.bitteEinenGelaendeabschnittWaehlenOder');
     } else if (b.persons > 0) {
-      if (b.kind !== 'FAHRZEUG') throw new HttpError(400, 'Nach Anzahl Personen werden nur Fahrzeuge angefragt');
+      if (b.kind !== 'FAHRZEUG') throw new HttpError(400, 'srv.nachAnzahlPersonenWerdenNur');
       if (b.category && !(await usableResources(wk)).some((x) => x.kind === 'FAHRZEUG' && x.category === b.category)) {
-        throw new HttpError(400, `«${b.category}» gibt es im Katalog nicht`);
+        throw new HttpError(400, 'srv.gibtEsImKatalogNicht', undefined, { a: b.category });
       }
       b.quantity = 1;
     } else {
-      if (!b.category) throw new HttpError(400, 'Bitte einen Typ wählen (z. B. Mannschaftsbus) oder ein bestimmtes Fahrzeug bzw. einen Raum');
+      if (!b.category) throw new HttpError(400, 'srv.bitteEinenTypWaehlenZ');
       if (!(await usableResources(wk)).some((x) => x.kind === b.kind && x.category === b.category)) {
-        throw new HttpError(400, `«${b.category}» gibt es im Katalog nicht`);
+        throw new HttpError(400, 'srv.gibtEsImKatalogNicht', undefined, { a: b.category });
       }
     }
   }
@@ -385,40 +385,40 @@ export function resourceRouter(db: DB) {
     if (b.status === 'BEWILLIGT') {
       const used = await occupied(wk.batId, q.date, q.startMin, q.endMin, q.id);
       if (q.resourceId != null) {
-        if (used.has(q.resourceId)) throw new HttpError(409, 'Die Ressource ist in diesem Zeitraum bereits vergeben');
+        if (used.has(q.resourceId)) throw new HttpError(409, 'srv.dieRessourceIstInDiesem');
       } else if (q.persons > 0) {
         const { free } = await availability(wk, q);
         const seats = (ids: number[]) => ids.reduce((a, id) => a + (free.find((x) => x.id === id)?.seats ?? 0), 0);
         if (b.assignedIds) {
           if (b.assignedIds.some((id) => !free.some((x) => x.id === id))) {
-            throw new HttpError(409, 'Mindestens ein gewähltes Fahrzeug ist in diesem Zeitraum nicht frei');
+            throw new HttpError(409, 'srv.mindestensEinGewaehltesFahrzeugIst');
           }
           assigned = [...new Set(b.assignedIds)];
-          if (seats(assigned) < q.persons) throw new HttpError(400, `Die gewählten Fahrzeuge haben ${seats(assigned)} von ${q.persons} Plätzen`);
+          if (seats(assigned) < q.persons) throw new HttpError(400, 'srv.dieGewaehltenFahrzeugeHabenVon', undefined, { a: seats(assigned), b: q.persons });
         } else {
           assigned = pickVehicles(free, q.persons);
           if (!assigned.length) {
             const total = free.reduce((a, x) => a + x.seats, 0);
-            throw new HttpError(409, `Nur ${total} von ${q.persons} Plätzen sind in diesem Zeitraum frei`);
+            throw new HttpError(409, 'srv.nurVonPlaetzenSindIn', undefined, { a: total, b: q.persons });
           }
         }
       } else if (q.kind !== 'GELAENDE') {
         const { free } = await availability(wk, q);
         if (b.assignedIds) {
           const freeIds = new Set(free.map((x) => x.id));
-          if (b.assignedIds.length !== q.quantity) throw new HttpError(400, `Bitte genau ${q.quantity} zuteilen`);
+          if (b.assignedIds.length !== q.quantity) throw new HttpError(400, 'srv.bitteGenauZuteilen', undefined, { a: q.quantity });
           const taken = b.assignedIds.filter((id) => !freeIds.has(id));
-          if (taken.length) throw new HttpError(409, 'Mindestens eine gewählte Ressource ist in diesem Zeitraum nicht frei');
+          if (taken.length) throw new HttpError(409, 'srv.mindestensEineGewaehlteRessourceIst');
           assigned = [...new Set(b.assignedIds)];
         } else {
           if (free.length < q.quantity) {
-            throw new HttpError(409, `Nur ${free.length} von ${q.quantity} «${q.category}» sind in diesem Zeitraum frei`);
+            throw new HttpError(409, 'srv.nurVonSindInDiesem', undefined, { a: free.length, b: q.quantity, c: q.category });
           }
           assigned = free.slice(0, q.quantity).map((x) => x.id);
         }
       }
     }
-    if (b.status === 'ABGELEHNT' && !b.note.trim()) throw new HttpError(400, 'Begründung erforderlich');
+    if (b.status === 'ABGELEHNT' && !b.note.trim()) throw new HttpError(400, 'srv.begruendungErforderlich');
     await db.prepare('UPDATE resource_request SET status = ?, decision_note = ?, decided_by = ?, assigned_ids = ? WHERE id = ?').run(
       b.status,
       b.note,

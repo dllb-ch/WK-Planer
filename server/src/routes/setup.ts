@@ -5,19 +5,19 @@ import { z } from 'zod';
 import type { DB } from '../db';
 import { audit, tx } from '../db';
 import { hashPassword, startSessionFor } from '../auth';
-import { HttpError, parse, asyncRouter } from '../http';
+import { HttpError, langOf, parse, asyncRouter } from '../http';
 import { seedDemo } from '../seed';
 import { saveTemplate } from '../vorbereitung';
-import { DEFAULT_VORBEREITUNG } from '../../../shared/util';
+import { defaultVorbereitung } from '../../../shared/util';
 
 const line = z.string().trim().max(200).default('');
-const name = z.string().trim().min(1, 'Name fehlt').max(100);
-const email = z.string().trim().toLowerCase().email('Ungültige E-Mail-Adresse').max(120);
+const name = z.string().trim().min(1, 'srv.nameFehlt').max(100);
+const email = z.string().trim().toLowerCase().email('srv.ungueltigeEMailAdresse').max(120);
 const count = z.number().int().min(0).max(999).default(0);
 const image = z
   .string()
-  .max(700_000, 'Logo zu gross (max. ca. 500 KB)')
-  .regex(/^data:image\/(png|jpeg|svg\+xml|webp);base64,/, 'Logo muss ein PNG-, JPEG-, WebP- oder SVG-Bild sein')
+  .max(700_000, 'srv.logoZuGrossMaxCa')
+  .regex(/^data:image\/(png|jpeg|svg\+xml|webp);base64,/, 'srv.logoMussEinPngJpeg')
   .nullable()
   .default(null);
 const person = z.object({ name, email, funktion: line });
@@ -36,9 +36,9 @@ const setupInput = z.object({
       .default(null),
   }),
   /** The first account: Bat Kommando, with its own password. */
-  admin: person.extend({ password: z.string().min(8, 'Passwort: mindestens 8 Zeichen').max(200) }),
+  admin: person.extend({ password: z.string().min(8, 'srv.passwortMindestensZeichen').max(200) }),
   /** Start password of all other accounts (changed under «Mein Konto»). */
-  startPassword: z.string().min(8, 'Startpasswort: mindestens 8 Zeichen').max(200).optional(),
+  startPassword: z.string().min(8, 'srv.startpasswortMindestensZeichen').max(200).optional(),
   kompanien: z
     .array(
       z.object({
@@ -56,7 +56,7 @@ const setupInput = z.object({
           .default([]),
       }),
     )
-    .min(1, 'Mindestens eine Kompanie')
+    .min(1, 'srv.mindestensEineKompanie')
     .max(30),
   resources: z
     .array(
@@ -81,10 +81,10 @@ export function setupRouter(db: DB, env: { SETUP_TOKEN?: string } = {}) {
   const r = asyncRouter();
   const empty = async () => ((await db.prepare('SELECT COUNT(*) AS n FROM app_user').get()) as { n: number }).n === 0;
   const checkToken = (token: string | undefined) => {
-    if (env.SETUP_TOKEN && !same(token ?? '', env.SETUP_TOKEN)) throw new HttpError(403, 'Einrichtungs-Code falsch');
+    if (env.SETUP_TOKEN && !same(token ?? '', env.SETUP_TOKEN)) throw new HttpError(403, 'srv.einrichtungsCodeFalsch');
   };
   const ensureEmpty = async () => {
-    if (!(await empty())) throw new HttpError(409, 'Die Installation ist bereits eingerichtet');
+    if (!(await empty())) throw new HttpError(409, 'srv.dieInstallationIstBereitsEingerichtet');
   };
 
   /** Whether the wizard is due, and whether it asks for the code. */
@@ -105,9 +105,9 @@ export function setupRouter(db: DB, env: { SETUP_TOKEN?: string } = {}) {
     const others = [...b.kompanien.flatMap((k) => [k.kdt, ...k.zuege.map((z) => z.zfhr)])].filter((p): p is NonNullable<typeof p> => !!p);
     const emails = [b.admin.email, ...others.map((p) => p.email)];
     const twice = emails.find((e, i) => emails.indexOf(e) !== i);
-    if (twice) throw new HttpError(400, `Die E-Mail-Adresse ${twice} kommt mehrfach vor`);
-    if (others.length && !b.startPassword) throw new HttpError(400, 'Startpasswort für die weiteren Konten fehlt');
-    if (b.resources.some((x) => x.kp !== null && x.kp >= b.kompanien.length)) throw new HttpError(400, 'Unbekannte Kompanie bei den Ressourcen');
+    if (twice) throw new HttpError(400, 'srv.dieEMailAdresseKommt', undefined, { a: twice });
+    if (others.length && !b.startPassword) throw new HttpError(400, 'srv.startpasswortFuerDieWeiterenKonten');
+    if (b.resources.some((x) => x.kp !== null && x.kp >= b.kompanien.length)) throw new HttpError(400, 'srv.unbekannteKompanieBeiDenRessourcen');
 
     const adminId = await tx(db, async () => {
       // Two browsers at once: only the first one sets up.
@@ -118,7 +118,7 @@ export function setupRouter(db: DB, env: { SETUP_TOKEN?: string } = {}) {
           .prepare('INSERT INTO bataillon (name, region_name, logo, kanton_logo, briefkopf, map_view) VALUES (?, ?, ?, ?, ?, ?)')
           .run(b.bataillon.name, b.bataillon.regionName, b.bataillon.logo, b.bataillon.kantonLogo, JSON.stringify(b.bataillon.briefkopf), b.bataillon.mapView ? JSON.stringify(b.bataillon.mapView) : null),
       );
-      await saveTemplate(db, bat, null, DEFAULT_VORBEREITUNG);
+      await saveTemplate(db, bat, null, defaultVorbereitung(langOf(req)));
       const startHash = b.startPassword ? hashPassword(b.startPassword) : '';
       const addUser = async (p: { name: string; email: string; funktion: string }, hash: string, role: string, kp: number | null, zug: number | null) =>
         id(

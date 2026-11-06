@@ -142,13 +142,13 @@ export async function loadWk(db: DB, id: number): Promise<Wk> {
   const r = await db
     .prepare('SELECT wk.*, kompanie.bat_id FROM wk JOIN kompanie ON kompanie.id = wk.kp_id WHERE wk.id = ?')
     .get(id);
-  if (!r) throw new HttpError(404, 'WK nicht gefunden');
+  if (!r) throw new HttpError(404, 'srv.wkNichtGefunden');
   return toWk(r);
 }
 
 export async function loadBlock(db: DB, wkId: number, id: number): Promise<Block> {
   const r = await db.prepare('SELECT * FROM block WHERE id = ? AND wk_id = ?').get(id, wkId);
-  if (!r) throw new HttpError(404, 'Block nicht gefunden');
+  if (!r) throw new HttpError(404, 'srv.blockNichtGefunden');
   return toBlock(r);
 }
 

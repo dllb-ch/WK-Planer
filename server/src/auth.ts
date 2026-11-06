@@ -129,7 +129,7 @@ export function authRouter(db: DB) {
   /** Own e-mail (= login); confirmed with the current password. */
   r.post('/email', async (req, res) => {
     const u = user(req);
-    const { password, email } = parse(z.object({ password: z.string(), email: z.string().trim().toLowerCase().email('Ungültige E-Mail-Adresse').max(200) }), req.body);
+    const { password, email } = parse(z.object({ password: z.string(), email: z.string().trim().toLowerCase().email('srv.ungueltigeEMailAdresse').max(200) }), req.body);
     const row = (await db.prepare('SELECT * FROM app_user WHERE id = ?').get(u.id)) as any;
     if (!bcrypt.compareSync(password, row.pw_hash)) throw new HttpError(400, 'err.auth.wrongPassword');
     if (await db.prepare('SELECT 1 FROM app_user WHERE lower(email) = lower(?) AND id != ?').get(email, u.id)) {

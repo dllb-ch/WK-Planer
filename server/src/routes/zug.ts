@@ -23,7 +23,7 @@ const avInput = z.object({
   blockId: z.number().int().nullable(),
   zugId: z.number().int(),
   ausbildungsart: z.string().default(''),
-  thema: z.string().trim().min(1, 'Thema erforderlich'),
+  thema: z.string().trim().min(1, 'srv.themaErforderlich'),
   fachbereiche: z.array(z.enum(['BETREUUNG', 'FU', 'PIONIER', 'KGS'])).max(4).default([]),
   datum: z.string().default(''),
   zeitVon: time.default(''),
@@ -66,7 +66,7 @@ export function zugRouter(db: DB) {
     const wk = await loadWk(db, idParam(req));
     const zugId = idParam(req, 'zugId');
     ensure(canEditDetails(u, wk, zugId));
-    if (!(await zuegeOfKp(db, wk.kpId)).some((z) => z.id === zugId)) throw new HttpError(404, 'Zug nicht gefunden');
+    if (!(await zuegeOfKp(db, wk.kpId)).some((z) => z.id === zugId)) throw new HttpError(404, 'srv.zugNichtGefunden');
     const list = parse(z.array(z.object({ id: z.number().int().optional(), name: z.string().trim().min(1).max(40) })).max(12), req.body);
     const saved = await tx(db, async () => {
       const existing = (await groupsOf(wk.id, zugId)).map((g) => g.id);
@@ -102,16 +102,16 @@ export function zugRouter(db: DB) {
     const block = await loadBlock(db, wk.id, idParam(req, 'blockId'));
     const zugId = idParam(req, 'zugId');
     ensure(canEditDetails(u, wk, zugId));
-    if (!block.zugIds.includes(zugId)) throw new HttpError(400, 'Der Block gehört nicht zu diesem Zug');
+    if (!block.zugIds.includes(zugId)) throw new HttpError(400, 'srv.derBlockGehoertNichtZu');
     const list = parse(z.array(detailInput).max(120), req.body);
     const groupIds = (await groupsOf(wk.id, zugId)).map((g) => g.id);
     for (const d of list) {
-      if (d.groupIds.some((g) => !groupIds.includes(g))) throw new HttpError(400, `«${d.title}»: unbekannte Gruppe`);
+      if (d.groupIds.some((g) => !groupIds.includes(g))) throw new HttpError(400, 'srv.unbekannteGruppe', undefined, { a: d.title });
       // All groups selected is the same as the whole Zug.
       d.groupIds = groupIds.length && groupIds.every((g) => d.groupIds.includes(g)) ? [] : [...new Set(d.groupIds)];
-      if (d.endMin <= d.startMin) throw new HttpError(400, `«${d.title}»: Ende muss nach Beginn liegen`);
+      if (d.endMin <= d.startMin) throw new HttpError(400, 'srv.endeMussNachBeginnLiegen2', undefined, { a: d.title });
       if (d.startMin < block.startMin || d.endMin > block.endMin) {
-        throw new HttpError(400, `«${d.title}» liegt ausserhalb des Zeitfensters des Blocks`);
+        throw new HttpError(400, 'srv.liegtAusserhalbDesZeitfenstersDes', undefined, { a: d.title });
       }
     }
     const saved = await tx(db, async () => {
@@ -129,19 +129,19 @@ export function zugRouter(db: DB) {
 
   const loadAv = async (wkId: number, id: number) => {
     const row = await db.prepare(`${AV_SELECT} WHERE ausbildungsvorbereitung.id = ? AND wk_id = ?`).get(id, wkId);
-    if (!row) throw new HttpError(404, 'Ausbildungsvorbereitung nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.ausbildungsvorbereitungNichtGefunden');
     return toAv(row);
   };
 
   const checkAvTarget = async (wkId: number, b: z.infer<typeof avInput>) => {
     const kp = ((await db.prepare('SELECT kp_id FROM wk WHERE id = ?').get(wkId)) as any).kp_id;
     for (const id of b.leiterUserIds) {
-      if (!(await db.prepare('SELECT 1 FROM app_user WHERE id = ? AND kp_id = ?').get(id, kp))) throw new HttpError(400, 'Zugeteilte Person gehört nicht zur Kompanie');
+      if (!(await db.prepare('SELECT 1 FROM app_user WHERE id = ? AND kp_id = ?').get(id, kp))) throw new HttpError(400, 'srv.zugeteiltePersonGehoertNichtZur');
     }
     b.leiterUserIds = [...new Set(b.leiterUserIds)];
-    if (b.zugId === KDO_ID) throw new HttpError(400, 'Ausbildungsvorbereitungen gehören zu einem Zug');
+    if (b.zugId === KDO_ID) throw new HttpError(400, 'srv.ausbildungsvorbereitungenGehoerenZuEinemZug');
     if (b.blockId != null && !(await loadBlock(db, wkId, b.blockId)).zugIds.includes(b.zugId)) {
-      throw new HttpError(400, 'Der Block gehört nicht zu diesem Zug');
+      throw new HttpError(400, 'srv.derBlockGehoertNichtZu');
     }
   };
 

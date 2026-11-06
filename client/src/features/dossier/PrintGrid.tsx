@@ -2,6 +2,7 @@
 import type { Block, BlockDetail, Location, Zug, ZugGroup } from '@shared/types';
 import { BLOCK_TYPE_INFO, KDO_ID } from '@shared/types';
 import { fmtDate, fmtTime, weekday } from '@shared/util';
+import { currentT } from '../../lib/lang';
 
 /** CSS px per mm (print maps 1 mm to 96/25.4 px). */
 export const MM = 96 / 25.4;
@@ -52,7 +53,7 @@ export function PrintGrid(p: Props) {
         {p.days.map((d, di) => (
           <div key={d} className={`flex flex-col ${di > 0 ? 'border-l-2 border-black' : ''}`} style={{ width: colW * nCol }}>
             <div className={`flex flex-1 items-center justify-center gap-1 text-[10px] font-bold ${p.avorDays.includes(d) ? 'bg-amber-100' : ''}`}>
-              {p.avorDays.includes(d) && <span className="rounded bg-amber-500 px-1 text-[8px] text-white">AVOR</span>}
+              {p.avorDays.includes(d) && <span className="rounded bg-amber-500 px-1 text-[8px] text-white">{currentT('duty.AVOR')}</span>}
               {weekday(d)} {fmtDate(d)}
             </div>
             <div className="flex border-t border-black/40">

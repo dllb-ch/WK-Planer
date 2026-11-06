@@ -48,7 +48,7 @@ const erkundungData = z.object({
 const erkundungInput = erkundungData.extend({
   zugId: z.number().int().nullable(),
   blockId: z.number().int().nullable().default(null),
-  title: z.string().trim().min(1, 'Titel erforderlich').max(200),
+  title: z.string().trim().min(1, 'srv.titelErforderlich').max(200),
 });
 
 const uebungData = z.object({
@@ -81,7 +81,7 @@ const uebungData = z.object({
 });
 const uebungInput = uebungData.extend({
   blockId: z.number().int().nullable().default(null),
-  title: z.string().trim().min(1, 'Titel erforderlich').max(200),
+  title: z.string().trim().min(1, 'srv.titelErforderlich').max(200),
 });
 
 const tagesbefehlInput = z.object({
@@ -131,15 +131,15 @@ export function einsatzRouter(db: DB) {
 
   const checkRefs = async (wk: Wk, b: { zugId?: number | null; blockId: number | null; leitungUserIds?: number[]; beuebteZugIds?: number[] }) => {
     const zuege = new Set((await zuegeOfKp(db, wk.kpId)).map((z) => z.id));
-    if (b.zugId != null && !zuege.has(b.zugId)) throw new HttpError(400, 'Unbekannter Zug');
-    if (b.beuebteZugIds?.some((id) => !zuege.has(id))) throw new HttpError(400, 'Unbekannter Zug');
+    if (b.zugId != null && !zuege.has(b.zugId)) throw new HttpError(400, 'srv.unbekannterZug');
+    if (b.beuebteZugIds?.some((id) => !zuege.has(id))) throw new HttpError(400, 'srv.unbekannterZug');
     if (b.blockId != null) await loadBlock(db, wk.id, b.blockId);
     if (b.leitungUserIds?.length) {
       // People of the Kp, and the Bat Kommando.
       const known = new Set(
         ((await db.prepare("SELECT id FROM app_user WHERE kp_id = ? OR (bat_id = ? AND role = 'BAT')").all(wk.kpId, wk.batId)) as any[]).map((x) => x.id),
       );
-      if (b.leitungUserIds.some((id) => !known.has(id))) throw new HttpError(400, 'Übungsleitung: Person gehört nicht zur Kompanie');
+      if (b.leitungUserIds.some((id) => !known.has(id))) throw new HttpError(400, 'srv.uebungsleitungPersonGehoertNichtZur');
     }
   };
 
@@ -147,7 +147,7 @@ export function einsatzRouter(db: DB) {
 
   const loadErkundung = async (wk: Wk, id: number) => {
     const row = await db.prepare(`${ERK} WHERE erkundung.id = ? AND wk_id = ?`).get(id, wk.id);
-    if (!row) throw new HttpError(404, 'Erkundung nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.erkundungNichtGefunden');
     return toErkundung(row);
   };
 
@@ -209,7 +209,7 @@ export function einsatzRouter(db: DB) {
 
   const loadUebung = async (wk: Wk, id: number) => {
     const row = await db.prepare(`${UEB} WHERE uebung.id = ? AND wk_id = ?`).get(id, wk.id);
-    if (!row) throw new HttpError(404, 'Übung nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.uebungNichtGefunden');
     return toUebung(row);
   };
 
@@ -279,7 +279,7 @@ export function einsatzRouter(db: DB) {
     const wk = await loadWk(db, idParam(req));
     ensure(canEditTagesbefehl(u, wk));
     const date = String(req.params.date);
-    if (!wkDays(wk).includes(date)) throw new HttpError(400, 'Der Tag liegt nicht im WK');
+    if (!wkDays(wk).includes(date)) throw new HttpError(400, 'srv.derTagLiegtNichtIm');
     const data = parse(tagesbefehlInput, req.body);
     await db.prepare('INSERT INTO tagesbefehl (wk_id, date, data) VALUES (?, ?, ?) ON CONFLICT (wk_id, date) DO UPDATE SET data = excluded.data').run(
       wk.id,

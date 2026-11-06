@@ -800,6 +800,10 @@ describe('Personal: Sollbestand, Teilnehmerliste, Check-in', () => {
     expect((await kdt.post('/api/auth/lang').send({ lang: 'it' })).body.lang).toBe('it');
     expect((await kdt.get('/api/auth/me')).body.lang).toBe('it');
     expect((await kdt.post('/api/auth/lang').send({ lang: 42 })).body.error).toMatch(/^Immissione non valida/);
+    // Server messages and the messages of the input checks follow the language.
+    expect((await kdt.get('/api/wks/99999').set('X-Lang', 'fr')).body.error).toBe('CR introuvable');
+    expect((await kdt.get('/api/wks/99999').set('X-Lang', 'en')).body.error).toBe('Course not found');
+    expect((await kdt.get('/api/wks/99999').set('X-Lang', 'de')).body.error).toBe('WK nicht gefunden');
   });
 
   it('sanitarische Eintrittsbefragung: required once per person, reports go to the Kp Kdt, Zfhr see restrictions only', async () => {
@@ -1352,7 +1356,7 @@ describe('Diensttage pro Zug', () => {
     const block = { date: '2027-04-20', startMin: 600, endMin: 660, zugIds: [z1], title: 'Erkundung', type: 'AUSBILDUNG' };
     const refused = await zf.post(`/api/wks/${id}/blocks`).send(block);
     expect(refused.status).toBe(400);
-    expect(refused.body.error).toMatch(/keinen Dienst/);
+    expect(refused.body.error).toMatch(/kein Dienst/);
     // Kdo plans on the AVOR day.
     expect((await kdt.post(`/api/wks/${id}/blocks`).send({ ...block, zugIds: [0] })).status).toBe(201);
     const res = await kdt.patch(`/api/wks/${id}`).send({ dayDuty: { ...wk.dayDuty, '2027-04-20': { [z1]: 'AVOR' } } });

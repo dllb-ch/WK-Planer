@@ -25,16 +25,16 @@ export function orgRouter(db: DB) {
 
   const kpOf = async (id: number) => {
     const row = await db.prepare('SELECT * FROM kompanie WHERE id = ?').get(id);
-    if (!row) throw new HttpError(404, 'Kompanie nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.kompanieNichtGefunden');
     return toKp(row);
   };
   const zugOf = async (id: number) => {
     const row = await db.prepare('SELECT * FROM zug WHERE id = ?').get(id);
-    if (!row) throw new HttpError(404, 'Zug nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.zugNichtGefunden');
     return (await withGruppen(db, [toZug(row)]))[0];
   };
   const ensureKpInBat = async (u: SessionUser, kpId: number) => {
-    if ((await kpOf(kpId)).batId !== u.batId) throw new HttpError(403, 'Kompanie gehört nicht zum Bataillon');
+    if ((await kpOf(kpId)).batId !== u.batId) throw new HttpError(403, 'srv.kompanieGehoertNichtZumBataillon');
   };
 
   /** Everything the current user may see of the organisation. */
@@ -63,8 +63,8 @@ export function orgRouter(db: DB) {
     ensure(canAdministrate(u, id));
     const image = z
       .string()
-      .max(700_000, 'Logo zu gross (max. ca. 500 KB)')
-      .regex(/^data:image\/(png|jpeg|svg\+xml|webp);base64,/, 'Logo muss ein PNG-, JPEG-, WebP- oder SVG-Bild sein')
+      .max(700_000, 'srv.logoZuGrossMaxCa')
+      .regex(/^data:image\/(png|jpeg|svg\+xml|webp);base64,/, 'srv.logoMussEinPngJpeg')
       .nullable()
       .default(null);
     const line = z.string().trim().max(200).default('');
@@ -150,7 +150,7 @@ export function orgRouter(db: DB) {
     );
     if (b.zfhrUserId != null) {
       const zf = (await db.prepare('SELECT * FROM app_user WHERE id = ?').get(b.zfhrUserId)) as any;
-      if (!zf || zf.role !== 'ZFHR' || zf.kp_id !== zug.kpId) throw new HttpError(400, 'Ungültige/r Zugführer/in');
+      if (!zf || zf.role !== 'ZFHR' || zf.kp_id !== zug.kpId) throw new HttpError(400, 'srv.ungueltigeRZugfuehrerIn');
       await db.prepare('UPDATE app_user SET zug_id = ? WHERE id = ?').run(zug.id, zf.id);
     }
     await db.prepare(
@@ -175,14 +175,14 @@ export function orgRouter(db: DB) {
     const { items } = parse(
       z.object({
         items: z
-          .array(z.object({ id: z.number().int().optional(), name: z.string().trim().min(1, 'Name der Gruppe fehlt').max(60), leiterUserId: z.number().int().nullable().default(null), soll: part, ist: part }))
+          .array(z.object({ id: z.number().int().optional(), name: z.string().trim().min(1, 'srv.nameDerGruppeFehlt').max(60), leiterUserId: z.number().int().nullable().default(null), soll: part, ist: part }))
           .max(20),
       }),
       req.body,
     );
     for (const g of items.filter((x) => x.leiterUserId !== null)) {
       const l = (await db.prepare('SELECT kp_id, role FROM app_user WHERE id = ?').get(g.leiterUserId)) as any;
-      if (!l || l.kp_id !== zug.kpId || l.role === 'BAT') throw new HttpError(400, `Ungültige/r Gruppenführer/in bei «${g.name}»`);
+      if (!l || l.kp_id !== zug.kpId || l.role === 'BAT') throw new HttpError(400, 'srv.ungueltigeRGruppenfuehrerInBei', undefined, { a: g.name });
     }
     await tx(db, async () => {
       const keep = items.map((g) => g.id).filter((id): id is number => id !== undefined);
@@ -204,7 +204,7 @@ export function orgRouter(db: DB) {
     await ensureKpInBat(u, zug.kpId);
     ensure(canEditZugAssignment(u, zug.kpId));
     const used = (await db.prepare('SELECT COUNT(*) AS n FROM block WHERE block.zug_ids::jsonb @> jsonb_build_array(?::int)').get(zug.id)) as any;
-    if (used.n > 0) throw new HttpError(409, 'Zug wird im Arbeitsprogramm verwendet');
+    if (used.n > 0) throw new HttpError(409, 'srv.zugWirdImArbeitsprogrammVerwendet');
     await db.prepare('DELETE FROM zug WHERE id = ?').run(zug.id);
     res.json({ ok: true });
   });
@@ -215,10 +215,10 @@ export function orgRouter(db: DB) {
       b.kpId = null;
       b.zugId = null;
     } else {
-      if (b.kpId == null) throw new HttpError(400, 'Kompanie erforderlich');
+      if (b.kpId == null) throw new HttpError(400, 'srv.kompanieErforderlich');
       await ensureKpInBat(u, b.kpId);
       if (b.role === 'KPKDT') b.zugId = null;
-      if (b.zugId != null && (await zugOf(b.zugId)).kpId !== b.kpId) throw new HttpError(400, 'Zug gehört nicht zur Kompanie');
+      if (b.zugId != null && (await zugOf(b.zugId)).kpId !== b.kpId) throw new HttpError(400, 'srv.zugGehoertNichtZurKompanie');
     }
     ensure(canManageUser(u, { role: b.role, kpId: b.kpId, batId: u.batId }));
   };
@@ -227,9 +227,9 @@ export function orgRouter(db: DB) {
     const u = user(req);
     const b = parse(userInput, req.body);
     await validateUserTarget(u, b);
-    if (!b.password) throw new HttpError(400, 'Passwort erforderlich (mind. 8 Zeichen)');
+    if (!b.password) throw new HttpError(400, 'srv.passwortErforderlichMindZeichen');
     const exists = await db.prepare('SELECT 1 FROM app_user WHERE lower(email) = lower(?)').get(b.email);
-    if (exists) throw new HttpError(409, 'E-Mail bereits vergeben');
+    if (exists) throw new HttpError(409, 'srv.eMailBereitsVergeben');
     const { lastInsertRowid } = await db
       .prepare('INSERT INTO app_user (name, email, pw_hash, role, bat_id, kp_id, zug_id, funktion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(b.name, b.email, hashPassword(b.password), b.role, u.batId, b.kpId, b.zugId, b.funktion);
@@ -241,7 +241,7 @@ export function orgRouter(db: DB) {
     const u = user(req);
     const id = idParam(req);
     const row = await db.prepare('SELECT * FROM app_user WHERE id = ?').get(id);
-    if (!row) throw new HttpError(404, 'Benutzer nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.benutzerNichtGefunden');
     const existing = toUser(row);
     ensure(canManageUser(u, existing));
     const b = parse(userInput, { ...existing, ...req.body });
@@ -266,9 +266,9 @@ export function orgRouter(db: DB) {
   r.delete('/users/:id', async (req, res) => {
     const u = user(req);
     const id = idParam(req);
-    if (id === u.id) throw new HttpError(400, 'Eigenes Konto kann nicht gelöscht werden');
+    if (id === u.id) throw new HttpError(400, 'srv.eigenesKontoKannNichtGeloescht');
     const row = await db.prepare('SELECT * FROM app_user WHERE id = ?').get(id);
-    if (!row) throw new HttpError(404, 'Benutzer nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.benutzerNichtGefunden');
     ensure(canManageUser(u, toUser(row)));
     await db.prepare('DELETE FROM app_user WHERE id = ?').run(id);
     await audit(db, u.id, 'user', id, 'delete');

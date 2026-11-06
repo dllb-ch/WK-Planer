@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Ausbildungsvorbereitung, Block, Resource, ResourceRequest, Zug } from '@shared/types';
-import { BLOCK_TYPE_INFO, KDO_ID, REQUEST_STATUS_LABEL, RESOURCE_KIND_LABEL, STATUS_LABEL } from '@shared/types';
+import { BLOCK_TYPE_INFO, KDO_ID } from '@shared/types';
 import { canManagePersonnel, canViewAuftrag, canViewBefehl, canViewTagesbefehl, canViewZug } from '@shared/permissions';
-import { fmtDate, fmtTime, weekday, wkDays, zieleFor } from '@shared/util';
+import { fmtDate, fmtTime, wkDays, zieleFor } from '@shared/util';
+
+const weekday = (d: string) => weekdayIn(currentLang(), d);
 import { api, type WkDetail } from '../../api';
 import { Briefkopf, marginBoxes, usePrintPage } from '../../components/Briefkopf';
 import { useUser } from '../../auth';
@@ -14,10 +16,13 @@ import { requestLabel } from '../ressourcen/conflicts';
 import { QrSheetContent } from '../personal/QrCodes';
 import { chunk, daysPerPage, LANDSCAPE, MM, PrintGrid } from './PrintGrid';
 import { Sheet as TagesbefehlSheet, tagesbefehlDays, tagesbefehlOf, useTagesbefehlSources } from '../tagesbefehl/TagesbefehlPage';
+import { currentT as tr, currentLang } from '../../lib/lang';
+import { weekdayIn, weekdayShortIn } from '@shared/i18n';
 
 type Variant = 'kp' | 'zug';
-const KP_SECTIONS = { deckblatt: 'Deckblatt', auftrag: 'Auftrag aus dem Ausbildungsbefehl', konzept: 'WK-Konzept / Befehl Kp Kdo', ap: 'Arbeitsprogramm (Blockübersicht)', ressourcen: 'Fahrzeuge, Räume und Standorte' } as const;
-const ZUG_SECTIONS = { deckblatt: 'Deckblatt', ap: 'Arbeitsprogramm des Zuges', zeitplan: 'Zeitplan mit Detailplanung', zfhr: 'Zugführerarbeitsprogramm', avs: 'Ausbildungsvorbereitungen', ressourcen: 'Fahrzeuge, Räume, Gelände des Zuges', konzept: 'Zielsetzungen aus dem WK-Konzept' } as const;
+// Sections of the Dossier, named in the language of the interface.
+const kpSections = () => ({ deckblatt: tr('dos.s.deckblatt'), auftrag: tr('dos.s.auftrag'), konzept: tr('dos.s.konzept'), ap: tr('dos.s.ap'), ressourcen: tr('dos.s.ressourcen') });
+const zugSections = () => ({ deckblatt: tr('dos.s.deckblatt'), ap: tr('dos.s.apZug'), zeitplan: tr('dos.s.zeitplan'), zfhr: tr('zf.title'), avs: tr('ov.preps'), ressourcen: tr('dos.s.ressourcenZug'), konzept: tr('dos.s.konzeptZug') });
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -36,11 +41,11 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
   const sectionsDef =
     variant === 'kp'
       ? {
-          ...KP_SECTIONS,
-          ...(tagesbefehl ? { tagesbefehl: 'Tagesbefehle (ein Blatt pro Tag)' } : {}),
-          ...(manage ? { qr: 'QR-Codes Check-in (Aushang pro Tag)' } : {}),
+          ...kpSections(),
+          ...(tagesbefehl ? { tagesbefehl: tr('dos.s.tagesbefehl') } : {}),
+          ...(manage ? { qr: tr('dos.s.qr') } : {}),
         }
-      : ZUG_SECTIONS;
+      : zugSections();
   // Tagesbefehle and QR notices are printed on demand, not with every Dossier.
   const [off, setOff] = useState<string[]>(['tagesbefehl', 'qr']);
   const [tbReady, setTbReady] = useState(false);
@@ -62,7 +67,7 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
   const kpKdts = (org.data?.users ?? []).filter((u) => u.kpId === wk.kpId && u.role === 'KPKDT').map((u) => u.name);
   const title = variant === 'kp' ? `Dossier ${kpName}` : `Dossier ${zug?.name ?? ''}`;
   const footer = [bat?.regionName || bat?.name, kpName, variant === 'zug' ? zug?.name : null, `${wk.title} (${fmtDate(wk.startDate)}–${fmtDate(wk.endDate)})`].filter(Boolean).join(' · ');
-  const stand = `Stand ${fmtDate(today())}`;
+  const stand = tr('dos.stand', { date: fmtDate(today()) });
   usePrintPage(footer, { stand, margin: '12mm 14mm 16mm 14mm' });
 
   const included = (Object.keys(sectionsDef) as string[]).filter(on);
@@ -75,15 +80,15 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
         <div className="flex rounded-md border border-slate-300 p-0.5">
           {kpAllowed && (
             <button className={`rounded px-2.5 py-1 text-xs font-medium ${variant === 'kp' ? 'bg-zs-blue text-white' : 'text-slate-600'}`} onClick={() => setVariant('kp')}>
-              Kompanie
+              {tr('common.kompanie')}
             </button>
           )}
           <button className={`rounded px-2.5 py-1 text-xs font-medium ${variant === 'zug' ? 'bg-zs-blue text-white' : 'text-slate-600'}`} onClick={() => setVariant('zug')}>
-            Zug
+            {tr('common.zug')}
           </button>
         </div>
         {variant === 'zug' && viewZuege.length > 1 && (
-          <select className="input !w-auto" value={zugId ?? ''} onChange={(e) => setZugId(Number(e.target.value))} aria-label="Zug">
+          <select className="input !w-auto" value={zugId ?? ''} onChange={(e) => setZugId(Number(e.target.value))} aria-label={tr('common.zug')}>
             {viewZuege.map((z) => (
               <option key={z.id} value={z.id}>
                 {z.name}
@@ -99,17 +104,17 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
         ))}
         <span className="flex-1" />
         <Button variant="primary" disabled={!ready || tbPending} onClick={() => window.print()}>
-          Drucken / PDF
+          {tr('av.printPdf')}
         </Button>
       </div>
       {!marginBoxes && (
         <p className="no-print mx-auto mt-3 max-w-[210mm] rounded bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Für Seitenzahlen in der Fusszeile mit Chrome oder Edge drucken. In anderen Browsern erscheint die Fusszeile ohne Seitenzahl.
+          {tr('dos.printHint')}
         </p>
       )}
 
       {!ready ? (
-        <p className="p-8 text-center text-slate-500">Dossier wird zusammengestellt …</p>
+        <p className="p-8 text-center text-slate-500">{tr('dos.building')}</p>
       ) : (
         <div className="dossier mx-auto py-4">
           {!marginBoxes && <div className="dos-fixed-foot print-only">{footer} · {stand}</div>}
@@ -128,7 +133,7 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
                   </div>
                 </div>
                 <div className="my-auto py-16">
-                  <div className="text-[11pt] uppercase tracking-widest text-slate-600">Dossier Wiederholungskurs</div>
+                  <div className="text-[11pt] uppercase tracking-widest text-slate-600">{tr('dos.coverTitle')}</div>
                   <h1 className="mt-2 text-[26pt] font-bold leading-tight">{wk.title}</h1>
                   <div className="mt-2 text-[14pt]">
                     {kpName}
@@ -136,30 +141,30 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
                   </div>
                   <div className="mt-1 text-[12pt]">
                     {fmtDate(wk.startDate)} – {fmtDate(wk.endDate)}
-                    {wk.avorDays.length > 0 && ` · AVOR: ${wk.avorDays.map((d) => fmtDate(d)).join(', ')}`}
+                    {wk.avorDays.length > 0 && ` · ${tr('duty.AVOR')}: ${wk.avorDays.map((d) => fmtDate(d)).join(', ')}`}
                   </div>
                 </div>
                 <table className="dos-table">
                   <tbody>
                     <tr>
-                      <th style={{ width: '35%' }}>Kp Kdt</th>
+                      <th style={{ width: '35%' }}>{tr('role.KPKDT')}</th>
                       <td>{kpKdts.join(', ') || '–'}</td>
                     </tr>
                     {variant === 'zug' && zug && (
                       <tr>
-                        <th>Zugführer/in</th>
+                        <th>{tr('role.ZFHR')}</th>
                         <td>{(org.data?.users ?? []).filter((u) => u.zugId === zug.id && u.role === 'ZFHR').map((u) => u.name).join(', ') || '–'}</td>
                       </tr>
                     )}
                     <tr>
-                      <th>Status Arbeitsprogramm</th>
+                      <th>{tr('dos.statusAp')}</th>
                       <td>
-                        {STATUS_LABEL[wk.status]}
+                        {tr(`status.${wk.status}`)}
                         {wk.reviewNote && ` – ${wk.reviewNote}`}
                       </td>
                     </tr>
                     <tr>
-                      <th>Inhalt</th>
+                      <th>{tr('dos.content')}</th>
                       <td>
                         <ol className="list-decimal pl-5">
                           {included
@@ -171,9 +176,9 @@ export function DossierPage({ detail }: { detail: WkDetail }) {
                       </td>
                     </tr>
                     <tr>
-                      <th>Erstellt</th>
+                      <th>{tr('dos.created')}</th>
                       <td>
-                        {fmtDate(today())} durch {me.name}
+                        {tr('dos.createdBy', { date: fmtDate(today()), name: me.name })}
                       </td>
                     </tr>
                   </tbody>
@@ -265,34 +270,34 @@ function KpSections(p: {
   return (
     <>
       {p.on('auftrag') && p.canAuftrag && (
-        <Sheet {...sheet} title={`Auftrag aus dem Ausbildungsbefehl ${p.befehl?.year ?? ''}`}>
+        <Sheet {...sheet} title={tr('dos.auftragTitle', { year: p.befehl?.year ?? '' })}>
           {!p.befehl || !auftrag ? (
-            <p>Kein Ausbildungsbefehl mit Auftrag an diese Kompanie erfasst.</p>
+            <p>{tr('dos.noAuftrag')}</p>
           ) : (
             <table className="dos-table">
               <tbody>
-                <Row k="Dienstart" v={p.befehl.dienstart} />
-                <Row k="Leitziel" v={p.befehl.leitziel} />
-                <Row k="Absicht Bat Kdt" v={p.befehl.absicht} />
-                <Row k="Richtziele Kp" v={auftrag.richtziele} />
-                <Row k="Teilnehmende" v={auftrag.teilnehmende} />
-                <Row k="KVK" v={auftrag.kvkDates.map(fmtDate).join(', ')} />
-                <Row k="WK" v={`${fmtDate(auftrag.wkFrom)} – ${fmtDate(auftrag.wkTo)}`} />
-                <Row k="Organisation" v={p.befehl.organisation} />
-                <Row k="Besonderes" v={p.befehl.besonderes} />
+                <Row k={tr('dos.dienstart')} v={p.befehl.dienstart} />
+                <Row k={tr('dos.leitziel')} v={p.befehl.leitziel} />
+                <Row k={tr('dos.absicht')} v={p.befehl.absicht} />
+                <Row k={tr('dos.richtziele')} v={auftrag.richtziele} />
+                <Row k={tr('bef.teilnehmende')} v={auftrag.teilnehmende} />
+                <Row k={tr('duty.KVK')} v={auftrag.kvkDates.map(fmtDate).join(', ')} />
+                <Row k={tr('duty.WK')} v={`${fmtDate(auftrag.wkFrom)} – ${fmtDate(auftrag.wkTo)}`} />
+                <Row k={tr('nav.organisation')} v={p.befehl.organisation} />
+                <Row k={tr('ueb.besonderes')} v={p.befehl.besonderes} />
               </tbody>
             </table>
           )}
         </Sheet>
       )}
       {p.on('konzept') && (
-        <Sheet {...sheet} title="WK-Konzept / Befehl zur WK-Vorbereitung">
+        <Sheet {...sheet} title={tr('konz.title')}>
           <KonzeptTable k={p.konzept} zuege={zuege} />
         </Sheet>
       )}
       {p.on('ap') &&
         pages.map((days, i) => (
-          <Sheet key={days[0]} {...sheet} landscape title={`Arbeitsprogramm ${pages.length > 1 ? `(${i + 1}/${pages.length})` : ''}`}>
+          <Sheet key={days[0]} {...sheet} landscape title={tr('dos.ap', { suffix: pages.length > 1 ? `(${i + 1}/${pages.length})` : '' })}>
             <PrintGrid
               days={days}
               columns={columns}
@@ -307,9 +312,9 @@ function KpSections(p: {
           </Sheet>
         ))}
       {p.on('ressourcen') && (
-        <Sheet {...sheet} title="Fahrzeuge, Räume und Standorte">
+        <Sheet {...sheet} title={tr('dos.s.ressourcen')}>
           <ResourcesTable requests={p.requests} resources={p.resources} zuege={zuege} />
-          <h3 className="dos-h3">Standorte (Legende Arbeitsprogramm)</h3>
+          <h3 className="dos-h3">{tr('dos.legendLocations')}</h3>
           <table className="dos-table">
             <tbody>
               {locations.map((l) => (
@@ -341,7 +346,7 @@ function TagesbefehlSections({ detail, footer, stand, onReady }: { detail: WkDet
     onReady(ready);
     return () => onReady(false);
   }, [ready, onReady]);
-  if (!ready) return <p className="no-print p-8 text-center text-slate-500">Tagesbefehle werden zusammengestellt …</p>;
+  if (!ready) return <p className="no-print p-8 text-center text-slate-500">{tr('dos.tbBuilding')}</p>;
   return (
     <>
       {tagesbefehlDays(wk).map((d) => (
@@ -379,7 +384,7 @@ function ZugSections(p: {
     <>
       {p.on('ap') &&
         pages.map((days, i) => (
-          <Sheet key={days[0]} {...sheet} landscape title={`Arbeitsprogramm ${p.zug.name} ${pages.length > 1 ? `(${i + 1}/${pages.length})` : ''}`}>
+          <Sheet key={days[0]} {...sheet} landscape title={tr('dos.ap', { suffix: `${p.zug.name} ${pages.length > 1 ? `(${i + 1}/${pages.length})` : ''}` })}>
             <PrintGrid
               days={days}
               columns={[p.zug]}
@@ -396,7 +401,7 @@ function ZugSections(p: {
           </Sheet>
         ))}
       {p.on('zeitplan') && (
-        <Sheet {...sheet} title={`Zeitplan ${p.zug.name}`}>
+        <Sheet {...sheet} title={tr('dos.zeitplan', { zug: p.zug.name })}>
           {wkDays(wk).map((d) => {
             const list = zugBlocks.filter((b) => b.date === d).sort((a, b) => a.startMin - b.startMin);
             if (!list.length) return null;
@@ -406,7 +411,7 @@ function ZugSections(p: {
                   <tr>
                     <th colSpan={4}>
                       {weekday(d)}, {fmtDate(d)}
-                      {wk.avorDays.includes(d) && ' (AVOR)'}
+                      {wk.avorDays.includes(d) && ` (${tr('duty.AVOR')})`}
                     </th>
                   </tr>
                 </thead>
@@ -430,7 +435,7 @@ function ZugSections(p: {
                             {fmtTime(x.startMin)}–{fmtTime(x.endMin)}
                           </td>
                           <td>{x.verantwortlich}</td>
-                          <td style={{ width: '14%' }}>{x.groupIds.length ? zugGroups.filter((g) => x.groupIds.includes(g.id)).map((g) => g.name).join(', ') : 'Zug'}</td>
+                          <td style={{ width: '14%' }}>{x.groupIds.length ? zugGroups.filter((g) => x.groupIds.includes(g.id)).map((g) => g.name).join(', ') : tr('common.zug')}</td>
                           <td>{x.title}</td>
                         </tr>
                       )),
@@ -442,22 +447,22 @@ function ZugSections(p: {
         </Sheet>
       )}
       {p.on('zfhr') && p.zfhr && (
-        <Sheet {...sheet} title={`Zugführerarbeitsprogramm ${p.zug.name}`}>
-          <h3 className="dos-h3">Ziele</h3>
+        <Sheet {...sheet} title={tr('dos.zfhr', { zug: p.zug.name })}>
+          <h3 className="dos-h3">{tr('dos.ziele')}</h3>
           <ol className="list-decimal pl-5">
             {p.zfhr.ziele.filter((z) => z.trim()).map((z, i) => (
               <li key={i}>{z}</li>
             ))}
           </ol>
-          <h3 className="dos-h3">Arbeitsposten</h3>
+          <h3 className="dos-h3">{tr('zf.posten')}</h3>
           <table className="dos-table">
             <thead>
               <tr>
                 <th>Nr</th>
-                <th>Thema / Ort</th>
-                <th>Lernziel / Auftrag</th>
-                <th>Material</th>
-                <th>Postenchef</th>
+                <th>{tr('dos.themaOrt')}</th>
+                <th>{tr('zf.lernziel')}</th>
+                <th>{tr('av.material')}</th>
+                <th>{tr('zf.postenchef')}</th>
               </tr>
             </thead>
             <tbody>
@@ -477,7 +482,7 @@ function ZugSections(p: {
           </table>
           {p.zfhr.zfhrAktivitaeten && (
             <>
-              <h3 className="dos-h3">Kontroll- und Besprechungspunkte</h3>
+              <h3 className="dos-h3">{tr('dos.kontroll')}</h3>
               <p className="whitespace-pre-wrap">{p.zfhr.zfhrAktivitaeten}</p>
             </>
           )}
@@ -490,12 +495,12 @@ function ZugSections(p: {
           </Sheet>
         ))}
       {p.on('ressourcen') && (
-        <Sheet {...sheet} title={`Fahrzeuge, Räume, Gelände ${p.zug.name}`}>
+        <Sheet {...sheet} title={tr('dos.ressourcenZug', { zug: p.zug.name })}>
           <ResourcesTable requests={p.requests.filter((q) => q.zugId === p.zug.id)} resources={p.resources} zuege={[p.zug]} />
         </Sheet>
       )}
       {p.on('konzept') && (
-        <Sheet {...sheet} title="Zielsetzungen aus dem WK-Konzept">
+        <Sheet {...sheet} title={tr('dos.s.konzeptZug')}>
           <ol className="list-decimal pl-5">
             {zieleFor(p.konzept.zielsetzungen, p.zug.id).map((z, i) => (
               <li key={i}>{z.text}</li>
@@ -503,7 +508,7 @@ function ZugSections(p: {
           </ol>
           {p.konzept.organisation && (
             <>
-              <h3 className="dos-h3">Organisation</h3>
+              <h3 className="dos-h3">{tr('nav.organisation')}</h3>
               <p className="whitespace-pre-wrap">{p.konzept.organisation}</p>
             </>
           )}
@@ -528,11 +533,11 @@ function KonzeptTable({ k, zuege }: { k: Awaited<ReturnType<typeof api.konzept>>
   return (
     <table className="dos-table">
       <tbody>
-        <Row k="1. Orientierung / Allgemeines" v={k.orientierung} />
-        <Row k="1.2 Organisation" v={k.organisation} />
-        <Row k="2. Absicht" v={k.absicht} />
+        <Row k={tr('dos.k1')} v={k.orientierung} />
+        <Row k={tr('dos.k12')} v={k.organisation} />
+        <Row k={tr('dos.k2')} v={k.absicht} />
         <tr>
-          <th>3. Zielsetzungen</th>
+          <th>{tr('dos.k3')}</th>
           <td>
             <ol className="list-decimal pl-5">
               {k.zielsetzungen.map((z, i) => (
@@ -544,9 +549,9 @@ function KonzeptTable({ k, zuege }: { k: Awaited<ReturnType<typeof api.konzept>>
             </ol>
           </td>
         </tr>
-        <Row k="4.1 Verpflegung" v={k.verpflegung} />
-        <Row k="4.2 Personal, Material, Fahrzeuge" v={k.material} />
-        <Row k="5. Standorte" v={k.standorte} />
+        <Row k={tr('dos.k41')} v={k.verpflegung} />
+        <Row k={tr('dos.k42')} v={k.material} />
+        <Row k={tr('dos.k5')} v={k.standorte} />
       </tbody>
     </table>
   );
@@ -554,21 +559,21 @@ function KonzeptTable({ k, zuege }: { k: Awaited<ReturnType<typeof api.konzept>>
 
 function ResourcesTable({ requests, resources, zuege }: { requests: ResourceRequest[]; resources: Resource[]; zuege: Zug[] }) {
   const active = requests.filter((q) => q.status !== 'ABGELEHNT').sort((a, b) => a.date.localeCompare(b.date) || a.startMin - b.startMin);
-  const zugName = (id: number) => (id === KDO_ID ? 'Kdo' : (zuege.find((z) => z.id === id)?.name ?? ''));
+  const zugName = (id: number) => (id === KDO_ID ? tr('kdo') : (zuege.find((z) => z.id === id)?.name ?? ''));
   const groups = (['FAHRZEUG', 'ANHAENGER', 'RAUM', 'GELAENDE'] as const).map((kind) => ({ kind, list: active.filter((q) => q.kind === kind) }));
   return (
     <>
       {groups.map(({ kind, list }) => (
         <div key={kind}>
-          <h3 className="dos-h3">{RESOURCE_KIND_LABEL[kind]}</h3>
+          <h3 className="dos-h3">{tr(`resource.${kind}`)}</h3>
           <table className="dos-table">
             <thead>
               <tr>
-                <th style={{ width: '22%' }}>{RESOURCE_KIND_LABEL[kind]}</th>
-                <th style={{ width: '20%' }}>Wann</th>
-                <th style={{ width: '10%' }}>Für</th>
-                <th>Zweck</th>
-                <th style={{ width: '11%' }}>Status</th>
+                <th style={{ width: '22%' }}>{tr(`resource.${kind}`)}</th>
+                <th style={{ width: '20%' }}>{tr('res.when')}</th>
+                <th style={{ width: '10%' }}>{tr('std.for')}</th>
+                <th>{tr('res.zweck')}</th>
+                <th style={{ width: '11%' }}>{tr('common.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -579,19 +584,19 @@ function ResourcesTable({ requests, resources, zuege }: { requests: ResourceRequ
                     {resources.find((r) => r.id === q.resourceId)?.kpId === null && ' (Bat)'}
                   </td>
                   <td>
-                    {weekday(q.date).slice(0, 2)} {fmtDate(q.date)} {fmtTime(q.startMin)}–{fmtTime(q.endMin)}
+                    {weekdayShortIn(currentLang(), q.date)} {fmtDate(q.date)} {fmtTime(q.startMin)}–{fmtTime(q.endMin)}
                   </td>
                   <td>{zugName(q.zugId)}</td>
                   <td>
                     {q.zweck}
                     {q.decisionNote && ` – ${q.decisionNote}`}
                   </td>
-                  <td>{REQUEST_STATUS_LABEL[q.status]}</td>
+                  <td>{tr(`request.${q.status}`)}</td>
                 </tr>
               ))}
               {list.length === 0 && (
                 <tr>
-                  <td colSpan={5}>Keine Anfragen.</td>
+                  <td colSpan={5}>{tr('res.none')}</td>
                 </tr>
               )}
             </tbody>
@@ -609,10 +614,10 @@ function Legend({ blocks, locations }: { blocks: Block[]; locations: { nr: numbe
       {types.map((t) => (
         <span key={t} className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5" style={{ background: BLOCK_TYPE_INFO[t].color }} />
-          {BLOCK_TYPE_INFO[t].label}
+          {tr(`block.${t}`)}
         </span>
       ))}
-      {locations.length > 0 && <span>· Standorte: {locations.map((l) => `${l.nr} = ${l.name}`).join(', ')}</span>}
+      {locations.length > 0 && <span>{tr('dos.locations', { list: locations.map((l) => `${l.nr} = ${l.name}`).join(', ') })}</span>}
     </div>
   );
 }

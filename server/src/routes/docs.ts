@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import type { DB } from '../db';
 import { audit, tx } from '../db';
-import { ensure, HttpError, idParam, parse, user, asyncRouter } from '../http';
+import { ensure, HttpError, idParam, parse, user, asyncRouter, langOf } from '../http';
 import { syncWksFromBefehl } from '../wkService';
 import { loadWk, toComment, toZug } from '../repo';
 import {
@@ -95,7 +95,7 @@ export function docsRouter(db: DB) {
     ensure(canComment(u, wk));
     const b = parse(z.object({ text: z.string().trim().min(1).max(4000), blockId: z.number().int().nullable().default(null) }), req.body);
     if (b.blockId != null && !(await db.prepare('SELECT 1 FROM block WHERE id = ? AND wk_id = ?').get(b.blockId, wk.id))) {
-      throw new HttpError(400, 'Unbekannter Block');
+      throw new HttpError(400, 'srv.unbekannterBlock');
     }
     const { lastInsertRowid } = await db
       .prepare('INSERT INTO comment (wk_id, block_id, user_id, text) VALUES (?, ?, ?, ?)')
@@ -109,7 +109,7 @@ export function docsRouter(db: DB) {
   r.delete('/wks/:id/comments/:cid', async (req, res) => {
     const u = user(req);
     const row = (await db.prepare('SELECT * FROM comment WHERE id = ? AND wk_id = ?').get(idParam(req, 'cid'), idParam(req))) as any;
-    if (!row) throw new HttpError(404, 'Kommentar nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.kommentarNichtGefunden');
     ensure(row.user_id === u.id);
     await db.prepare('DELETE FROM comment WHERE id = ?').run(row.id);
     res.json({ ok: true });
@@ -173,7 +173,7 @@ export function docsRouter(db: DB) {
     const year = idParam(req, 'year');
     const b = parse(befehlInput, req.body);
     const kpIds = (await db.prepare('SELECT id FROM kompanie WHERE bat_id = ?').all(u.batId)).map((x: any) => x.id as number);
-    if (b.auftraege.some((a) => !kpIds.includes(a.kpId))) throw new HttpError(400, 'Unbekannte Kompanie');
+    if (b.auftraege.some((a) => !kpIds.includes(a.kpId))) throw new HttpError(400, 'srv.unbekannteKompanie');
     const wks = await tx(db, async () => {
       await db.prepare(
         `INSERT INTO befehl (bat_id, year, dienstart, leitziel, absicht, organisation, besonderes) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -189,7 +189,7 @@ export function docsRouter(db: DB) {
       await audit(db, u.id, 'befehl', id, 'save');
       // Each Kp with WK dates gets its WK.
       const auftraege = b.auftraege.map((a) => ({ ...a, kvkDates: [...new Set(a.kvkDates)].sort() }));
-      return syncWksFromBefehl(db, u.id, u.batId, { id, year, dienstart: b.dienstart }, auftraege);
+      return syncWksFromBefehl(db, u.id, u.batId, { id, year, dienstart: b.dienstart }, auftraege, langOf(req));
     });
     res.json({ ...(await loadBefehl(u.batId, year)), wks });
   });
@@ -199,15 +199,15 @@ export function docsRouter(db: DB) {
   const befehlIdOf = async (batId: number, year: number, create: boolean) => {
     const row = (await db.prepare('SELECT id FROM befehl WHERE bat_id = ? AND year = ?').get(batId, year)) as any;
     if (row) return row.id as number;
-    if (!create) throw new HttpError(404, 'Kein Ausbildungsbefehl für dieses Jahr');
+    if (!create) throw new HttpError(404, 'srv.keinAusbildungsbefehlFuerDiesesJahr');
     return Number((await db.prepare('INSERT INTO befehl (bat_id, year) VALUES (?, ?)').run(batId, year)).lastInsertRowid);
   };
 
   r.post('/befehle/:year/files', express.raw({ type: 'application/pdf', limit: '20mb' }), async (req, res) => {
     const u = user(req);
     ensure(canEditBefehl(u));
-    if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Bitte eine PDF-Datei senden');
-    if (req.body.subarray(0, 5).toString() !== '%PDF-') throw new HttpError(400, 'Die Datei ist kein PDF');
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'srv.bitteEinePdfDateiSenden');
+    if (req.body.subarray(0, 5).toString() !== '%PDF-') throw new HttpError(400, 'srv.dieDateiIstKeinPdf');
     const name = decodeURIComponent(String(req.headers['x-filename'] ?? 'Ausbildungsbefehl.pdf')).slice(0, 200);
     const befehlId = await befehlIdOf(u.batId, idParam(req, 'year'), true);
     const { lastInsertRowid } = await db
@@ -222,7 +222,7 @@ export function docsRouter(db: DB) {
     ensure(canViewBefehl(u));
     const befehlId = await befehlIdOf(u.batId, idParam(req, 'year'), false);
     const f = (await db.prepare('SELECT * FROM befehl_file WHERE id = ? AND befehl_id = ?').get(idParam(req, 'fileId'), befehlId)) as any;
-    if (!f) throw new HttpError(404, 'Datei nicht gefunden');
+    if (!f) throw new HttpError(404, 'srv.dateiNichtGefunden');
     res.setHeader('Content-Type', f.mime);
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(f.name)}`);
     res.send(Buffer.from(f.data));
@@ -266,7 +266,7 @@ export function docsRouter(db: DB) {
 
   const zugOfWk = async (kpId: number, zugId: number) => {
     const row = await db.prepare('SELECT * FROM zug WHERE id = ? AND kp_id = ?').get(zugId, kpId);
-    if (!row) throw new HttpError(404, 'Zug nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.zugNichtGefunden');
     return toZug(row);
   };
 

@@ -25,6 +25,11 @@ import { rest } from './rest';
 import { rest2 } from './rest2';
 import { rest3 } from './rest3';
 import { rest4 } from './rest4';
+import { dossier } from './dossier';
+import { tagesbefehl } from './tagesbefehl';
+import { server } from './server';
+import { rapport_traktanden } from './rapport_traktanden';
+import { defaults } from './defaults';
 // AREA-IMPORTS
 
 export const AREAS = {
@@ -53,6 +58,11 @@ export const AREAS = {
   ...rest2,
   ...rest3,
   ...rest4,
+  ...dossier,
+  ...tagesbefehl,
+  ...server,
+  ...rapport_traktanden,
+  ...defaults,
   // AREA-SPREAD
 };
 export type AreaKey = keyof typeof AREAS;

@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import type { DB } from '../db';
 import { audit } from '../db';
-import { ensure, HttpError, idParam, parse, user, asyncRouter } from '../http';
+import { ensure, HttpError, idParam, langOf, parse, user, asyncRouter } from '../http';
 import { loadBlock, loadWk, zuegeOfKp } from '../repo';
 import { canAssignPendenz, canCreateRapport, canEditRapport, canTickPendenz, canViewRapport, canViewWk } from '../../../shared/permissions';
 import type { Pendenz, Rapport, SessionUser, Wk } from '../../../shared/types';
@@ -21,7 +21,7 @@ const traktandum = z.object({
 const rapportInput = z.object({
   zugId: z.number().int().nullable(),
   blockId: z.number().int().nullable().default(null),
-  title: z.string().trim().min(1, 'Titel erforderlich').max(200),
+  title: z.string().trim().min(1, 'srv.titelErforderlich').max(200),
   schema,
   date,
   startMin: z.number().int().min(0).max(1440).nullable().default(null),
@@ -44,7 +44,7 @@ const pendenzInput = z.object({
   rapportId: z.number().int().nullable().default(null),
   traktandumKey: z.string().max(40).nullable().default(null),
   zugId: z.number().int().nullable().default(null),
-  text: z.string().trim().min(1, 'Text erforderlich').max(2000),
+  text: z.string().trim().min(1, 'srv.textErforderlich').max(2000),
   responsibleUserId: z.number().int().nullable().default(null),
   dueDate: z.union([z.literal(''), date]).default(''),
 });
@@ -95,21 +95,21 @@ export function rapportRouter(db: DB) {
 
   const loadRapport = async (wk: Wk, id: number) => {
     const row = await db.prepare('SELECT * FROM rapport WHERE id = ? AND wk_id = ?').get(id, wk.id);
-    if (!row) throw new HttpError(404, 'Rapport nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.rapportNichtGefunden');
     return toRapport(row);
   };
   const loadPendenz = async (wk: Wk, id: number) => {
     const row = await db.prepare(`${PENDENZ_SELECT} WHERE p.id = ? AND p.wk_id = ?`).get(id, wk.id);
-    if (!row) throw new HttpError(404, 'Pendenz nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.pendenzNichtGefunden');
     return toPendenz(row);
   };
   const checkZug = async (wk: Wk, zugId: number | null) => {
-    if (zugId !== null && !(await zuegeOfKp(db, wk.kpId)).some((z) => z.id === zugId)) throw new HttpError(400, 'Unbekannter Zug');
+    if (zugId !== null && !(await zuegeOfKp(db, wk.kpId)).some((z) => z.id === zugId)) throw new HttpError(400, 'srv.unbekannterZug');
   };
   /** People of the Bataillon only. */
   const checkUsers = async (wk: Wk, ids: (number | null)[]) => {
     const known = new Set(((await db.prepare('SELECT id FROM app_user WHERE bat_id = ?').all(wk.batId)) as any[]).map((x) => x.id));
-    if (ids.some((id) => id !== null && !known.has(id))) throw new HttpError(400, 'Unbekannte Person');
+    if (ids.some((id) => id !== null && !known.has(id))) throw new HttpError(400, 'srv.unbekanntePerson');
   };
   /** Who may change a Pendenz: editors of its Rapport; without Rapport the Kp Kdt, the Zfhr of the Zug and who created it. */
   const canEditPendenz = async (u: SessionUser, wk: Wk, p: Pick<Pendenz, 'rapportId' | 'zugId' | 'createdBy'>) => {
@@ -149,7 +149,7 @@ export function rapportRouter(db: DB) {
     const block = b.blockId ? (await loadBlock(db, wk.id, b.blockId)) : null;
     const sch = b.schema ?? from?.schema ?? 'AUSB_DURCH';
     const dateOf = b.date ?? block?.date;
-    if (!dateOf) throw new HttpError(400, 'Datum erforderlich');
+    if (!dateOf) throw new HttpError(400, 'srv.datumErforderlich');
     const title = b.title ?? block?.title ?? 'Rapport';
     const leitung = b.leitungUserId ?? from?.leitungUserId ?? u.id;
     const teilnehmer = b.teilnehmerIds?.length ? b.teilnehmerIds : (from?.teilnehmerIds ?? []);
@@ -172,7 +172,7 @@ export function rapportRouter(db: DB) {
           leitung,
           b.protokollUserId ?? from?.protokollUserId ?? null,
           JSON.stringify(teilnehmer),
-          JSON.stringify(b.traktanden ?? traktandenOf(sch)),
+          JSON.stringify(b.traktanden ?? traktandenOf(sch, langOf(req))),
           u.id,
         )).lastInsertRowid,
     );
@@ -186,7 +186,7 @@ export function rapportRouter(db: DB) {
     const rap = await loadRapport(wk, idParam(req, 'rid'));
     ensure(canEditRapport(u, wk, rap));
     const b = parse(rapportInput, req.body);
-    if (rap.status === 'ABGESCHLOSSEN' && b.status === 'ABGESCHLOSSEN') throw new HttpError(409, 'Der Rapport ist abgeschlossen – zuerst wieder öffnen');
+    if (rap.status === 'ABGESCHLOSSEN' && b.status === 'ABGESCHLOSSEN') throw new HttpError(409, 'srv.derRapportIstAbgeschlossenZuerst');
     if (b.zugId !== rap.zugId) ensure(canCreateRapport(u, wk, b.zugId));
     await checkZug(wk, b.zugId);
     await checkUsers(wk, [b.leitungUserId, b.protokollUserId, ...b.teilnehmerIds]);
@@ -241,7 +241,7 @@ export function rapportRouter(db: DB) {
   const resolveScope = async (wk: Wk, b: z.infer<typeof pendenzInput>) => {
     if (b.rapportId !== null) {
       const rap = await loadRapport(wk, b.rapportId);
-      if (b.traktandumKey && !rap.traktanden.some((t) => t.key === b.traktandumKey)) throw new HttpError(400, 'Unbekanntes Traktandum');
+      if (b.traktandumKey && !rap.traktanden.some((t) => t.key === b.traktandumKey)) throw new HttpError(400, 'srv.unbekanntesTraktandum');
       return { ...b, zugId: rap.zugId };
     }
     await checkZug(wk, b.zugId);

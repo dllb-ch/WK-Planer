@@ -29,7 +29,7 @@ const healthAnswer = z.object({
 });
 
 const participantInput = z.object({
-  nachname: z.string().trim().min(1, 'Nachname erforderlich').max(80),
+  nachname: z.string().trim().min(1, 'srv.nachnameErforderlich').max(80),
   vorname: z.string().trim().max(80).default(''),
   grad: z.string().trim().max(40).default(''),
   funktion: z.string().trim().max(80).default(''),
@@ -40,10 +40,10 @@ const participantInput = z.object({
 });
 
 const checkInInput = z.object({
-  vorname: z.string().trim().min(1, 'Vorname erforderlich').max(80),
-  nachname: z.string().trim().min(1, 'Nachname erforderlich').max(80),
+  vorname: z.string().trim().min(1, 'srv.vornameErforderlich').max(80),
+  nachname: z.string().trim().min(1, 'srv.nachnameErforderlich').max(80),
   // Optional: helps matching, but people without e-mail check in by name.
-  email: z.union([z.literal(''), z.string().trim().email('Bitte eine gültige E-Mail-Adresse angeben').max(120)]).default(''),
+  email: z.union([z.literal(''), z.string().trim().email('srv.bitteEineGueltigeEMail').max(120)]).default(''),
   zugId: z.number().int().nullable().default(null),
   diet: diet.default('NORMAL'),
   intolerances: z.string().trim().max(300).default(''),
@@ -146,18 +146,18 @@ export function personalRouter(db: DB) {
     if (zugId !== null && !(await zugIds(wk)).has(zugId)) throw new HttpError(400, 'err.checkin.unknownZug');
   };
   const checkDate = (wk: Wk, d: string) => {
-    if (!wkDays(wk).includes(d)) throw new HttpError(400, 'Der Tag liegt nicht im WK');
+    if (!wkDays(wk).includes(d)) throw new HttpError(400, 'srv.derTagLiegtNichtIm');
   };
   const participantsOf = async (wkId: number) =>
     ((await db.prepare('SELECT * FROM participant WHERE wk_id = ? ORDER BY nachname, vorname').all(wkId)) as any[]).map(toParticipant);
   const loadParticipant = async (wk: Wk, id: number) => {
     const row = await db.prepare('SELECT * FROM participant WHERE id = ? AND wk_id = ?').get(id, wk.id);
-    if (!row) throw new HttpError(404, 'Person nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.personNichtGefunden');
     return toParticipant(row);
   };
   const loadCheckIn = async (wk: Wk, id: number) => {
     const row = await db.prepare('SELECT * FROM checkin WHERE id = ? AND wk_id = ?').get(id, wk.id);
-    if (!row) throw new HttpError(404, 'Check-in nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.checkInNichtGefunden');
     return toCheckIn(row);
   };
   /** A Zfhr sees the people of the own Zug only. */
@@ -477,7 +477,7 @@ export function personalRouter(db: DB) {
     ensure(canHandleHealth(u, wk));
     const b = parse(healthAnswer.extend({ participantId: z.number().int() }), req.body);
     const p = await loadParticipant(wk, b.participantId);
-    if (await healthOf(db, wk.id, p.id, p)) throw new HttpError(409, 'Für diese Person ist die Eintrittsbefragung schon erfasst');
+    if (await healthOf(db, wk.id, p.id, p)) throw new HttpError(409, 'srv.fuerDiesePersonIstDie');
     const id = (
       await db
         .prepare(
@@ -499,7 +499,7 @@ export function personalRouter(db: DB) {
       req.body,
     );
     const row = (await db.prepare('SELECT * FROM health_check WHERE id = ? AND wk_id = ?').get(idParam(req, 'hid'), wk.id)) as any;
-    if (!row) throw new HttpError(404, 'Eintrag nicht gefunden');
+    if (!row) throw new HttpError(404, 'srv.eintragNichtGefunden');
     await db
       .prepare('UPDATE health_check SET status = ?, restriction = ?, updated_by = ? WHERE id = ?')
       .run(b.status ?? row.status, b.restriction ?? row.restriction, u.id, row.id);
@@ -554,7 +554,7 @@ export function publicRouter(db: DB) {
     const { row, open } = await dayOf(req.params.token);
     if (!open) throw new HttpError(409, 'err.checkin.closed');
     const b = parse(checkInInput, req.body);
-    if (b.zugId !== null && !(await zuegeOfKp(db, row.kp_id)).some((z) => z.id === b.zugId)) throw new HttpError(400, 'Unbekannter Zug');
+    if (b.zugId !== null && !(await zuegeOfKp(db, row.kp_id)).some((z) => z.id === b.zugId)) throw new HttpError(400, 'srv.unbekannterZug');
     const wkId: number = row.wk_id;
     const list = ((await db.prepare('SELECT * FROM participant WHERE wk_id = ?').all(wkId)) as any[]).map(toParticipant);
     const pid = matchParticipant(list, b);

@@ -2,7 +2,7 @@ import { normalizeDayDuty } from '../../../shared/ranks';
 import { z } from 'zod';
 import type { DB } from '../db';
 import { audit, tx } from '../db';
-import { ensure, HttpError, idParam, parse, user, asyncRouter } from '../http';
+import { ensure, HttpError, idParam, parse, user, asyncRouter, langOf } from '../http';
 import { createWk } from '../wkService';
 import { loadBlock, loadWk, toBlock, toDetail, toGroup, toLocation, toWk, touchWk, zuegeOfKp } from '../repo';
 import {
@@ -66,33 +66,33 @@ export function wkRouter(db: DB) {
 
   /** Validates block geometry against the WK and the Kp's Züge. */
   async function checkBlock(wk: Wk, b: BlockIn) {
-    if (b.endMin <= b.startMin) throw new HttpError(400, 'Ende muss nach Beginn liegen');
-    if (b.startMin < wk.dayStart || b.endMin > wk.dayEnd) throw new HttpError(400, 'Block liegt ausserhalb der Tageszeit');
-    if (!wkDays(wk).includes(b.date)) throw new HttpError(400, 'Datum liegt ausserhalb des WK');
+    if (b.endMin <= b.startMin) throw new HttpError(400, 'srv.endeMussNachBeginnLiegen');
+    if (b.startMin < wk.dayStart || b.endMin > wk.dayEnd) throw new HttpError(400, 'srv.blockLiegtAusserhalbDerTageszeit');
+    if (!wkDays(wk).includes(b.date)) throw new HttpError(400, 'srv.datumLiegtAusserhalbDesWk');
     // The Kdo column comes first, then the Züge in their order.
     const order = [KDO_ID, ...(await zuegeOfKp(db, wk.kpId)).map((z) => z.id)];
     const idx = b.zugIds.map((id) => order.indexOf(id)).sort((a, c) => a - c);
-    if (idx.some((i) => i < 0)) throw new HttpError(400, 'Unbekannter Zug');
-    if (idx.some((i, k) => k > 0 && i !== idx[k - 1] + 1)) throw new HttpError(400, 'Züge müssen nebeneinander liegen');
+    if (idx.some((i) => i < 0)) throw new HttpError(400, 'srv.unbekannterZug');
+    if (idx.some((i, k) => k > 0 && i !== idx[k - 1] + 1)) throw new HttpError(400, 'srv.zuegeMuessenNebeneinanderLiegen');
     b.zugIds = idx.map((i) => order[i]);
     // Only Züge serving on that day (AVOR days: Kdo and the Züge added for the day); blocks across several
     // columns (Mittagessen for all …) may cross a Zug without service.
     const off = b.zugIds.filter((id) => !servesOnDay(wk, b.date, id));
     if (!blockFitsDay(wk, b.date, b.zugIds)) {
       const names = (await zuegeOfKp(db, wk.kpId)).filter((z) => off.includes(z.id)).map((z) => z.name);
-      throw new HttpError(400, `${names.join(', ')} ${off.length > 1 ? 'haben' : 'hat'} an diesem Tag keinen Dienst`);
+      throw new HttpError(400, 'srv.noServiceThatDay', undefined, { a: names.join(', ') });
     }
     if (b.locationId != null) {
       const loc = await db.prepare('SELECT 1 FROM location WHERE id = ? AND wk_id = ?').get(b.locationId, wk.id);
-      if (!loc) throw new HttpError(400, 'Unbekannter Standort');
+      if (!loc) throw new HttpError(400, 'srv.unbekannterStandort');
     }
   }
 
   async function insertBlock(u: SessionUser, wk: Wk, b: BlockIn): Promise<Block> {
     const source = u.role === 'BAT' ? 'BAT' : 'KP';
     if (source === 'BAT') b.locked = true;
-    if (b.locked && source === 'KP' && !canLockBlocks(u)) throw new HttpError(403, 'Nur der Kp Kdt kann Blöcke sperren');
-    if (b.zugIds.length > 1 && !canSpanZuege(u)) throw new HttpError(403, 'Nur der Kp Kdt kann zugübergreifende Blöcke planen');
+    if (b.locked && source === 'KP' && !canLockBlocks(u)) throw new HttpError(403, 'srv.nurDerKpKdtKann2');
+    if (b.zugIds.length > 1 && !canSpanZuege(u)) throw new HttpError(403, 'srv.nurDerKpKdtKann');
     await checkBlock(wk, b);
     ensure(canCreateBlock(u, wk, { ...b, source }));
     const { lastInsertRowid } = await db
@@ -174,8 +174,8 @@ export function wkRouter(db: DB) {
     ensure(canCreateWk(u));
     const b = parse(wkSettings.extend({ kpId: z.number().int() }), req.body);
     const kp = await db.prepare('SELECT * FROM kompanie WHERE id = ? AND bat_id = ?').get(b.kpId, u.batId);
-    if (!kp) throw new HttpError(400, 'Unbekannte Kompanie');
-    const id = await createWk(db, u.id, u.batId, b);
+    if (!kp) throw new HttpError(400, 'srv.unbekannteKompanie');
+    const id = await createWk(db, u.id, u.batId, b, langOf(req));
     res.status(201).json((await loadWk(db, id)));
   });
 
@@ -201,9 +201,9 @@ export function wkRouter(db: DB) {
     ensure(canEditApStructure(u, wk) || (u.role === 'BAT' && wk.status !== 'FREIGEGEBEN'));
     const b = parse(wkSettings, { ...wk, ...req.body });
     if (b.endDate < b.startDate || dateRange(b.startDate, b.endDate).length > 21) {
-      throw new HttpError(400, 'WK-Dauer muss zwischen 1 und 21 Tagen liegen');
+      throw new HttpError(400, 'srv.wkDauerMussZwischenUnd');
     }
-    if (b.dayEnd - b.dayStart < 60) throw new HttpError(400, 'Tageszeit zu kurz');
+    if (b.dayEnd - b.dayStart < 60) throw new HttpError(400, 'srv.tageszeitZuKurz');
     // A day is either AVOR (Kdo) or KVK (all).
     b.kvkDays = [...new Set(b.kvkDays)].filter((d) => !b.avorDays.includes(d)).sort();
     b.avorDays = [...new Set(b.avorDays)].sort();
@@ -213,9 +213,9 @@ export function wkRouter(db: DB) {
     b.dayDuty = normalizeDayDuty(b, b.dayDuty, zuegeOfWk);
     const blocks = (await db.prepare('SELECT date, start_min, end_min, zug_ids FROM block WHERE wk_id = ?').all(wk.id)) as any[];
     const outside = blocks.filter((x) => !days.includes(x.date) || x.start_min < b.dayStart || x.end_min > b.dayEnd).length;
-    if (outside > 0) throw new HttpError(409, `${outside} Block/Blöcke lägen ausserhalb des neuen Zeitraums`);
+    if (outside > 0) throw new HttpError(409, 'srv.blockBloeckeLaegenAusserhalbDes', undefined, { a: outside });
     const offDuty = blocks.filter((x) => days.includes(x.date) && !blockFitsDay(b, x.date, JSON.parse(x.zug_ids) as number[])).length;
-    if (offDuty > 0) throw new HttpError(409, `${offDuty} Block/Blöcke von Zügen lägen an Tagen ohne Dienst – zuerst verschieben oder löschen`);
+    if (offDuty > 0) throw new HttpError(409, 'srv.blockBloeckeVonZuegenLaegen', undefined, { a: offDuty });
     await db
       .prepare(
         "UPDATE wk SET title = ?, start_date = ?, end_date = ?, day_start = ?, day_end = ?, snap_min = ?, avor_days = ?, kvk_days = ?, day_duty = ?, updated_at = to_char(now() at time zone 'utc', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?",
@@ -275,7 +275,7 @@ export function wkRouter(db: DB) {
     const u = user(req);
     const wk = await viewWk(u, idParam(req));
     ensure(canReview(u, wk));
-    const { note } = parse(z.object({ note: z.string().min(1, 'Begründung erforderlich') }), req.body ?? {});
+    const { note } = parse(z.object({ note: z.string().min(1, 'srv.begruendungErforderlich') }), req.body ?? {});
     res.json((await setStatus(u, wk, 'ZURUECKGEWIESEN', note, 'reject')));
   });
 
@@ -308,7 +308,7 @@ export function wkRouter(db: DB) {
       if (l.resourceId == null) continue;
       const res = (await db.prepare('SELECT kind, kp_id, bat_id FROM resource WHERE id = ?').get(l.resourceId)) as any;
       const usable = res && (res.kp_id === wk.kpId || (res.kp_id === null && res.bat_id === wk.batId));
-      if (!usable || (res.kind !== 'RAUM' && res.kind !== 'GELAENDE')) throw new HttpError(400, 'Standort: nur Räume und Gelände des Katalogs');
+      if (!usable || (res.kind !== 'RAUM' && res.kind !== 'GELAENDE')) throw new HttpError(400, 'srv.standortNurRaeumeUndGelaende');
     }
     await tx(db, async () => {
       const keep = list.filter((l) => l.id).map((l) => l.id!);
@@ -367,13 +367,13 @@ export function wkRouter(db: DB) {
     const before = await loadBlock(db, wk.id, idParam(req, 'blockId'));
     const { version, ...patch } = parse(blockInput.partial().extend({ version: z.number().int() }), req.body);
     if (version !== before.version) {
-      throw new HttpError(409, 'Der Block wurde inzwischen von jemand anderem geändert', { current: before });
+      throw new HttpError(409, 'srv.derBlockWurdeInzwischenVon', { current: before });
     }
     ensure(canEditBlock(u, wk, before));
     const after: BlockIn = { ...before, ...patch };
     if (before.source === 'BAT') after.locked = true;
-    if (after.locked !== before.locked && !canLockBlocks(u)) throw new HttpError(403, 'Nur der Kp Kdt kann Blöcke sperren');
-    if (after.zugIds.length > 1 && !canSpanZuege(u)) throw new HttpError(403, 'Nur der Kp Kdt kann zugübergreifende Blöcke planen');
+    if (after.locked !== before.locked && !canLockBlocks(u)) throw new HttpError(403, 'srv.nurDerKpKdtKann2');
+    if (after.zugIds.length > 1 && !canSpanZuege(u)) throw new HttpError(403, 'srv.nurDerKpKdtKann');
     await checkBlock(wk, after);
     ensure(canUpdateBlock(u, wk, before, { ...after, source: before.source }));
     await db.prepare(
@@ -419,7 +419,7 @@ export function wkRouter(db: DB) {
     const wk = await viewWk(u, idParam(req));
     const src = await viewWk(u, idParam(req, 'srcId'));
     ensure(canEditApStructure(u, wk) && apEditable(wk));
-    if (src.kpId !== wk.kpId || src.id === wk.id) throw new HttpError(400, 'Nur WKs derselben Kompanie können kopiert werden');
+    if (src.kpId !== wk.kpId || src.id === wk.id) throw new HttpError(400, 'srv.nurWksDerselbenKompanieKoennen');
     const days = dateRange(wk.startDate, wk.endDate);
     const srcDays = dateRange(src.startDate, src.endDate);
     const blocks = (await db

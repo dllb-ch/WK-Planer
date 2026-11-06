@@ -3,17 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Block, Tagesbefehl, TagesbefehlData } from '@shared/types';
-import { DIET_LABEL, KDO_ID } from '@shared/types';
+import { DIETS, KDO_ID } from '@shared/types';
 import { canEditTagesbefehl, canViewPersonnel } from '@shared/permissions';
 import { emptyTagesbefehl } from '@shared/einsatz';
-import { fmtDate, fmtTime, weekday, wkDays } from '@shared/util';
+import { fmtDate, fmtTime, wkDays } from '@shared/util';
+
+const weekday = (d: string) => weekdayIn(currentLang(), d);
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
 import { Button, Card, Field, TextArea } from '../../components/ui';
-import { SAVE_LABEL, useAutosave } from '../../components/useAutosave';
+import { useAutosave } from '../../components/useAutosave';
 import { columnName } from '../arbeitsprogramm/columns';
 import { Briefkopf, usePrintPage } from '../../components/Briefkopf';
 import { requestLabel } from '../ressourcen/conflicts';
+import { currentT as tr, currentLang } from '../../lib/lang';
+import { weekdayIn } from '@shared/i18n';
 
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Zurich' }).format(new Date());
 
@@ -27,7 +31,7 @@ export function TagesbefehlPage({ detail }: { detail: WkDetail }) {
   const data = useTagesbefehlSources(detail);
   const editable = canEditTagesbefehl(me, wk);
   const kpName = useQuery({ queryKey: ['org'], queryFn: api.org }).data?.kompanien.find((k) => k.id === wk.kpId)?.name ?? '';
-  usePrintPage(['Tagesbefehl', kpName, wk.title].filter(Boolean).join(' · '));
+  usePrintPage([tr('tb.title'), kpName, wk.title].filter(Boolean).join(' · '));
 
   useEffect(() => {
     if (!printDays.length) return;
@@ -45,27 +49,27 @@ export function TagesbefehlPage({ detail }: { detail: WkDetail }) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="no-print mx-auto w-full max-w-6xl space-y-4 p-3 sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="mr-2 text-lg font-semibold">Tagesbefehl</h2>
-          <select className="input !w-auto" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Tag">
+          <h2 className="mr-2 text-lg font-semibold">{tr('tb.title')}</h2>
+          <select className="input !w-auto" value={date} onChange={(e) => setDate(e.target.value)} aria-label={tr('ap.day')}>
             {days.map((d, i) => (
               <option key={d} value={d}>
-                Nr. {i + 1} – {weekday(d)}, {fmtDate(d)}
-                {wk.avorDays.includes(d) ? ' (AVOR)' : wk.kvkDays.includes(d) ? ' (KVK)' : ''}
+                {tr('tb.nr', { n: i + 1 })} – {weekday(d)}, {fmtDate(d)}
+                {wk.avorDays.includes(d) ? ` (${tr('duty.AVOR')})` : wk.kvkDays.includes(d) ? ` (${tr('duty.KVK')})` : ''}
               </option>
             ))}
           </select>
           <span className="flex-1" />
-          <Button onClick={() => setPrintDays([date])}>Diesen Tag drucken</Button>
+          <Button onClick={() => setPrintDays([date])}>{tr('tb.printDay')}</Button>
           <Button variant="primary" onClick={() => setPrintDays(tagesbefehlDays(wk, date))}>
-            Alle Tage drucken
+            {tr('tb.printAll')}
           </Button>
         </div>
         <p className="text-sm text-slate-600">
-          Der Tagesbefehl wird aus der Planung zusammengestellt: Tagesprogramm aus dem Arbeitsprogramm, Standorte, Verpflegung, bewilligte Transporte,
-          Bestand, Rapporte, Übungen und fällige Pendenzen. Ergänzt werden nur die Angaben links{editable ? '' : ' (durch Kp Kdt oder Log Of)'}.
+          {tr('tb.intro')}
+          {editable ? '' : tr('tb.introRo')}
         </p>
         <div className="grid gap-4 lg:grid-cols-[22rem,1fr]">
-          {q.data ? <ManualFields key={date} detail={detail} day={of(date)} editable={editable} /> : <Card>Laden …</Card>}
+          {q.data ? <ManualFields key={date} detail={detail} day={of(date)} editable={editable} /> : <Card>{tr('common.loading')}</Card>}
           <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
             <Sheet detail={detail} day={of(date)} data={data} />
           </div>
@@ -97,7 +101,7 @@ function ManualFields({ detail, day, editable }: { detail: WkDetail; day: Tagesb
   const set = (patch: Partial<TagesbefehlData>) => update({ ...f, ...patch });
   // Tenue and Erreichbarkeit are often the same every day.
   const copyToAll = async () => {
-    if (!confirm('Tenue und Erreichbarkeit dieses Tages für alle Tage übernehmen?')) return;
+    if (!confirm(tr('tb.confirmCopy'))) return;
     for (const t of all.data ?? []) {
       if (t.date === date) continue;
       const { wkId: _x, date: d, ...rest } = t;
@@ -106,26 +110,26 @@ function ManualFields({ detail, day, editable }: { detail: WkDetail; day: Tagesb
     qc.invalidateQueries({ queryKey: ['tagesbefehle', wk.id] });
   };
   return (
-    <Card title="Ergänzungen" actions={editable && <span className="text-xs text-slate-500">{SAVE_LABEL[state]}</span>}>
+    <Card title={tr('tb.additions')} actions={editable && <span className="text-xs text-slate-500">{tr(`save.${state}`)}</span>}>
       <div className="space-y-3">
-        <Field label="Tagesverantwortliche/r">
+        <Field label={tr('tb.verantwortlich')}>
           <input className="input" disabled={!editable} value={f.tagesverantwortlicher} onChange={(e) => set({ tagesverantwortlicher: e.target.value })} />
         </Field>
-        <Field label="Tenue">
-          <input className="input" disabled={!editable} value={f.tenue} onChange={(e) => set({ tenue: e.target.value })} placeholder="z. B. Arbeitstenue, Helm, Schutzbrille" />
+        <Field label={tr('tb.tenue')}>
+          <input className="input" disabled={!editable} value={f.tenue} onChange={(e) => set({ tenue: e.target.value })} placeholder={tr('tb.tenuePh')} />
         </Field>
-        <Field label="Erreichbarkeit / Pikett">
-          <TextArea rows={2} disabled={!editable} value={f.erreichbarkeit} onChange={(e) => set({ erreichbarkeit: e.target.value })} placeholder="Kp Kdt 079 …, KP Werkhof …" />
+        <Field label={tr('tb.erreichbarkeitPikett')}>
+          <TextArea rows={2} disabled={!editable} value={f.erreichbarkeit} onChange={(e) => set({ erreichbarkeit: e.target.value })} placeholder={tr('tb.erreichbarkeitPh')} />
         </Field>
-        <Field label="Sicherheit">
-          <TextArea rows={3} disabled={!editable} value={f.sicherheit} onChange={(e) => set({ sicherheit: e.target.value })} placeholder="Sicherheitsvorschriften, Gefahren des Tages" />
+        <Field label={tr('ueb.sicherheit')}>
+          <TextArea rows={3} disabled={!editable} value={f.sicherheit} onChange={(e) => set({ sicherheit: e.target.value })} placeholder={tr('tb.sicherheitPh')} />
         </Field>
-        <Field label="Besondere Anordnungen">
+        <Field label={tr('tb.besondere')}>
           <TextArea rows={4} disabled={!editable} value={f.besonderes} onChange={(e) => set({ besonderes: e.target.value })} />
         </Field>
         {editable && (
           <Button className="text-xs" onClick={copyToAll}>
-            Tenue und Erreichbarkeit für alle Tage übernehmen
+            {tr('tb.copyAll')}
           </Button>
         )}
       </div>
@@ -173,7 +177,7 @@ export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefeh
   const nr = wkDays(wk).indexOf(d) + 1;
   const allCols = [KDO_ID, ...zuege.map((z) => z.id)];
   const who = (b: Block) =>
-    zuege.length > 1 && zuege.every((z) => b.zugIds.includes(z.id)) ? (b.zugIds.includes(KDO_ID) ? 'alle' : 'alle Züge') : b.zugIds.map((id) => columnName(zuege, id)).join(', ');
+    zuege.length > 1 && zuege.every((z) => b.zugIds.includes(z.id)) ? (b.zugIds.includes(KDO_ID) ? tr('ap.allZuege') : tr('tb.allZuege')) : b.zugIds.map((id) => columnName(zuege, id)).join(', ');
   const ofDay = blocks
     .filter((b) => b.date === d)
     .sort((a, b) => a.startMin - b.startMin || allCols.indexOf(a.zugIds[0]) - allCols.indexOf(b.zugIds[0]));
@@ -215,10 +219,10 @@ export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefeh
   );
   const head = (label: string) => (
     <tr className="border-b border-black bg-slate-100 text-left">
-      <th className="w-24 py-0.5 pr-2">{label === 'Zeit' ? 'Zeit' : label}</th>
-      <th className="pr-2">{label === 'Zeit' ? 'Was' : ''}</th>
-      <th className="w-36 pr-2">{label === 'Zeit' ? 'Wer' : ''}</th>
-      <th className="w-36">{label === 'Zeit' ? 'Ort' : ''}</th>
+      <th className="w-24 py-0.5 pr-2">{label === 'Zeit' ? tr('common.time') : label}</th>
+      <th className="pr-2">{label === 'Zeit' ? tr('tb.what') : ''}</th>
+      <th className="w-36 pr-2">{label === 'Zeit' ? tr('tb.who') : ''}</th>
+      <th className="w-36">{label === 'Zeit' ? tr('tb.where') : ''}</th>
     </tr>
   );
   return (
@@ -226,25 +230,25 @@ export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefeh
       <Briefkopf />
       <div className="flex items-start justify-between gap-4 border-b border-black pb-2">
         <h1 className="text-[16pt] leading-tight" style={{ fontFamily: '"Arial Black", Arial, sans-serif', fontWeight: 900 }}>
-          Tagesbefehl {weekday(d)}
-          {avor && ' AVOR'}
-          {kvk && ' KVK'}
+          {tr('tb.heading', { day: weekday(d) })}
+          {avor && ` ${tr('duty.AVOR')}`}
+          {kvk && ` ${tr('duty.KVK')}`}
           <div className="text-[11pt] font-normal" style={{ fontFamily: 'Arial, sans-serif' }}>
-            Nr. {nr} · {fmtDate(d)} · {wk.title}
+            {tr('tb.nr', { n: nr })} · {fmtDate(d)} · {wk.title}
           </div>
         </h1>
         <table className="shrink-0 text-[9pt]">
           <tbody>
             <tr>
-              <td className="pr-2 font-semibold">Datum:</td>
+              <td className="pr-2 font-semibold">{tr('tb.date')}</td>
               <td className="min-w-[7rem] border-b border-slate-400">{fmtDate(today())}</td>
             </tr>
             <tr>
-              <td className="pr-2 font-semibold">Erfasser:</td>
+              <td className="pr-2 font-semibold">{tr('tb.author')}</td>
               <td className="border-b border-slate-400">{data.kdt}</td>
             </tr>
             <tr>
-              <td className="pr-2 font-semibold">Ersetzt Dok vom:</td>
+              <td className="pr-2 font-semibold">{tr('tb.replaces')}</td>
               <td className="border-b border-slate-400" />
             </tr>
           </tbody>
@@ -255,19 +259,19 @@ export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefeh
           <tbody>
             {day.tagesverantwortlicher && (
               <tr>
-                <td className="w-40 font-semibold">Tagesverantwortliche/r</td>
+                <td className="w-40 font-semibold">{tr('tb.verantwortlich')}</td>
                 <td>{day.tagesverantwortlicher}</td>
               </tr>
             )}
             {day.tenue && (
               <tr>
-                <td className="w-40 font-semibold">Tenue</td>
+                <td className="w-40 font-semibold">{tr('tb.tenue')}</td>
                 <td>{day.tenue}</td>
               </tr>
             )}
             {day.erreichbarkeit && (
               <tr>
-                <td className="w-40 align-top font-semibold">Erreichbarkeit</td>
+                <td className="w-40 align-top font-semibold">{tr('tb.erreichbarkeit')}</td>
                 <td className="whitespace-pre-wrap">{day.erreichbarkeit}</td>
               </tr>
             )}
@@ -278,52 +282,52 @@ export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefeh
       <table className="mt-3 w-full border-collapse text-[9pt]">
         <thead>{head('Zeit')}</thead>
         <tbody>
-          {programm.length === 0 && row('leer', '', 'Keine Einträge im Arbeitsprogramm', '', '')}
+          {programm.length === 0 && row('leer', '', tr('tb.noEntries'), '', '')}
           {programm.map((b) => row(b.id, `${t(b.startMin)}-${t(b.endMin)}`, b.title, b.verantwortlich ? `${who(b)} (${b.verantwortlich})` : who(b), ort(b)))}
         </tbody>
         {(rapportBlocks.length > 0 || otherRapporte.length > 0) && (
           <tbody>
             <tr className="border-b border-black bg-slate-100 text-left">
               <th colSpan={4} className="py-0.5">
-                Rapporte
+                {tr('rap.title')}
               </th>
             </tr>
             {rapportBlocks.map((b) => row(`r${b.id}`, t(b.startMin), b.title, b.verantwortlich || who(b), ort(b)))}
-            {otherRapporte.map((r) => row(`p${r.id}`, r.startMin !== null ? t(r.startMin) : '', r.title, r.zugId === null ? 'Kdo' : columnName(zuege, r.zugId), r.ort))}
+            {otherRapporte.map((r) => row(`p${r.id}`, r.startMin !== null ? t(r.startMin) : '', r.title, r.zugId === null ? tr('kdo') : columnName(zuege, r.zugId), r.ort))}
           </tbody>
         )}
       </table>
 
       {usedLocs.length > 0 && (
         <>
-          <H n={++n}>Standorte</H>
+          <H n={++n}>{tr('sb.locations')}</H>
           <p>{usedLocs.map((l) => `(${l.nr}) ${l.name}`).join(' · ')}</p>
         </>
       )}
 
       {(meals.length > 0 || checked.length > 0 || total > 0) && (
         <>
-          <H n={++n}>Verpflegung</H>
+          <H n={++n}>{tr('pres.food')}</H>
           {meals.length > 0 && <p>{meals.map((b) => `${fmtTime(b.startMin)} ${b.title}${loc(b.locationId) ? ` (${loc(b.locationId)!.name})` : ''}`).join(' · ')}</p>}
           {checked.length > 0 ? (
             <p>
-              {checked.length} Personen eingecheckt:{' '}
-              {(Object.keys(DIET_LABEL) as (keyof typeof DIET_LABEL)[])
+              {tr('tb.checkedIn', { n: checked.length })}{' '}
+              {DIETS
                 .map((k) => [k, checked.filter((c) => c.diet === k).length] as const)
                 .filter(([, c]) => c > 0)
-                .map(([k, c]) => `${c} ${DIET_LABEL[k]}`)
+                .map(([k, c]) => `${c} ${tr(`diet.${k}`)}`)
                 .join(', ')}
-              {checked.some((c) => c.intolerances.trim()) && ` · Unverträglichkeiten: ${checked.filter((c) => c.intolerances.trim()).map((c) => `${c.vorname} ${c.nachname} (${c.intolerances})`).join(', ')}`}
+              {checked.some((c) => c.intolerances.trim()) && tr('rap.intol', { list: checked.filter((c) => c.intolerances.trim()).map((c) => `${c.vorname} ${c.nachname} (${c.intolerances})`).join(', ') })}
             </p>
           ) : (
-            total > 0 && <p>Geplant: {total} Personen</p>
+            total > 0 && <p>{tr('tb.planned', { n: total })}</p>
           )}
         </>
       )}
 
       {transports.length > 0 && (
         <>
-          <H n={++n}>Fahrzeuge, Räume, Gelände</H>
+          <H n={++n}>{tr('sb.resources')}</H>
           <ul>
             {transports.map((q) => (
               <li key={q.id}>
@@ -340,7 +344,7 @@ export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefeh
 
       {planned.length > 0 && (
         <>
-          <H n={++n}>Bestand (Soll)</H>
+          <H n={++n}>{tr('tb.bestand')}</H>
           <p>
             {planned
               .filter((s) => s.planned > 0)
@@ -353,13 +357,13 @@ export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefeh
 
       {uebungen.length > 0 && (
         <>
-          <H n={++n}>Übungen</H>
+          <H n={++n}>{tr('ueb.title')}</H>
           <ul>
             {uebungen.map((x) => (
               <li key={`u${x.id}`}>
                 {x.zeitVon && <span className="tabular-nums">{x.zeitVon}–{x.zeitBis} </span>}
                 {x.title} ({x.art}){x.ort && `, ${x.ort}`}
-                {x.leitung && ` – Leitung: ${x.leitung}`}
+                {x.leitung && tr('tb.leitung', { name: x.leitung })}
               </li>
             ))}
           </ul>
@@ -368,18 +372,18 @@ export function Sheet({ detail, day, data }: { detail: WkDetail; day: Tagesbefeh
 
       {day.sicherheit && (
         <>
-          <H n={++n}>Sicherheit</H>
+          <H n={++n}>{tr('ueb.sicherheit')}</H>
           <p className="whitespace-pre-wrap">{day.sicherheit}</p>
         </>
       )}
 
       {(day.besonderes || due.length > 0) && (
         <>
-          <H n={++n}>Besondere Anordnungen</H>
+          <H n={++n}>{tr('tb.besondere')}</H>
           {day.besonderes && <p className="whitespace-pre-wrap">{day.besonderes}</p>}
           {due.length > 0 && (
             <>
-              <p className="mt-1 font-medium">Heute fällige Pendenzen:</p>
+              <p className="mt-1 font-medium">{tr('tb.duePendenzen')}</p>
               <ul className="list-disc pl-5">
                 {due.map((p) => (
                   <li key={p.id}>

@@ -2,7 +2,8 @@
 import type { DB } from './db';
 import type { Milestone, Role, SessionUser, TemplateItem, VorbereitungTemplate, Wk } from '../../shared/types';
 import { canSeeAllMilestones } from '../../shared/permissions';
-import { addDays, DEFAULT_VORBEREITUNG } from '../../shared/util';
+import { addDays, defaultVorbereitung } from '../../shared/util';
+import type { Lang } from '../../shared/i18n';
 
 type Row = any;
 
@@ -16,14 +17,14 @@ async function rowsOf(db: DB, batId: number, kpId: number | null): Promise<Templ
 }
 
 /** Template that applies to a Kp (own override, else the Bat's, else the built-in default). */
-export async function effectiveTemplate(db: DB, batId: number, kpId: number | null): Promise<VorbereitungTemplate> {
+export async function effectiveTemplate(db: DB, batId: number, kpId: number | null, lang: Lang = 'de'): Promise<VorbereitungTemplate> {
   if (kpId !== null) {
     const own = await rowsOf(db, batId, kpId);
     if (own.length) return { batId, kpId, source: 'KP', items: own };
   }
   const bat = await rowsOf(db, batId, null);
   if (bat.length) return { batId, kpId, source: 'BAT', items: bat };
-  return { batId, kpId, source: 'DEFAULT', items: DEFAULT_VORBEREITUNG };
+  return { batId, kpId, source: 'DEFAULT', items: defaultVorbereitung(lang) };
 }
 
 export async function saveTemplate(db: DB, batId: number, kpId: number | null, items: TemplateItem[]) {
