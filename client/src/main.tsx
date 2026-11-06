@@ -39,11 +39,11 @@ const render = (extra?: React.ReactNode) =>
               <BrowserRouter basename={BASE || '/'}>
                 <App />
               </BrowserRouter>
+              {extra}
             </I18nProvider>
           </AuthProvider>
         </ToastProvider>
       </QueryClientProvider>
-      {extra}
     </React.StrictMode>,
   );
 

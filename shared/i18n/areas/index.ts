@@ -30,6 +30,7 @@ import { tagesbefehl } from './tagesbefehl';
 import { server } from './server';
 import { rapport_traktanden } from './rapport_traktanden';
 import { defaults } from './defaults';
+import { demo } from './demo';
 // AREA-IMPORTS
 
 export const AREAS = {
@@ -63,6 +64,7 @@ export const AREAS = {
   ...server,
   ...rapport_traktanden,
   ...defaults,
+  ...demo,
   // AREA-SPREAD
 };
 export type AreaKey = keyof typeof AREAS;
