@@ -18,6 +18,9 @@ import { pickVehicles, wkDays } from '../../../shared/util';
 
 const kind = z.enum(['FAHRZEUG', 'ANHAENGER', 'RAUM', 'GELAENDE']);
 const area = z.array(z.tuple([z.number().min(-90).max(90), z.number().min(-180).max(180)])).min(3).max(200).nullable();
+const points = z
+  .array(z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), label: z.string().trim().max(80).default('') }))
+  .max(50);
 const minutes = z.number().int().min(0).max(24 * 60);
 
 const resourceInput = z.object({
@@ -29,6 +32,7 @@ const resourceInput = z.object({
   seats: z.number().int().min(0).max(100).default(0),
   nr: z.number().int().min(0).max(9999).nullable().default(null),
   area: area.default(null),
+  points: points.default([]),
 });
 
 /** Vehicles, trailers, rooms, terrain; Bataillon material first; numbered ones by number, then by name. */
@@ -38,6 +42,10 @@ const RES_ORDER = `ORDER BY CASE kind WHEN 'FAHRZEUG' THEN 0 WHEN 'ANHAENGER' TH
 /** Seats from the field, or else from a capacity like «9 Pl.». */
 const seatsOf = (b: { kind: string; seats: number; capacity: string }) =>
   b.kind !== 'FAHRZEUG' ? 0 : b.seats || Number(b.capacity.match(/(\d+)/)?.[1] ?? 0);
+
+/** Area and points as stored; only sites (Gelände) have them. */
+const shapesOf = (b: { kind: string; area: [number, number][] | null; points: z.infer<typeof points> }) =>
+  b.kind === 'GELAENDE' ? [b.area ? JSON.stringify(b.area) : null, JSON.stringify(b.points)] : [null, '[]'];
 
 const requestInput = z.object({
   zugId: z.number().int(),
@@ -108,8 +116,8 @@ export function resourceRouter(db: DB) {
   const insertResource = async (batId: number, kpId: number | null, b: z.infer<typeof resourceInput>) =>
     Number(
       (await db
-        .prepare('INSERT INTO resource (bat_id, kp_id, kind, category, name, description, capacity, seats, nr, area) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(batId, kpId, b.kind, b.category || b.name, b.name, b.description, b.capacity, seatsOf(b), b.nr, b.area ? JSON.stringify(b.area) : null))
+        .prepare('INSERT INTO resource (bat_id, kp_id, kind, category, name, description, capacity, seats, nr, area, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(batId, kpId, b.kind, b.category || b.name, b.name, b.description, b.capacity, seatsOf(b), b.nr, ...shapesOf(b)))
         .lastInsertRowid,
     );
 
@@ -135,7 +143,7 @@ export function resourceRouter(db: DB) {
     // Moving material between Kp and Bataillon needs the right on both sides.
     const kpId = b.kpId === undefined ? existing.kpId : b.kpId;
     ensure(canManageResources(u, (await scopeOf(existing.batId, kpId))));
-    await db.prepare('UPDATE resource SET kp_id = ?, kind = ?, category = ?, name = ?, description = ?, capacity = ?, seats = ?, nr = ?, area = ? WHERE id = ?').run(
+    await db.prepare('UPDATE resource SET kp_id = ?, kind = ?, category = ?, name = ?, description = ?, capacity = ?, seats = ?, nr = ?, area = ?, points = ? WHERE id = ?').run(
       kpId,
       b.kind,
       b.category || b.name,
@@ -144,7 +152,7 @@ export function resourceRouter(db: DB) {
       b.capacity,
       seatsOf(b),
       b.nr,
-      b.area ? JSON.stringify(b.area) : null,
+      ...shapesOf(b),
       existing.id,
     );
     res.json((await loadResource(existing.id)));

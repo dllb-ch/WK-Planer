@@ -491,6 +491,30 @@ describe('Bataillon material', () => {
     expect((await batKdo.put(`/api/resources/${own.id}`).send({ kind: 'RAUM', name: 'Büro', kpId: null })).body.kpId).toBeNull();
   });
 
+  it('sites keep their area and points; only the managers of the material change them', async () => {
+    const kies = ((await db.prepare("SELECT id FROM resource WHERE name = 'Kieswerk'").get()) as any).id;
+    const kdt = await login('kpkdt@demo.ch');
+    const list = (await kdt.get(`/api/kompanien/${(await kpByName('Pi Kp'))}/resources`)).body as any[];
+    const site = list.find((r) => r.id === kies);
+    expect(site.points.map((p: any) => p.label)).toEqual(['Zufahrt Werkstrasse', 'Sammelplatz']);
+    expect(list.find((r) => r.name === 'Mannschaftsbus 1').points).toEqual([]);
+
+    const area = [[47.2418, 7.6395], [47.2425, 7.644], [47.24, 7.6452]];
+    const points = [{ lat: 47.241, lng: 7.642, label: 'Wasserbezug' }];
+    const saved = (await kdt.put(`/api/resources/${kies}`).send({ ...site, area, points })).body;
+    expect(saved.area).toEqual(area);
+    expect(saved.points).toEqual(points);
+    // Invalid coordinates are refused.
+    expect((await kdt.put(`/api/resources/${kies}`).send({ ...site, points: [{ lat: 123, lng: 7, label: 'x' }] })).status).toBe(400);
+    // Other kinds have no shapes.
+    const room = (await kdt.post('/api/resources').send({ batId: (await bat()), kpId: (await kpByName('Pi Kp')), kind: 'RAUM', name: 'Saal', area, points })).body;
+    expect([room.area, room.points]).toEqual([null, []]);
+    // A Zugführer cannot change the site.
+    const zf = await login('zfhr1@demo.ch');
+    expect((await zf.put(`/api/resources/${kies}`).send({ ...site, points: [] })).status).toBe(403);
+    expect((await kdt.get(`/api/kompanien/${(await kpByName('Pi Kp'))}/resources`)).body.find((r: any) => r.id === kies).points).toEqual(points);
+  });
+
   it('shared vehicles cannot be approved twice across Kompanien', async () => {
     const batKdo = await login('bat@demo.ch');
     const wk = (

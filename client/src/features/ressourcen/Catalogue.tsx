@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ImportExportMenu } from '../../components/ImportExport';
 import { exportTable, importTable, type Column } from '../../lib/tableFile';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Area, Resource, ResourceKind } from '@shared/types';
+import type { Area, Resource, ResourceKind, SitePoint } from '@shared/types';
 import { RESOURCE_KIND_LABEL } from '@shared/types';
 
 const KINDS: ResourceKind[] = ['FAHRZEUG', 'ANHAENGER', 'RAUM', 'GELAENDE'];
@@ -29,6 +29,7 @@ const RES_COLUMNS: Column[] = [
   { key: 'beschreibung', header: 'Beschreibung / Ausstattung', width: 40 },
   { key: 'gehoertZu', header: 'Gehört zu', width: 18 },
   { key: 'flaeche', header: 'Fläche (Koordinaten)', width: 30 },
+  { key: 'punkte', header: 'Punkte', width: 30 },
 ];
 
 const kindOf = (s = ''): ResourceKind | null => {
@@ -75,6 +76,7 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
         beschreibung: r.description,
         gehoertZu: kpName(r.kpId),
         flaeche: r.area ? JSON.stringify(r.area) : '',
+        punkte: r.points.length ? JSON.stringify(r.points) : '',
       })),
       format,
     );
@@ -107,8 +109,20 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
       } catch {
         /* no area */
       }
-      const body = { kind, category: row.typ || row.bezeichnung.replace(/\s*\d+$/, ''), name: row.bezeichnung, capacity: row.kapazitaet ?? '', seats: Number(row.sitzplaetze) || 0, nr: row.nr?.trim() && !isNaN(Number(row.nr)) ? Number(row.nr) : null, description: row.beschreibung ?? '', area, kpId: owner };
       const existing = resources.find((r) => r.kind === kind && r.name === row.bezeichnung && r.kpId === owner);
+      // Points only from a file that has them; otherwise the existing ones stay.
+      let points: SitePoint[] = existing?.points ?? [];
+      try {
+        const p = row.punkte ? JSON.parse(row.punkte) : null;
+        if (Array.isArray(p)) {
+          points = p
+            .filter((x) => x && typeof x.lat === 'number' && typeof x.lng === 'number')
+            .map((x) => ({ lat: x.lat, lng: x.lng, label: String(x.label ?? '').slice(0, 80) }));
+        }
+      } catch {
+        /* keep the points */
+      }
+      const body = { kind, category: row.typ || row.bezeichnung.replace(/\s*\d+$/, ''), name: row.bezeichnung, capacity: row.kapazitaet ?? '', seats: Number(row.sitzplaetze) || 0, nr: row.nr?.trim() && !isNaN(Number(row.nr)) ? Number(row.nr) : null, description: row.beschreibung ?? '', area, points, kpId: owner };
       if (existing) {
         await api.updateResource(existing.id, body);
         updated++;
@@ -128,7 +142,7 @@ export function Catalogue({ batId, kpId, resources, title }: { batId: number; kp
         <>
           <ImportExportMenu onExport={exportFile} onImport={canAddShared || canAddKp ? importFile : undefined} />
         {(canAddShared || canAddKp) && (
-          <Button onClick={() => setEdit({ kind: 'FAHRZEUG', category: '', name: '', description: '', capacity: '', seats: 0, nr: null, area: null, kpId: canAddKp ? kpId : null })}>
+          <Button onClick={() => setEdit({ kind: 'FAHRZEUG', category: '', name: '', description: '', capacity: '', seats: 0, nr: null, area: null, points: [], kpId: canAddKp ? kpId : null })}>
             {t('cat.add')}
           </Button>
         )}
@@ -182,6 +196,7 @@ function ResourceDialog({ batId, kpId, initial, types, onClose }: { batId: numbe
     seats: initial.seats ?? 0,
     nr: initial.nr ?? (null as number | null),
     area: initial.area ?? (null as Area | null),
+    points: initial.points ?? ([] as SitePoint[]),
     kpId: initial.kpId ?? null,
   });
   // The Kp a resource can be assigned to: its current one, or the Kp in context.
@@ -199,7 +214,8 @@ function ResourceDialog({ batId, kpId, initial, types, onClose }: { batId: numbe
       toast(errMsg(e), 'error');
     }
   };
-  const body = { ...r, area: r.kind === 'GELAENDE' && r.area && r.area.length >= 3 ? r.area : null };
+  const site = r.kind === 'GELAENDE';
+  const body = { ...r, area: site && r.area && r.area.length >= 3 ? r.area : null, points: site ? r.points : [] };
   return (
     <Modal
       title={initial.id ? t('cat.edit') : t('cat.new')}
@@ -293,7 +309,15 @@ function ResourceDialog({ batId, kpId, initial, types, onClose }: { batId: numbe
           </select>
         </Field>
       </div>
-      {r.kind === 'GELAENDE' && <SwissMap value={r.area} onChange={(area) => setR({ ...r, area })} height={320} />}
+      {site && (
+        <SwissMap
+          value={r.area}
+          onChange={(area) => setR((x) => ({ ...x, area }))}
+          points={r.points}
+          onPointsChange={(points) => setR((x) => ({ ...x, points }))}
+          height={320}
+        />
+      )}
     </Modal>
   );
 }

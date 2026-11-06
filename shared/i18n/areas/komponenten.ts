@@ -3,8 +3,6 @@ import type { L4 } from '.';
 export const komponenten = {
   'map.topo': ['Landeskarte', 'Carte nationale', 'Carta nazionale', 'National map'],
   'map.aerial': ['Luftbild', 'Photo aérienne', 'Foto aerea', 'Aerial photo'],
-  'map.drawHint': ['Auf die Karte klicken, um die Eckpunkte des Geländeabschnitts zu setzen (mind. 3).', 'Cliquer sur la carte pour placer les coins du secteur de terrain (au moins 3).', 'Cliccare sulla carta per impostare i vertici del settore di terreno (almeno 3).', 'Click on the map to set the corners of the site section (at least 3).'],
-  'map.removeLast': ['Letzten Punkt entfernen', 'Retirer le dernier point', 'Rimuovi l’ultimo punto', 'Remove last point'],
   'map.deleteArea': ['Fläche löschen', 'Supprimer la surface', 'Elimina superficie', 'Delete area'],
   'map.search': ['Ort oder Adresse suchen (swisstopo) …', 'Rechercher un lieu ou une adresse (swisstopo) …', 'Cercare un luogo o un indirizzo (swisstopo) …', 'Search for a place or address (swisstopo) …'],
   'files.title': ['Dateien der Züge', 'Fichiers des sections', 'File delle sezioni', 'Files of the platoons'],

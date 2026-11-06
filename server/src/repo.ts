@@ -189,6 +189,7 @@ export const toResource = (r: Row): Resource => ({
   seats: r.seats ?? 0,
   nr: r.nr ?? null,
   area: r.area ? JSON.parse(r.area) : null,
+  points: r.points ? JSON.parse(r.points) : [],
 });
 
 export const toRequest = (r: Row): ResourceRequest => ({

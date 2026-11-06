@@ -435,3 +435,5 @@ CREATE INDEX IF NOT EXISTS gruppe_zug ON gruppe(zug_id);
 ALTER TABLE wk ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false;
 -- Language of the interface per user (de, fr, it, en); NULL = the browser's.
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS lang TEXT;
+-- Named points of a site (Gelände): JSON [{lat, lng, label}].
+ALTER TABLE resource ADD COLUMN IF NOT EXISTS points TEXT NOT NULL DEFAULT '[]';

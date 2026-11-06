@@ -31,6 +31,7 @@ import { server } from './server';
 import { rapport_traktanden } from './rapport_traktanden';
 import { defaults } from './defaults';
 import { demo } from './demo';
+import { gelaende } from './gelaende';
 // AREA-IMPORTS
 
 export const AREAS = {
@@ -65,6 +66,7 @@ export const AREAS = {
   ...rapport_traktanden,
   ...defaults,
   ...demo,
+  ...gelaende,
   // AREA-SPREAD
 };
 export type AreaKey = keyof typeof AREAS;

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Area, RequestInput, ResourceKind, ResourceRequest, Zug } from '@shared/types';
+import type { Area, RequestInput, RequestStatus, ResourceKind, ResourceRequest, Zug } from '@shared/types';
 import { KDO_ID } from '@shared/types';
-import { canRequestResource } from '@shared/permissions';
+import { canDecideRequest, canRequestResource } from '@shared/permissions';
 import { fmtDate, fmtTime, parseTime, wkDays } from '@shared/util';
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
@@ -11,6 +11,7 @@ import { SwissMap, type MapShape } from '../../components/SwissMap';
 import { columnName, withKdo } from '../arbeitsprogramm/columns';
 import { externalClashes, overlapping } from './conflicts';
 import { OwnerBadge } from './Catalogue';
+import { DecisionDialog } from './DecisionDialog';
 import { useT } from '../../i18n';
 
 interface Props {
@@ -79,9 +80,9 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
   const terrainShapes: MapShape[] = useMemo(
     () => [
       ...(resources.data ?? [])
-        .filter((r) => r.kind === 'GELAENDE' && r.area && r.id !== f.resourceId)
-        .map((r) => ({ area: r.area!, color: '#1e3a8a', label: r.name })),
-      ...(chosen?.area ? [{ area: chosen.area, color: '#f97316', label: chosen.name }] : []),
+        .filter((r) => r.kind === 'GELAENDE' && (r.area || r.points.length) && r.id !== f.resourceId)
+        .map((r) => ({ area: r.area, points: r.points, color: '#1e3a8a', label: r.name })),
+      ...(chosen && (chosen.area || chosen.points.length) ? [{ area: chosen.area, points: chosen.points, color: '#f97316', label: chosen.name, focus: true }] : []),
       ...(requests.data ?? [])
         .filter((q) => q.area && q.date === f.date && q.id !== existing?.id && q.status !== 'ABGELEHNT')
         .map((q) => ({ area: q.area!, color: q.status === 'BEWILLIGT' ? '#16a34a' : '#ca8a04', label: `${columnName(zuege, q.zugId)}: ${q.zweck}` })),
@@ -111,6 +112,12 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
     }
   };
 
+  // The approvers can decide right here, with the requested site on the map (only on the saved request).
+  const [decide, setDecide] = useState<RequestStatus | null>(null);
+  const unchanged = !!existing && (Object.keys(f) as (keyof RequestInput)[]).every((k) => JSON.stringify(f[k]) === JSON.stringify(existing[k]));
+  const decider = !!existing && canDecideRequest(me, wk);
+  if (decide && existing) return <DecisionDialog detail={detail} q={existing} status={decide} onClose={onClose} />;
+
   return (
     <Modal
       title={existing ? t('req.edit') : t('req.new')}
@@ -118,6 +125,20 @@ export function RequestDialog({ detail, initial, existing, onClose }: Props) {
       wide
       footer={
         <>
+          {decider && unchanged && (
+            <div className="mr-auto flex gap-2">
+              {existing.status !== 'BEWILLIGT' && (
+                <Button className="text-emerald-700" onClick={() => setDecide('BEWILLIGT')}>
+                  {t('res.approve')}
+                </Button>
+              )}
+              {existing.status !== 'ABGELEHNT' && (
+                <Button className="text-red-700" onClick={() => setDecide('ABGELEHNT')}>
+                  {t('res.decline')}
+                </Button>
+              )}
+            </div>
+          )}
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" disabled={!valid} onClick={save}>
             {existing ? t('common.save') : t('req.send')}

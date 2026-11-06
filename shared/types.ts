@@ -454,6 +454,13 @@ export const RESOURCE_KIND_LABEL: Record<ResourceKind, string> = { FAHRZEUG: 'Fa
 /** [lat, lng] pairs (WGS84) of a polygon. */
 export type Area = [number, number][];
 
+/** A named point of a site, e.g. Sammelplatz, Zufahrt or Wasserbezug (WGS84). */
+export interface SitePoint {
+  lat: number;
+  lng: number;
+  label: string;
+}
+
 export interface Resource {
   id: number;
   batId: number;
@@ -470,6 +477,8 @@ export interface Resource {
   /** Number of the vehicle (e.g. 3 for «Log 3»); numbered ones are listed first, in this order. */
   nr: number | null;
   area: Area | null;
+  /** Named points of a site (Gelände); empty for other kinds. */
+  points: SitePoint[];
 }
 
 export type ResourceInput = Omit<Resource, 'id' | 'batId'>;

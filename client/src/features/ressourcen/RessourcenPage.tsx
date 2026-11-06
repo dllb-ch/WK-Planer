@@ -6,12 +6,12 @@ import { KDO_ID } from '@shared/types';
 const KINDS: ResourceKind[] = ['FAHRZEUG', 'ANHAENGER', 'RAUM', 'GELAENDE'];
 const STATUSES: RequestStatus[] = ['BEANTRAGT', 'BEWILLIGT', 'ABGELEHNT'];
 import { canDecideRequest, canEditRequest, canRequestResource } from '@shared/permissions';
-import { fmtDate, fmtTime, pickVehicles, wkDays } from '@shared/util';
+import { fmtDate, fmtTime, wkDays } from '@shared/util';
 
 const wd = (d: string) => weekdayShortIn(currentLang(), d);
 import { api, type WkDetail } from '../../api';
 import { useUser } from '../../auth';
-import { Button, Card, Empty, errMsg, Modal, TextArea, useToast } from '../../components/ui';
+import { Button, Card, Empty, errMsg, useToast } from '../../components/ui';
 import { DaySelector, useDaySelection } from '../../components/DaySelector';
 import { SwissMap, type MapShape } from '../../components/SwissMap';
 import { columnName, withKdo } from '../arbeitsprogramm/columns';
@@ -19,6 +19,7 @@ import { externalClashes, overlapping, requestLabel } from './conflicts';
 import { Catalogue, OwnerBadge } from './Catalogue';
 import { ResourceTimeline, type TimelineItem, type TimelineRow } from './ResourceTimeline';
 import { RequestDialog } from './RequestDialog';
+import { DecisionDialog } from './DecisionDialog';
 import { useT } from '../../i18n';
 import { currentLang, currentT } from '../../lib/lang';
 import { weekdayShortIn } from '@shared/i18n';
@@ -56,10 +57,12 @@ export function RessourcenPage({ detail }: { detail: WkDetail }) {
 
   const dayShapes: MapShape[] = useMemo(
     () => [
-      ...(resources.data ?? []).filter((r) => r.kind === 'GELAENDE' && r.area).map((r) => ({ area: r.area!, color: '#1e3a8a', label: r.name })),
+      ...(resources.data ?? [])
+        .filter((r) => r.kind === 'GELAENDE' && (r.area || r.points.length))
+        .map((r) => ({ area: r.area, points: r.points, color: '#1e3a8a', label: r.name })),
       ...all
         .filter((q) => q.date === mapDay && q.kind === 'GELAENDE' && q.status !== 'ABGELEHNT')
-        .map((q) => {
+        .map((q): MapShape | null => {
           const area = q.area ?? resources.data?.find((r) => r.id === q.resourceId)?.area;
           return area
             ? {
@@ -244,100 +247,10 @@ export function RessourcenPage({ detail }: { detail: WkDetail }) {
           onClose={() => setDialog(null)}
         />
       )}
-      {decision && <DecisionDialog wkId={wk.id} {...decision} onClose={() => setDecision(null)} />}
+      {decision && <DecisionDialog detail={detail} {...decision} onClose={() => setDecision(null)} />}
     </div>
   );
 }
-
-function DecisionDialog({ wkId, q, status, onClose }: { wkId: number; q: ResourceRequest; status: RequestStatus; onClose: () => void }) {
-  const { t } = useT();
-  const qc = useQueryClient();
-  const toast = useToast();
-  const [note, setNote] = useState('');
-  // Requests by amount get concrete vehicles/rooms on approval; the first free ones are suggested.
-  const assigning = status === 'BEWILLIGT' && q.resourceId == null && q.kind !== 'GELAENDE';
-  const avail = useQuery({
-    queryKey: ['availability', wkId, q.kind, q.category, q.date, q.startMin, q.endMin, q.id],
-    queryFn: () => api.availability(wkId, { kind: q.kind, category: q.category, date: q.date, startMin: q.startMin, endMin: q.endMin, exclude: q.id }),
-    enabled: assigning,
-  });
-  const [picked, setPicked] = useState<number[] | null>(null);
-  const free = avail.data?.free ?? [];
-  const byPersons = q.persons > 0;
-  const chosen = picked ?? (byPersons ? pickVehicles(free, q.persons) : free.slice(0, q.quantity).map((r) => r.id));
-  const seats = chosen.reduce((a, id) => a + (free.find((r) => r.id === id)?.seats ?? 0), 0);
-  const freeSeats = free.reduce((a, r) => a + r.seats, 0);
-  const enough = byPersons ? seats >= q.persons : chosen.length === q.quantity;
-  const toggle = (id: number) => setPicked(chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id]);
-  const go = async () => {
-    try {
-      await api.decideRequest(wkId, q.id, status, note, assigning ? chosen : undefined);
-      qc.invalidateQueries({ queryKey: ['requests', wkId] });
-      qc.invalidateQueries({ predicate: (x) => x.queryKey[0] === 'availability' || x.queryKey[0] === 'bat-bookings' });
-      onClose();
-    } catch (e) {
-      toast(errMsg(e), 'error');
-    }
-  };
-  return (
-    <Modal
-      title={status === 'BEWILLIGT' ? t('res.approveTitle') : t('res.declineTitle')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant={status === 'BEWILLIGT' ? 'primary' : 'danger'}
-            disabled={(status === 'ABGELEHNT' && !note.trim()) || (assigning && !enough)}
-            onClick={go}
-          >
-            {status === 'BEWILLIGT' ? t('res.approve') : t('res.decline')}
-          </Button>
-        </>
-      }
-    >
-      <p className="text-sm">
-        {q.zweck} – {fmtDate(q.date)} {fmtTime(q.startMin)}–{fmtTime(q.endMin)}
-      </p>
-      {assigning && (
-        <div className="space-y-1.5">
-          <div className="label">
-            {byPersons
-              ? t('res.assignVehicles', { n: q.persons, cat: q.category ? ` (${q.category})` : '', seats })
-              : t('res.assignN', { q: q.quantity, cat: q.category, n: chosen.length })}
-          </div>
-          {q.note && <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-900">Anforderung: {q.note}</p>}
-          {avail.isLoading ? (
-            <p className="text-sm text-slate-500">{t('res.searching')}</p>
-          ) : byPersons ? (
-            freeSeats < q.persons && (
-              <p className="rounded bg-red-50 px-2 py-1 text-sm text-red-800">
-                {t('res.onlySeats', { free: freeSeats, n: q.persons })}
-              </p>
-            )
-          ) : free.length < q.quantity ? (
-            <p className="rounded bg-red-50 px-2 py-1 text-sm text-red-800">
-              {t('res.onlyN', { free: free.length, n: q.quantity, cat: q.category })}
-            </p>
-          ) : null}
-          <div className="grid gap-1 sm:grid-cols-2">
-            {free.map((r) => (
-              <label key={r.id} className={`flex items-start gap-2 rounded border px-2 py-1 text-sm ${chosen.includes(r.id) ? 'border-zs-blue bg-blue-50' : 'border-slate-200'}`}>
-                <input type="checkbox" className="mt-1" checked={chosen.includes(r.id)} onChange={() => toggle(r.id)} />
-                <span>
-                  {r.name} {r.seats > 0 && <span className="text-xs text-slate-500">{t('res.seatsShort', { n: r.seats })}</span>} <OwnerBadge r={r} />
-                  {r.description && <span className="block text-xs text-slate-500">{r.description}</span>}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-      <TextArea value={note} onChange={(e) => setNote(e.target.value)} placeholder={status === 'BEWILLIGT' ? t('res.noteApprove') : t('res.noteDecline')} />
-    </Modal>
-  );
-}
-
 
 /** Resources of the Kp (own and shared) over the days of the WK. */
 function Belegungsplan({

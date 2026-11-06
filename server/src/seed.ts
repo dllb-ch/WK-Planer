@@ -304,6 +304,13 @@ export async function seedDemo(db: DB) {
     await res('RAUM', 'Theoriesaal 1 MZH', '40 Pers.');
     await res('RAUM', 'Theoriesaal BSA Bühl', '25 Pers.');
     const kies = await res('GELAENDE', 'Kieswerk', '', [[47.2418, 7.6395], [47.2425, 7.644], [47.24, 7.6452], [47.2393, 7.6405]], 'Zufahrt über Werkstrasse');
+    await db.prepare('UPDATE resource SET points = ? WHERE id = ?').run(
+      JSON.stringify([
+        { lat: 47.2421, lng: 7.6398, label: 'Zufahrt Werkstrasse' },
+        { lat: 47.2405, lng: 7.6435, label: 'Sammelplatz' },
+      ]),
+      kies,
+    );
     await res('GELAENDE', 'Werkhof Vorplatz', '', [[47.2338, 7.656], [47.2342, 7.6575], [47.2333, 7.658], [47.233, 7.6565]]);
     await res('GELAENDE', 'Aareufer Wangen (Übungsraum AQUA)', '', [[47.2365, 7.648], [47.2372, 7.653], [47.236, 7.6535], [47.2355, 7.6485]]);
     const reqIns = db.prepare(
