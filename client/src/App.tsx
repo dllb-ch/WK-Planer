@@ -20,6 +20,7 @@ import { BibliothekPage } from './pages/BibliothekPage';
 import { CheckInPage } from './pages/CheckInPage';
 import { ProfilPage } from './pages/ProfilPage';
 import { useT } from './i18n';
+import { LangMenu } from './components/LangSwitch';
 
 export function App() {
   // The QR check-in works without login.
@@ -102,21 +103,21 @@ function TopBar() {
   useEffect(() => setMenu(false), [loc.pathname]);
   const nav = useNav();
   const active = nav.find((n) => isIn(n, loc.pathname));
-  const pill = (on: boolean) => `rounded-full px-3 py-1.5 text-sm transition ${on ? 'bg-slate-200/80 font-semibold text-slate-900' : 'text-zs-blue hover:bg-slate-200/60'}`;
+  const pill = (on: boolean) => `whitespace-nowrap rounded-full px-3 py-1.5 text-sm transition ${on ? 'bg-slate-200/80 font-semibold text-slate-900' : 'text-zs-blue hover:bg-slate-200/60'}`;
   const sub = ({ isActive }: { isActive: boolean }) =>
     `rounded-full px-3 py-1 text-sm transition ${isActive ? 'bg-zs-blue font-semibold text-white' : 'text-zs-blue hover:bg-slate-200/60'}`;
 
   return (
     <header className="material hairline-b no-print relative z-30 pt-[env(safe-area-inset-top)]">
       <div className="flex h-[52px] items-center gap-3 px-3 sm:px-4">
-        <NavLink to="/" className="flex items-center gap-2 font-semibold text-slate-900">
+        <NavLink to="/" className="flex shrink-0 items-center gap-2 whitespace-nowrap font-semibold text-slate-900">
           <svg viewBox="0 0 32 32" className="h-6 w-6" aria-hidden>
             <circle cx="16" cy="16" r="15" fill="#f97316" />
             <path d="M16 6 L26 24 H6 Z" fill="#1e3a8a" />
           </svg>
           WK-Planer
         </NavLink>
-        <nav className="hidden gap-1 md:flex">
+        <nav className="hidden gap-1 lg:flex">
           {nav.map((n) => (
             <NavLink key={n.label} to={n.to} end={n.end} className={() => pill(n === active)} aria-haspopup={n.subs ? 'true' : undefined}>
               {n.label}
@@ -125,12 +126,13 @@ function TopBar() {
           ))}
         </nav>
         <span className="flex-1" />
+        <LangMenu />
         <AccountMenu />
-        <button className="hidden rounded-full px-3 py-1.5 text-sm text-zs-blue hover:bg-slate-200/60 md:block" onClick={logout}>
+        <button className="hidden whitespace-nowrap rounded-full px-3 py-1.5 text-sm text-zs-blue hover:bg-slate-200/60 lg:block" onClick={logout}>
           {t('nav.logout')}
         </button>
         <button
-          className="grid h-8 w-8 place-items-center rounded-full text-lg text-zs-blue hover:bg-slate-200/60 md:hidden"
+          className="grid h-8 w-8 place-items-center rounded-full text-lg text-zs-blue hover:bg-slate-200/60 lg:hidden"
           onClick={() => setMenu(!menu)}
           aria-expanded={menu}
           aria-label={t('nav.menu')}
@@ -149,7 +151,7 @@ function TopBar() {
         </nav>
       )}
       {menu && (
-        <nav className="material-menu anim-pop absolute right-2 top-[calc(52px+env(safe-area-inset-top))] z-50 mt-1 flex min-w-[15rem] flex-col gap-0.5 rounded-xl p-[5px] md:hidden">
+        <nav className="material-menu anim-pop absolute right-2 top-[calc(52px+env(safe-area-inset-top))] z-50 mt-1 flex min-w-[15rem] flex-col gap-0.5 rounded-xl p-[5px] lg:hidden">
           {nav.map((n) =>
             n.subs ? (
               <div key={n.label} className="flex flex-col gap-0.5">
@@ -211,16 +213,16 @@ function AccountMenu() {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="menu"
-        title={accounts.length ? t('nav.switchAccount') : t('nav.account')}
+        title={`${me.name} · ${t(`role.${me.role}`)}\n${accounts.length ? t('nav.switchAccount') : t('nav.account')}`}
       >
         <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-b from-slate-400 to-slate-500 text-xs font-semibold text-white" aria-hidden>
           {initials(me.name)}
         </span>
-        <span className="hidden text-left text-xs leading-tight sm:block">
+        <span className="hidden whitespace-nowrap text-left text-xs leading-tight sm:block lg:hidden xl:block">
           <span className="block font-medium text-slate-900">{me.name}</span>
           <span className="block text-slate-500">{t(`role.${me.role}`)}</span>
         </span>
-        <span className="hidden text-[10px] text-slate-400 sm:inline" aria-hidden>
+        <span className="hidden text-[10px] text-slate-400 sm:inline lg:hidden xl:inline" aria-hidden>
           ▾
         </span>
       </button>
