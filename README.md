@@ -15,6 +15,7 @@
 ![Node.js](https://img.shields.io/badge/Node.js-5fa04e?logo=nodedotjs&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169e1?logo=postgresql&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-installierbar-5a0fc8?logo=pwa&logoColor=white)
+![Sprachen](https://img.shields.io/badge/Sprachen-DE_·_FR_·_IT_·_EN-ff9500)
 
 [Funktionen](#funktionen) · [Schnellstart](#schnellstart) · [Installation](INSTALL.md) · [Handbuch](docs/handbuch.md)
 
@@ -36,8 +37,8 @@ planen gleichzeitig, jede Rolle mit ihren eigenen Rechten:
 |:---:|:---:|:---:|:---:|:---:|
 | Ausbildungsbefehl, Jahresplanung, Freigabe | WK-Konzept, Arbeitsprogramm, Personal | Logistik, Anfragen für Fahrzeuge und Räume | Programm des eigenen Zugs, Lektionen | Eigenes Programm lesen |
 
-Läuft im Browser auf Computer, Tablet und Handy, lässt sich als App installieren und funktioniert im hellen und
-dunklen Modus.
+Läuft im Browser auf Computer, Tablet und Handy, lässt sich als App installieren, funktioniert im hellen und
+dunklen Modus und spricht Deutsch, Französisch, Italienisch und Englisch.
 
 > [!TIP]
 > **[Demo im Browser ausprobieren →](https://dllb-ch.github.io/WK-Planer/)** – ohne Installation und ohne Konto:
@@ -118,6 +119,17 @@ grossen Bedienelementen.
 </tr>
 </table>
 
+### 🌐 Deutsch, Français, Italiano, English
+
+Die ganze Oberfläche gibt es in vier Sprachen, mit den Begriffen der Unterlagen des BABS (z. B. WK / CR / CR, Kp Kdt /
+cdt cp / cdt cp). Jedes Konto wählt seine Sprache unter «Mein Konto»; Anmeldung und Check-in lassen sich direkt
+umschalten, sodass Teilnehmende in ihrer Sprache einchecken.
+
+- Ausdrucke wie Dossier und Tagesbefehl erscheinen in der Sprache der druckenden Person
+- Meldungen des Servers, Traktanden und Vorlagen folgen ebenfalls der gewählten Sprache
+- Eingegebene Inhalte bleiben, wie sie erfasst wurden
+- Die verwendeten Begriffe stehen im [Glossar](docs/glossar.md)
+
 ### Ausserdem
 
 <table>
@@ -194,6 +206,7 @@ Bataillon, Kompanien und Züge, Konten, Ressourcen und Karte – in wenigen Minu
 - **Client:** React 18, TypeScript, Vite, TanStack Query, Tailwind CSS; installierbar als PWA
 - **Server:** Node.js, Express, zod, PostgreSQL (oder PGlite)
 - **Gemeinsam:** Typen und Berechtigungen in `shared/` – die Rechte werden im Server geprüft und im Client gespiegelt
+- **Sprachen:** typisierte Kataloge in `shared/i18n/` (de, fr, it, en); ein Test prüft, dass jede Sprache jeden Text hat
 
 ```
 client/   Oberfläche (Planer: client/src/features/arbeitsprogramm/)
