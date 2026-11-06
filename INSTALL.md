@@ -1,5 +1,7 @@
 # Installation und Betrieb
 
+**Deutsch** · [Français](INSTALL.fr.md) · [Italiano](INSTALL.it.md) · [English](INSTALL.en.md)
+
 - [Ausprobieren mit Docker](#ausprobieren-mit-docker)
 - [Entwicklung](#entwicklung)
 - [Erste Einrichtung](#erste-einrichtung)
@@ -75,6 +77,9 @@ Eine leere Installation zeigt statt der Anmeldung einen Assistenten, der die Org
 Danach ist man als Bat Kommando angemeldet; der Vorbereitungs-Zeitplan wird mit der Standardvorlage angelegt. Alles
 Weitere (Gruppen, Kader, Log Of, Geländeflächen, eigene Vorlagen) folgt unter «Organisation». Statt der eigenen
 Organisation lässt sich auch die Demo laden. Sobald ein Konto besteht, ist die Einrichtung gesperrt.
+
+Der Assistent erscheint in der Sprache des Browsers; Standardtexte (Vorbereitungs-Zeitplan, Traktanden der Rapporte)
+werden in dieser Sprache angelegt.
 
 Ist eine leere Installation öffentlich erreichbar, sollte `SETUP_TOKEN` gesetzt sein: Der Assistent fragt dann nach
 diesem Code, damit niemand anderes die Installation zuerst einrichtet.

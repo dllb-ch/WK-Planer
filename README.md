@@ -6,6 +6,8 @@
 
 **Wiederholungskurse im Schweizer Zivilschutz planen – vom Ausbildungsbefehl bis zum Check-in.**
 
+**Deutsch** · [Français](README.fr.md) · [Italiano](README.it.md) · [English](README.en.md)
+
 [![Demo](https://img.shields.io/badge/Demo-im_Browser_öffnen-007aff?style=for-the-badge)](https://dllb-ch.github.io/WK-Planer/)
 &nbsp;
 [![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-34c759?style=for-the-badge)](LICENSE)
